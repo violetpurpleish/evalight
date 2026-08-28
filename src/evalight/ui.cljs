@@ -268,7 +268,7 @@
    [:header.pane-head
     [:span "Files"]
     [:div.tree-tools
-     [:button.tiny {:on {:click [:new-file-dialog]}} (icons/plus) "File"]
+     [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
      [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]]]
    (file-tree state)])
 

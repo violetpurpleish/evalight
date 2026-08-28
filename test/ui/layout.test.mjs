@@ -169,6 +169,30 @@ try {
     check(`file op "${b.label}" is large enough to click`, b.box.width >= 16 && b.box.height >= 16);
   }
 
+  const toolAlign = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll(".tree-tools .tiny")]
+      .find((el) => el.textContent.trim() === "File");
+    if (!btn) return { missing: true };
+    const br = btn.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(btn);
+    const tr = range.getBoundingClientRect();
+    return {
+      dx: (tr.left + tr.right) / 2 - (br.left + br.right) / 2,
+      dy: (tr.top + tr.bottom) / 2 - (br.top + br.bottom) / 2,
+      hasSvg: Boolean(btn.querySelector("svg")),
+    };
+  });
+  check("File tool button is present", !toolAlign.missing);
+  if (!toolAlign.missing) {
+    check("File tool has no leading icon", !toolAlign.hasSvg);
+    check(
+      "File label is centered in its pill",
+      Math.abs(toolAlign.dx) <= 1.5 && Math.abs(toolAlign.dy) <= 1.5,
+      `dx=${toolAlign.dx.toFixed(2)} dy=${toolAlign.dy.toFixed(2)}`
+    );
+  }
+
   const project = await page.evaluate(() => {
     const wrap = document.querySelector(".project");
     const select = document.querySelector("#project-select, .project select");

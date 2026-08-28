@@ -109,9 +109,22 @@ code, pre { font-family: var(--mono); }
 .icon-btn svg, .ghost svg, .primary svg { width: 1rem; height: 1rem; }
 .small { padding: 0.2rem 0.55rem; font-size: 0.78rem; }
 .tiny {
-  padding: 0.15rem 0.45rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 0.28em 0.65em 0.32em;
   font-size: 0.7rem;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--muted);
+}
+.tree-tools .tiny {
+  min-height: 1.5rem;
+}
+.tiny svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  display: block;
+  flex: none;
 }
 .tree-ops .tiny {
   padding: 0.18rem;
