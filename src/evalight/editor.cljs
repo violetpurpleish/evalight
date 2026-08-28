@@ -188,6 +188,13 @@
     :markdown (.markdown lang-md)
     nil))
 
+(defn- completion-keymap []
+  (.highest cm-state/Prec
+           (.of view/keymap
+                #js [#js {:key "Ctrl-Space" :run ac/startCompletion}
+                     #js {:key "Ctrl-." :run ac/startCompletion}
+                     #js {:key "Alt-/" :run ac/startCompletion}])))
+
 (defn- clojure-exts [on-eval]
   (flatten-exts
    [(.-default_extensions clj-mode)
@@ -196,9 +203,10 @@
     (eval-keymap on-eval)
     (ac/autocompletion #js {:override #js [complete-source]
                             :activateOnTyping true
-                            :activateOnTypingDelay 120
+                            :activateOnTypingDelay 80
                             :aboveCursor true
                             :icons true})
+    (completion-keymap)
     (.of view/keymap ac/completionKeymap)
     (view/hoverTooltip hover-source #js {:hoverTime 380})
     (.parinferExtension parinfer)]))

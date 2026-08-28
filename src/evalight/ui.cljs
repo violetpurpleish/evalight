@@ -97,6 +97,7 @@
     (shortcut ["Ctrl" "Shift" "Enter"] "Evaluate the top-level form")
     (shortcut ["Alt" "Enter"] "Evaluate the whole file")
     (shortcut ["Ctrl" "Space"] "Completions from the live preview")
+    (shortcut ["Ctrl" "."] "Completions, if Ctrl-Space is taken")
     (shortcut ["Tab"] "Parinfer follows indentation")]
    [:p.muted "Hover a symbol in the editor for its docstring. Completions come from the running preview, the same image the REPL talks to."]
    [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. The files are yours to edit."]

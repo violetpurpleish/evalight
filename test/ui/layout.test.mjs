@@ -553,41 +553,46 @@ try {
   await page.keyboard.up("Control");
   await page.keyboard.press("Enter");
   await page.keyboard.type("bum");
-  await page.keyboard.down("Control");
-  await page.keyboard.press("Space");
-  await page.keyboard.up("Control");
+  const completionVisible = () => {
+    const tip = document.querySelector(".cm-tooltip-autocomplete");
+    if (!tip) return false;
+    const r = tip.getBoundingClientRect();
+    const x = r.left + Math.min(24, r.width / 2);
+    const y = r.top + Math.min(12, r.height / 2);
+    const hit = document.elementFromPoint(x, y);
+    return (
+      r.top > 0 &&
+      r.bottom < window.innerHeight &&
+      r.width > 16 &&
+      r.height > 8 &&
+      hit &&
+      tip.contains(hit) &&
+      /bump/i.test(tip.textContent)
+    );
+  };
   try {
-    await page.waitForFunction(() => {
-      const tip = document.querySelector(".cm-tooltip-autocomplete");
-      if (!tip) return false;
-      const r = tip.getBoundingClientRect();
-      const x = r.left + Math.min(24, r.width / 2);
-      const y = r.top + Math.min(12, r.height / 2);
-      const hit = document.elementFromPoint(x, y);
-      return (
-        r.top > 0 &&
-        r.bottom < window.innerHeight &&
-        r.width > 16 &&
-        r.height > 8 &&
-        hit &&
-        tip.contains(hit) &&
-        /bump/i.test(tip.textContent)
-      );
-    }, { timeout: 8000 });
-  } catch (err) {
-    const dump = await page.evaluate(() => {
-      const tip = document.querySelector(".cm-tooltip-autocomplete");
-      const r = tip?.getBoundingClientRect();
-      return {
-        file: document.querySelector(".file-path")?.textContent,
-        tooltip: Boolean(document.querySelector(".cm-tooltip")),
-        inEditor: Boolean(tip?.closest(".cm-editor")),
-        text: tip?.textContent,
-        cm: document.querySelector(".cm-content")?.innerText?.slice(-80),
-        rect: r ? { w: r.width, h: r.height, top: r.top } : null,
-      };
-    });
-    throw new Error(`Completions did not appear: ${JSON.stringify(dump)}`);
+    await page.waitForFunction(completionVisible, { timeout: 2500 });
+  } catch {
+    await page.keyboard.down("Control");
+    await page.keyboard.press("Period");
+    await page.keyboard.up("Control");
+    try {
+      await page.waitForFunction(completionVisible, { timeout: 8000 });
+    } catch (err) {
+      const dump = await page.evaluate(() => {
+        const tip = document.querySelector(".cm-tooltip-autocomplete");
+        const r = tip?.getBoundingClientRect();
+        return {
+          file: document.querySelector(".file-path")?.textContent,
+          tooltip: Boolean(document.querySelector(".cm-tooltip")),
+          inEditor: Boolean(tip?.closest(".cm-editor")),
+          text: tip?.textContent,
+          cm: document.querySelector(".cm-content")?.innerText?.slice(-80),
+          rect: r ? { w: r.width, h: r.height, top: r.top } : null,
+        };
+      });
+      throw new Error(`Completions did not appear: ${JSON.stringify(dump)}`);
+    }
   }
   const labels = await page.$$eval(".cm-tooltip-autocomplete li", (els) =>
     els.map((e) => e.textContent)

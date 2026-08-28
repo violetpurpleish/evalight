@@ -138,9 +138,25 @@ function effectivelyEnabled(tr) {
     return (enabled(tr.startState) ||
         (aSetConfigEffect && aSetConfigEffect.value.enabled));
 }
+function insertedIdentifierChar(tr) {
+    if (!tr.docChanged) return false;
+    if (!(tr.isUserEvent("input.type") || tr.isUserEvent("input.type.compose")))
+        return false;
+    let ok = true;
+    let count = 0;
+    let text = "";
+    tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+        count++;
+        text = typeof inserted === "string" ? inserted : inserted.toString();
+        if (fromA !== toA || text.length !== 1) ok = false;
+    });
+    return ok && count === 1 && /^[A-Za-z0-9*!?+\-_$<>/]$/.test(text);
+}
+
 function needToApplyParinfer(tr) {
-    return effectivelyEnabled(tr) &&
-        (tr.docChanged || tr.isUserEvent("select"));
+    if (!effectivelyEnabled(tr)) return false;
+    if (insertedIdentifierChar(tr)) return false;
+    return tr.docChanged || tr.isUserEvent("select");
 }
 function parinferTransactionFilter(initialConfig) {
     return EditorState.transactionFilter.of(tr => {
