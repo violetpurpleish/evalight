@@ -7,7 +7,7 @@
          :projects []
          :project nil
          :tree []
-         :expanded #{"src" "public" "src/app"}
+         :expanded #{"src" "public" "src/app" "src/ui" "public/css"}
          :active-file nil
          :dirty #{}
          :repl {:ns "app.core"

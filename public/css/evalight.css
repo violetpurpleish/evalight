@@ -15,6 +15,18 @@
   --sans: "Figtree", "Source Sans 3", system-ui, sans-serif;
   --serif: "Fraunces", Georgia, serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --ui-fg: var(--text);
+  --ui-bg: var(--panel-2);
+  --ui-muted: var(--muted);
+  --ui-line: var(--line);
+  --ui-accent: var(--gold);
+  --ui-accent-fg: #1a1408;
+  --ui-danger: var(--ember);
+  --ui-danger-fg: #fff;
+  --ui-overlay: rgba(8, 6, 4, 0.55);
+  --ui-shadow: var(--shadow);
+  --ui-font: var(--sans);
+  --ui-serif: var(--serif);
 }
 
 * { box-sizing: border-box; }
@@ -481,6 +493,25 @@ kbd {
   padding: 0.55rem 0.7rem;
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 0.4rem; }
+
+.kit-list {
+  list-style: none;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.kit-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+}
+.kit-list li:first-child { border-top: 0; padding-top: 0; }
+.kit-title { font-weight: 600; }
+.kit-list .muted { margin: 0.15rem 0 0; font-size: 0.8rem; }
+.kit-list .ui-btn { flex: none; margin-left: auto; }
 
 .toast {
   position: fixed;

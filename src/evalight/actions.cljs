@@ -6,6 +6,7 @@
             [evalight.fs.http :as http-fs]
             [evalight.fs.opfs :as opfs]
             [evalight.paths :as paths]
+            [evalight.kit :as kit]
             [evalight.preview :as preview]
             [evalight.promise :as p]
             [evalight.state :as state]
@@ -332,6 +333,50 @@
              (disj s path)
              (conj s path)))))
 
+(defn- write-kit-files! [fs files]
+  (p/reduce-p
+   (fn [acc {:keys [path content]}]
+     (-> (fs/exists? fs path)
+         (.then (fn [exists]
+                  (if exists
+                    (conj acc :exists)
+                    (.then (fs/write-file fs path content)
+                           (fn [_] (conj acc path))))))))
+   []
+   files))
+
+(defn- ensure-ui-css-listed! [fs]
+  (-> (fs/exists? fs "evalight.edn")
+      (.then (fn [exists]
+               (if-not exists
+                 nil
+                 (.then (fs/read-file fs "evalight.edn")
+                        (fn [text]
+                          (fs/write-file fs "evalight.edn"
+                                         (kit/with-ui-css text)))))))))
+
+(defn add-ui-component!
+  "Copy a kit control (and its deps) into the open project."
+  [id]
+  (let [item (kit/by-id id)
+        files (kit/files-for id)
+        fs (now-fs)]
+    (if-not (and item (seq files))
+      (p/ok (flash! "Unknown control." :err))
+      (-> (write-kit-files! fs files)
+          (.then (fn [acc]
+                   (.then (ensure-ui-css-listed! fs)
+                          (fn [_] acc))))
+          (.then (fn [acc]
+                   (swap! state/app assoc :dialog nil)
+                   (swap! state/app update :expanded conj "src" "src/ui" "public" "public/css")
+                   (.then (refresh-tree!)
+                          (fn [_]
+                            (schedule-live-reload!)
+                            (if (every? #{:exists} acc)
+                              (flash! (str (:title item) " is already in this project."))
+                              (flash! (str "Added " (:title item))))))))))))
+
 (defn set-dialog! [dialog]
   (swap! state/app assoc :dialog dialog))
 
@@ -498,6 +543,8 @@
       :delete-project-dialog (set-dialog! {:kind :delete-project
                                             :name (:project @state/app)
                                             :last? (= 1 (count (:projects @state/app)))})
+      :add-ui-dialog (set-dialog! {:kind :add-ui})
+      :add-ui (catch-ui (add-ui-component! (first args)))
       :close-dialog (close-dialog!)
       :toggle-help (toggle-help!)
       :toggle-live (toggle-live!)

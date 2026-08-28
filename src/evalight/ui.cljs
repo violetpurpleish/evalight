@@ -2,8 +2,12 @@
   (:require [evalight.actions :as actions]
             [evalight.editor :as editor]
             [evalight.icons :as icons]
+            [evalight.kit :as kit]
             [evalight.preview :as preview]
-            [evalight.state :as state]))
+            [evalight.state :as state]
+            [ui.button :as btn]
+            [ui.dialog :as ui-dialog]
+            [ui.input :as ui-input]))
 
 (defn- dirty? [state path]
   (contains? (:dirty state) path))
@@ -95,89 +99,101 @@
     (shortcut ["Ctrl" "Space"] "Completions from the live preview")
     (shortcut ["Tab"] "Parinfer follows indentation")]
    [:p.muted "Hover a symbol in the editor for its docstring. Completions come from the running preview, the same image the REPL talks to."]
+   [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. The files are yours to edit."]
    [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a normal zip of those files — the same tree you would open locally."]])
 
 (defn dialog [{:keys [kind value path] :as d}]
-  [:div.modal-backdrop {:on {:click [:close-dialog]}}
-   [:form.modal
-    {:on {:click (fn [e] (.stopPropagation e))
-          :submit (case kind
-                    :new-file [:submit-new-file]
-                    :new-folder [:submit-new-folder]
-                    :new-project [:submit-new-project]
-                    :rename [:submit-rename]
-                    :delete [:confirm-delete]
-                    :delete-project [:confirm-delete-project])}}
-    (case kind
-      :new-file
-      [:div
-       [:h2 "New file"]
-       [:p.muted "Path relative to the project root."]
-       [:input {:name "path"
-                :value value
-                :replicant/on-mount (fn [{:keys [replicant/node]}]
-                                      (.focus node)
-                                      (.select node))}]
-       [:div.modal-actions
-        [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
-        [:button.primary {:type "submit"} "Create"]]]
+  (if (= kind :add-ui)
+    (ui-dialog/dialog {:on-close [:close-dialog] :title "Add UI"}
+      [:p.muted "Each control is a ClojureScript file. Adding one copies it into this project, with anything it needs."]
+      [:ul.kit-list
+       (for [{:keys [id title blurb]} kit/catalog]
+         [:li {:replicant/key id}
+          [:div
+           [:div.kit-title title]
+           [:p.muted blurb]]
+          (btn/button {:size :sm :on {:click [:add-ui id]}} "Add")])]
+      (ui-dialog/actions
+       (btn/button {:on {:click [:close-dialog]}} "Done")))
+    (ui-dialog/dialog {:on-close [:close-dialog]}
+      [:form
+       {:on {:submit (case kind
+                       :new-file [:submit-new-file]
+                       :new-folder [:submit-new-folder]
+                       :new-project [:submit-new-project]
+                       :rename [:submit-rename]
+                       :delete [:confirm-delete]
+                       :delete-project [:confirm-delete-project])}}
+       (case kind
+         :new-file
+         [:div
+          [:h2.ui-dialog-title "New file"]
+          [:p.muted "Path relative to the project root."]
+          (ui-input/input {:name "path"
+                           :value value
+                           :replicant/on-mount (fn [{:keys [replicant/node]}]
+                                                 (.focus node)
+                                                 (.select node))})
+          (ui-dialog/actions
+           (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
+           (btn/button {:variant :primary :class "primary" :type "submit"} "Create"))]
 
-      :new-folder
-      [:div
-       [:h2 "New folder"]
-       [:input {:name "path"
-                :value value
-                :replicant/on-mount (fn [{:keys [replicant/node]}]
-                                      (.focus node))}]
-       [:div.modal-actions
-        [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
-        [:button.primary {:type "submit"} "Create"]]]
+         :new-folder
+         [:div
+          [:h2.ui-dialog-title "New folder"]
+          (ui-input/input {:name "path"
+                           :value value
+                           :replicant/on-mount (fn [{:keys [replicant/node]}]
+                                                 (.focus node))})
+          (ui-dialog/actions
+           (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
+           (btn/button {:variant :primary :class "primary" :type "submit"} "Create"))]
 
-      :new-project
-      [:div
-       [:h2 "New project"]
-       [:p.muted "A fresh ClojureScript project stored in this browser."]
-       [:input {:name "name"
-                :placeholder "amber-counter"
-                :value value
-                :replicant/on-mount (fn [{:keys [replicant/node]}]
-                                      (.focus node))}]
-       [:div.modal-actions
-        [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
-        [:button.primary {:type "submit"} "Create"]]]
+         :new-project
+         [:div
+          [:h2.ui-dialog-title "New project"]
+          [:p.muted "A fresh ClojureScript project stored in this browser."]
+          (ui-input/input {:name "name"
+                           :placeholder "amber-counter"
+                           :value value
+                           :replicant/on-mount (fn [{:keys [replicant/node]}]
+                                                 (.focus node))})
+          (ui-dialog/actions
+           (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
+           (btn/button {:variant :primary :class "primary" :type "submit"} "Create"))]
 
-      :rename
-      [:div
-       [:h2 "Rename"]
-       [:input {:name "path"
-                :value value
-                :replicant/on-mount (fn [{:keys [replicant/node]}]
-                                      (.focus node)
-                                      (.select node))}]
-       [:div.modal-actions
-        [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
-        [:button.primary {:type "submit"} "Rename"]]]
+         :rename
+         [:div
+          [:h2.ui-dialog-title "Rename"]
+          (ui-input/input {:name "path"
+                           :value value
+                           :replicant/on-mount (fn [{:keys [replicant/node]}]
+                                                 (.focus node)
+                                                 (.select node))})
+          (ui-dialog/actions
+           (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
+           (btn/button {:variant :primary :class "primary" :type "submit"} "Rename"))]
 
-      :delete
-      [:div
-       [:h2 "Delete"]
-       [:p "Delete " [:code path] "? This cannot be undone."]
-       [:div.modal-actions
-        [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
-        [:button.danger {:type "submit"} "Delete"]]]
+         :delete
+         [:div
+          [:h2.ui-dialog-title "Delete"]
+          [:p "Delete " [:code path] "? This cannot be undone."]
+          (ui-dialog/actions
+           (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
+           (btn/button {:variant :danger :class "danger" :type "submit"} "Delete"))]
 
-      :delete-project
-      [:div
-       [:h2 "Delete project"]
-       [:p "Delete " [:code (:name d)] " from this browser? The files are gone for good."]
-       (when (:last? d)
-         [:p.muted "This is the only project, so a new lamp will take its place."])
-       [:div.modal-actions
-        [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
-        [:button.danger {:type "submit"
-                         :replicant/on-mount (fn [{:keys [replicant/node]}]
-                                               (.focus node))}
-         "Delete project"]]])]])
+         :delete-project
+         [:div
+          [:h2.ui-dialog-title "Delete project"]
+          [:p "Delete " [:code (:name d)] " from this browser? The files are gone for good."]
+          (when (:last? d)
+            [:p.muted "This is the only project, so a new lamp will take its place."])
+          (ui-dialog/actions
+           (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
+           (btn/button {:variant :danger :class "danger" :type "submit"
+                        :replicant/on-mount (fn [{:keys [replicant/node]}]
+                                              (.focus node))}
+                       "Delete project"))])])))
 
 (defn repl-pane [{:keys [repl]}]
   [:section.repl {:replicant/key "repl-pane"}
@@ -315,6 +331,7 @@
       [:div.tree-tools
        [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
        [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]
+       [:button.tiny {:on {:click [:add-ui-dialog]}} "UI"]
        [:button.icon-btn.pane-hide
         {:on {:click [:toggle-files]}
          :title "Hide files"

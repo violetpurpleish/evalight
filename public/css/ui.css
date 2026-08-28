@@ -1,0 +1,167 @@
+/* Kit styles. Tokens live on :root so a project can retheme without
+   editing every control. Evalight's chrome and the lamp template both
+   set these variables. */
+
+:root {
+  --ui-fg: CanvasText;
+  --ui-bg: Canvas;
+  --ui-muted: GrayText;
+  --ui-line: ButtonBorder;
+  --ui-accent: Highlight;
+  --ui-accent-fg: HighlightText;
+  --ui-danger: tomato;
+  --ui-danger-fg: #fff;
+  --ui-overlay: rgba(0, 0, 0, 0.45);
+  --ui-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  --ui-font: inherit;
+  --ui-serif: inherit;
+  --ui-radius: 10px;
+  --ui-radius-full: 999px;
+}
+
+.ui-btn {
+  font: inherit;
+  font-family: var(--ui-font);
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--ui-radius-full);
+  border: 1px solid var(--ui-line);
+  background: transparent;
+  padding: 0.4rem 0.85rem;
+  line-height: 1.2;
+}
+.ui-btn:hover { border-color: var(--ui-accent); }
+.ui-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ui-btn-primary {
+  background: var(--ui-accent);
+  color: var(--ui-accent-fg);
+  border-color: var(--ui-accent);
+  font-weight: 600;
+}
+.ui-btn-primary:hover { filter: brightness(1.05); }
+.ui-btn-danger {
+  background: var(--ui-danger);
+  color: var(--ui-danger-fg);
+  border-color: var(--ui-danger);
+}
+.ui-btn-icon { padding: 0.38rem; }
+.ui-btn-icon svg { width: 1rem; height: 1rem; display: block; }
+.ui-btn-sm { padding: 0.22rem 0.6rem; font-size: 0.82rem; }
+.ui-btn-lg { padding: 0.55rem 1.1rem; font-size: 1.02rem; }
+.ui-btn svg { width: 1rem; height: 1rem; }
+
+.ui-input,
+.ui-textarea,
+.ui-select {
+  font: inherit;
+  font-family: var(--ui-font);
+  color: inherit;
+  width: 100%;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  padding: 0.5rem 0.7rem;
+}
+.ui-input:focus,
+.ui-textarea:focus,
+.ui-select:focus {
+  outline: none;
+  border-color: var(--ui-accent);
+}
+.ui-textarea { min-height: 5rem; resize: vertical; }
+.ui-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23888' stroke-width='1.7' stroke-linecap='round'><path d='M3 4.5 6 8l3-3.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 0.75rem;
+  padding-right: 1.7rem;
+}
+
+.ui-field { display: grid; gap: 0.3rem; }
+.ui-field-label { font-size: 0.82rem; color: var(--ui-muted); }
+.ui-field-hint { font-size: 0.78rem; color: var(--ui-muted); }
+.ui-field-hint.is-error { color: var(--ui-danger); }
+
+.ui-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--ui-overlay);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+  padding: 1rem;
+}
+.ui-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-line);
+  border-radius: 16px;
+  padding: 1.1rem;
+  box-shadow: var(--ui-shadow);
+}
+.ui-dialog-title {
+  font-family: var(--ui-serif);
+  font-size: 1.2rem;
+  font-weight: 560;
+  margin: 0 0 0.5rem;
+}
+.ui-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+
+.ui-popover { position: relative; display: inline-flex; }
+.ui-popover-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+}
+.ui-popover-panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 19;
+  min-width: 14rem;
+  max-width: 22rem;
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  border: 1px solid var(--ui-line);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: var(--ui-shadow);
+}
+.ui-popover-panel.is-end { left: auto; right: 0; }
+
+.ui-split {
+  display: flex;
+  min-width: 0;
+  min-height: 8rem;
+  overflow: hidden;
+}
+.ui-split.is-col { flex-direction: column; }
+.ui-split-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  flex: 1 1 0;
+}
+.ui-split-handle {
+  flex: 0 0 6px;
+  background: var(--ui-line);
+  cursor: col-resize;
+  position: relative;
+}
+.ui-split.is-col .ui-split-handle { cursor: row-resize; }
+.ui-split-handle:hover,
+.ui-split-handle:focus {
+  background: var(--ui-accent);
+}

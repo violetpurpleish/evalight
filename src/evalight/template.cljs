@@ -1,10 +1,11 @@
-(ns evalight.template)
+(ns evalight.template
+  (:require [evalight.kit :as kit]))
 
 (defn evalight-edn [project-name]
   (str "{:name " (pr-str project-name) "\n"
        " :main app.core\n"
        " :src-paths [\"src\"]\n"
-       " :preview {:css [\"public/style.css\"]}}\n"))
+       " :preview {:css [\"public/css/ui.css\" \"public/style.css\"]}}\n"))
 
 (defn package-json [project-name]
   (str "{\n"
@@ -44,6 +45,10 @@
        "The files in this zip are a normal project directory. They are not an\n"
        "Evalight-specific storage format. You can keep editing them in the browser,\n"
        "or extract this archive and continue locally.\n\n"
+       "Controls under `src/ui` are ordinary ClojureScript. They are not an\n"
+       "installed package. Edit a button, delete a popover, or copy another\n"
+       "control from Evalight's **Add UI** dialog. The same files run in the\n"
+       "browser preview (SCI) and in a local shadow-cljs build.\n\n"
        "## Run the app locally\n\n"
        "Install [Bun](https://bun.sh) and a JDK, then:\n\n"
        "```sh\n"
@@ -72,6 +77,7 @@
        "  <meta charset=\"utf-8\">\n"
        "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
        "  <title>" project-name "</title>\n"
+       "  <link rel=\"stylesheet\" href=\"/css/ui.css\">\n"
        "  <link rel=\"stylesheet\" href=\"/style.css\">\n"
        "</head>\n"
        "<body>\n"
@@ -87,11 +93,23 @@
        "  --gold: #c4922a;\n"
        "  --muted: #7a6a52;\n"
        "  --line: #e0d4b8;\n"
+       "  --ui-fg: var(--ink);\n"
+       "  --ui-bg: #fffaf0;\n"
+       "  --ui-muted: var(--muted);\n"
+       "  --ui-line: var(--line);\n"
+       "  --ui-accent: var(--gold);\n"
+       "  --ui-accent-fg: #1c1610;\n"
+       "  --ui-danger: #c44b2a;\n"
+       "  --ui-danger-fg: #fff;\n"
+       "  --ui-overlay: rgba(28, 22, 16, 0.4);\n"
+       "  --ui-shadow: 0 18px 50px rgba(28, 22, 16, 0.18);\n"
+       "  --ui-font: \"Figtree\", \"Source Sans 3\", system-ui, sans-serif;\n"
+       "  --ui-serif: \"Fraunces\", Georgia, serif;\n"
        "}\n\n"
        "* { box-sizing: border-box; }\n"
        "html, body { margin: 0; height: 100%; }\n"
        "body {\n"
-       "  font-family: \"Figtree\", \"Source Sans 3\", system-ui, sans-serif;\n"
+       "  font-family: var(--ui-font);\n"
        "  background: radial-gradient(1200px 600px at 20% -10%, #fff6e3, var(--paper));\n"
        "  color: var(--ink);\n"
        "}\n"
@@ -104,8 +122,9 @@
        "  color: var(--gold);\n"
        "  margin: 0 0 0.6rem;\n"
        "}\n"
-       "h1 { font-family: \"Fraunces\", Georgia, serif; font-weight: 560; font-size: 2.4rem; margin: 0 0 0.6rem; }\n"
+       "h1 { font-family: var(--ui-serif); font-weight: 560; font-size: 2.4rem; margin: 0 0 0.6rem; }\n"
        ".lede { color: var(--muted); line-height: 1.5; margin: 0 0 1.8rem; }\n"
+       ".toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0 0 1.25rem; }\n"
        ".lamp {\n"
        "  display: flex; align-items: center; gap: 1rem;\n"
        "  border: 1px solid var(--line);\n"
@@ -116,7 +135,8 @@
        "  font: inherit;\n"
        "  color: inherit;\n"
        "}\n"
-       ".lamp:hover { border-color: var(--gold); }\n"
+       ".ui-btn.lamp { background: #fffaf0; color: var(--ink); font-weight: 500; }\n"
+       ".lamp:hover, .ui-btn.lamp:hover { border-color: var(--gold); }\n"
        ".count {\n"
        "  width: 2.4rem; height: 2.4rem; border-radius: 999px;\n"
        "  display: grid; place-items: center;\n"
@@ -129,6 +149,7 @@
        "  border-top: 1px solid var(--line);\n"
        "  color: var(--muted);\n"
        "}\n"
+       ".about-copy { margin: 0; color: var(--muted); line-height: 1.45; font-size: 0.9rem; }\n"
        "code { font-family: \"IBM Plex Mono\", ui-monospace, monospace; font-size: 0.92em; color: var(--ink); }\n"))
 
 (defn greet-cljs []
@@ -141,21 +162,40 @@
 (defn core-cljs [project-name]
   (str "(ns app.core\n"
        "  (:require [app.greet :as greet]\n"
-       "            [replicant.dom :as r]))\n\n"
+       "            [replicant.dom :as r]\n"
+       "            [ui.button :as btn]\n"
+       "            [ui.dialog :as dialog]\n"
+       "            [ui.field :as field]\n"
+       "            [ui.input :as input]\n"
+       "            [ui.popover :as popover]))\n\n"
        "(defonce store\n"
        "  (atom {:title " (pr-str (str "Lamp · " project-name)) "\n"
        "         :count 0\n"
+       "         :about? false\n"
+       "         :rename? false\n"
        "         :notes [\"Edit src/app/core.cljs — the preview follows.\"\n"
        "                 \"Evaluate (bump) in the REPL to touch the live app.\"\n"
-       "                 \"Parinfer will keep the parentheses on your side.\"]}))\n\n"
-       "(defn view [{:keys [title count notes]}]\n"
+       "                 \"The controls live in src/ui. Change them, or delete a file you don't want.\"]}))\n\n"
+       "(defn view [{:keys [title count notes about? rename?]}]\n"
        "  [:div.app\n"
        "   [:p.eyebrow \"Live ClojureScript\"]\n"
        "   [:h1 title]\n"
        "   [:p.lede (greet/greet \"Evalight\") \" This page is the running program, not a build artifact.\"]\n"
-       "   [:button.lamp {:on {:click (fn [_e] (bump))}}\n"
-       "    [:span.count (str count)]\n"
-       "    [:span \"Light another lamp\"]]\n"
+       "   [:div.toolbar\n"
+       "    (btn/button {:class \"lamp\" :on {:click (fn [_e] (bump))}}\n"
+       "      [:span.count (str count)]\n"
+       "      \"Light another lamp\")\n"
+       "    (popover/popover {:open? about? :on-close (fn [_e] (toggle-about false))}\n"
+       "      (btn/button {:on {:click (fn [_e] (toggle-about))}} \"About the kit\")\n"
+       "      [:p.about-copy \"src/ui is copied into this project. Evalight's Add UI dialog can put a control back if you delete it.\"])\n"
+       "    (btn/button {:on {:click (fn [_e] (open-rename))}} \"Rename\")]\n"
+       "   (dialog/dialog {:open? rename? :on-close (fn [_e] (close-rename)) :title \"Rename the lamp\"}\n"
+       "     [:form {:on {:submit (fn [e] (save-title e))}}\n"
+       "      (field/field {:label \"Title\" :hint \"Shown in the heading.\"}\n"
+       "        (input/input {:name \"title\" :value title}))\n"
+       "      (dialog/actions\n"
+       "        (btn/button {:type \"button\" :on {:click (fn [_e] (close-rename))}} \"Cancel\")\n"
+       "        (btn/button {:variant :primary :type \"submit\"} \"Save\"))])\n"
        "   [:ul.notes\n"
        "    (for [n notes]\n"
        "      [:li n])]])\n\n"
@@ -168,6 +208,33 @@
        "  (swap! store update :count inc)\n"
        "  (render)\n"
        "  (:count @store))\n\n"
+       "(defn toggle-about\n"
+       "  \"Show or hide the kit popover. Pass false to close.\"\n"
+       "  ([] (toggle-about (not (:about? @store))))\n"
+       "  ([open?]\n"
+       "   (swap! store assoc :about? (boolean open?))\n"
+       "   (render)))\n\n"
+       "(defn open-rename\n"
+       "  \"Open the title dialog.\"\n"
+       "  []\n"
+       "  (swap! store assoc :rename? true)\n"
+       "  (render))\n\n"
+       "(defn close-rename\n"
+       "  \"Close the title dialog.\"\n"
+       "  []\n"
+       "  (swap! store assoc :rename? false)\n"
+       "  (render))\n\n"
+       "(defn save-title\n"
+       "  \"Read the rename form and set the heading.\"\n"
+       "  [e]\n"
+       "  (let [ev (or (and (map? e) (:replicant/dom-event e)) e)\n"
+       "        form (when ev (.-target ev))\n"
+       "        field (when form (.querySelector form \"input[name=title]\"))\n"
+       "        s (if field (.-value field) \"\")]\n"
+       "    (when ev (.preventDefault ev))\n"
+       "    (retitle s)\n"
+       "    (close-rename)\n"
+       "    s))\n\n"
        "(defn retitle [s]\n"
        "  (swap! store assoc :title s)\n"
        "  (render)\n"
@@ -180,12 +247,14 @@
   "Return an ordered map of relative path -> content for a new project."
   [project-name]
   (let [name (or (not-empty project-name) "lamp")]
-    {"evalight.edn" (evalight-edn name)
-     "package.json" (package-json name)
-     "shadow-cljs.edn" (shadow-cljs-edn)
-     ".gitignore" (gitignore)
-     "README.md" (readme name)
-     "public/index.html" (public-html name)
-     "public/style.css" (public-css)
-     "src/app/greet.cljs" (greet-cljs)
-     "src/app/core.cljs" (core-cljs name)}))
+    (merge
+     kit/sources
+     {"evalight.edn" (evalight-edn name)
+      "package.json" (package-json name)
+      "shadow-cljs.edn" (shadow-cljs-edn)
+      ".gitignore" (gitignore)
+      "README.md" (readme name)
+      "public/index.html" (public-html name)
+      "public/style.css" (public-css)
+      "src/app/greet.cljs" (greet-cljs)
+      "src/app/core.cljs" (core-cljs name)})))

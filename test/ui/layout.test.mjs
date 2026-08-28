@@ -119,7 +119,9 @@ try {
   };
   step("index.html", "public");
   step("app", "src");
+  step("ui", "src");
   step("core.cljs", "app");
+  step("button.cljs", "ui");
   step("core.cljs", "src", 28);
   if (Number.isFinite(indent[".gitignore"]) && Number.isFinite(indent.public)) {
     check(
@@ -192,6 +194,28 @@ try {
       `dx=${toolAlign.dx.toFixed(2)} dy=${toolAlign.dy.toFixed(2)}`
     );
   }
+
+  await page.evaluate(() => {
+    [...document.querySelectorAll(".tree-tools .tiny")]
+      .find((el) => el.textContent.trim() === "UI")
+      ?.click();
+  });
+  await page.waitForSelector(".ui-dialog", { timeout: 4000 });
+  const kitDialog = await page.evaluate(() => {
+    const panel = document.querySelector(".ui-dialog");
+    return {
+      title: panel?.querySelector("h2")?.textContent ?? "",
+      items: [...panel.querySelectorAll(".kit-title")].map((el) => el.textContent),
+    };
+  });
+  check("Add UI dialog title", kitDialog.title === "Add UI", kitDialog.title);
+  check("Add UI lists Button", kitDialog.items.includes("Button"), kitDialog.items.join(", "));
+  check("Add UI lists Split", kitDialog.items.includes("Split"), kitDialog.items.join(", "));
+  await page.evaluate(() => {
+    const buttons = [...document.querySelectorAll(".ui-dialog .ui-btn")];
+    buttons.find((b) => b.textContent.trim() === "Done")?.click();
+  });
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
 
   const project = await page.evaluate(() => {
     const wrap = document.querySelector(".project");
@@ -452,13 +476,13 @@ try {
   const currentProject = await page.$eval("#project-select", (el) => el.value);
   check("delete project button is present", Boolean(await page.$("button[aria-label='Delete project']")));
   await page.click("button[aria-label='Delete project']");
-  await page.waitForSelector(".modal", { timeout: 4000 });
+  await page.waitForSelector(".ui-dialog", { timeout: 4000 });
   const deleteDialog = await page.evaluate(() => {
-    const modal = document.querySelector(".modal");
+    const modal = document.querySelector(".ui-dialog");
     return {
       title: modal?.querySelector("h2")?.textContent ?? "",
       text: modal?.innerText ?? "",
-      confirm: modal?.querySelector("button.danger")?.textContent?.trim() ?? "",
+      confirm: modal?.querySelector(".ui-btn-danger")?.textContent?.trim() ?? "",
     };
   });
   check("delete project dialog title", deleteDialog.title === "Delete project", deleteDialog.title);
@@ -468,8 +492,8 @@ try {
     deleteDialog.text.slice(0, 300)
   );
   check("delete project confirm is a danger button", deleteDialog.confirm === "Delete project", deleteDialog.confirm);
-  await page.click(".modal button.ghost");
-  await page.waitForSelector(".modal", { hidden: true, timeout: 4000 });
+  await page.click(".ui-dialog .ui-btn-ghost");
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
   const afterCancel = await page.$eval("#project-select", (el) => el.value);
   check("cancel keeps the current project", afterCancel === currentProject, afterCancel);
 
@@ -477,10 +501,10 @@ try {
     const btn = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "New project");
     btn?.click();
   });
-  await page.waitForSelector(".modal input[name=name]", { timeout: 4000 });
-  await page.focus(".modal input[name=name]");
+  await page.waitForSelector(".ui-dialog input[name=name]", { timeout: 4000 });
+  await page.focus(".ui-dialog input[name=name]");
   await page.keyboard.type("doomed");
-  await page.click(".modal button.primary");
+  await page.click(".ui-dialog .ui-btn-primary");
   await page.waitForFunction(
     () => [...document.querySelectorAll("#project-select option")].some((o) => o.value === "doomed"),
     { timeout: 15000 }
@@ -491,11 +515,11 @@ try {
   );
 
   await page.click("button[aria-label='Delete project']");
-  await page.waitForSelector(".modal button.danger", { timeout: 4000 });
-  await page.click(".modal button.danger");
+  await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
+  await page.click(".ui-dialog .ui-btn-danger");
   await page.waitForFunction(
     () =>
-      !document.querySelector(".modal") &&
+      !document.querySelector(".ui-dialog") &&
       document.querySelector("#project-select")?.value !== "doomed" &&
       ![...document.querySelectorAll("#project-select option")].some((o) => o.value === "doomed"),
     { timeout: 15000 }

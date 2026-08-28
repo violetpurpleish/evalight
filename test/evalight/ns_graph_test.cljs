@@ -37,9 +37,9 @@
 (deftest lamp-template-declares-forward-refs
   (let [src (template/core-cljs "lamp")
         out (ns-graph/with-forward-refs src)]
-    (is (= '[store view render bump retitle init]
+    (is (= '[store view render bump toggle-about open-rename close-rename save-title retitle init]
            (ns-graph/top-level-defs src)))
-    (is (re-find #"\(declare store view render bump retitle init\)" out))))
+    (is (re-find #"\(declare store view render bump toggle-about open-rename close-rename save-title retitle init\)" out))))
 
 (deftest load-order-puts-dependencies-first
   (let [files [{:path "src/app/core.cljs"

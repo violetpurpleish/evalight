@@ -44,6 +44,7 @@ A first visit creates a `lamp` project in the [Origin Private File System](https
 - Drag the divider between Files, the editor, and Preview to resize the columns. Double-click a divider to restore its default width. The header can hide Files or Preview, and each of those panes has the same control. Hiding Preview keeps the iframe loaded, so the REPL still talks to the running program.
 - **Delete project** removes the current browser project after a confirmation. Local mode has no such button, because that folder is yours on disk.
 - Ctrl-Space asks the live preview for completions. Hover a symbol to see its docstring and arglists. Both come from the running program, not a separate language server.
+- **Add UI** in the Files pane copies a Replicant control into `src/ui`. Those files are source, not a package. Edit them, or delete the ones you do not want. New projects already include the kit.
 - **Export ZIP** downloads the project tree as it exists on disk.
 
 Try `(bump)` in the REPL after the lamp preview has loaded.
@@ -95,4 +96,4 @@ That compiles the ClojureScript unit tests, then opens the workshop in headless 
 
 `bun run test:ui` runs only the Chrome pass. It serves `public/` itself, so the IDE must already be compiled (`bun run dev` or `bun run release`). Point it at a running server with `EVALIGHT_URL=http://127.0.0.1:48721 bun run test:ui`.
 
-The workshop UI is handwritten CSS on [Replicant](https://github.com/cjohansen/replicant). There is no React and no component library. File actions, the help popover, and the project picker are ordinary DOM plus CSS, which is why the layout tests measure bounding boxes instead of asserting against a design system.
+The workshop UI is Replicant plus a small kit in `src/ui` (button, dialog, popover, split, and so on). The same files are copied into new projects. There is no React and no installable widget package. File actions, the help panel, and the project picker are still measured in layout tests as ordinary DOM.
