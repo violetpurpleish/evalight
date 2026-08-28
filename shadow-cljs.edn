@@ -3,7 +3,6 @@
  [[no.cjohansen/replicant "2026.07.1"]
   [org.babashka/sci "0.15.58"]]
  :nrepl {:port 7888}
- :dev-http {48721 "public"}
  :node-modules {:managed-by :bun}
  :builds
  {:app

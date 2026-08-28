@@ -15,7 +15,7 @@ bun install
 bun run dev
 ```
 
-Then open [http://127.0.0.1:48721](http://127.0.0.1:48721).
+Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts shadow-cljs in watch mode and serves the UI from `public/`.
 
 | Script | What it does |
 | --- | --- |

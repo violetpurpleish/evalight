@@ -5,7 +5,8 @@
   "description": "A small live ClojureScript environment that starts in the browser.",
   "packageManager": "bun@1.4.0",
   "scripts": {
-    "dev": "shadow-cljs watch app preview",
+    "dev": "bun scripts/dev.mjs",
+    "watch": "shadow-cljs watch app preview",
     "release": "shadow-cljs release app preview",
     "local": "bun scripts/local-server.mjs",
     "test": "shadow-cljs compile test && bun out/node-tests.js"
