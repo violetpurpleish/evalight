@@ -97,7 +97,7 @@
              (.of view/keymap
                   #js [#js {:key "Mod-Enter" :run run-cursor :shift run-top}
                        #js {:key "Ctrl-Enter" :run run-cursor :shift run-top}
-                       #js {:key "Alt-Enter" :run run-cell}])))))
+                       #js {:key "Alt-Enter" :run run-cell}]))))
 
 (defn- lang-ext [lang]
   (case lang
