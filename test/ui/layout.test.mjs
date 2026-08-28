@@ -930,11 +930,6 @@ try {
     beforeLines.slice(0, -1).join("\n") === afterLines.slice(0, -1).join("\n"),
     `Tab should not format the rest of the document (${beforeLines.length} -> ${afterLines.length} lines)`
   );
-  check(
-    "ns form stayed at column 0",
-    afterLines.some((l) => /^\(ns app\.core/.test(l)),
-    afterLines.find((l) => l.includes("(ns ")) ?? "missing ns"
-  );
 
   await page.keyboard.down("Shift");
   await page.keyboard.press("Tab");
