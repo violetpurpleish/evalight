@@ -196,6 +196,8 @@
     (eval-keymap on-eval)
     (ac/autocompletion #js {:override #js [complete-source]
                             :activateOnTyping true
+                            :activateOnTypingDelay 120
+                            :aboveCursor true
                             :icons true})
     (.of view/keymap ac/completionKeymap)
     (view/hoverTooltip hover-source #js {:hoverTime 380})
@@ -211,6 +213,8 @@
       (view/highlightActiveLineGutter)
       (view/drawSelection)
       (view/tooltips #js {:parent (.-body js/document)})
+      (.of (.-scrollMargins view/EditorView)
+           (fn [_] #js {:top 12 :bottom 48}))
       (language/foldGutter)
       (language/syntaxHighlighting highlight-style #js {:fallback true})
       (.of view/keymap (.-historyKeymap commands))
