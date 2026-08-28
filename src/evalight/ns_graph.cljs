@@ -31,6 +31,110 @@
       {:name (second form)
        :requires (ns-require-names form)})))
 
+(def ^:private def-ops #{'def 'defonce 'defn 'defn-})
+
+(defn read-forms
+  "Read every top-level form. Returns [] if the source is not readable."
+  [source]
+  (try
+    (vec (reader/read-string (str "[\n" source "\n]")))
+    (catch :default _
+      [])))
+
+(def ^:private def-head
+  "Top-level def/defn/defonce. defn- before defn, defonce before def."
+  #"(?m)^\s*\((?:defn-|defn|defonce|def)\s+(?:\^[^\s]+\s+)*([A-Za-z*!?+\-_$<>][\w*!?+\-_$<>]*)")
+
+(defn- scan-def-names [source]
+  (->> (re-seq def-head (or source ""))
+       (mapv (comp symbol second))))
+
+(defn top-level-defs
+  "Symbols interned by top-level def/defn/defonce forms.
+  Prefers the reader, then a line scan. cljs.reader cannot read
+  js/document.getElementById, which the lamp template uses."
+  [source]
+  (let [read (into []
+                   (keep (fn [form]
+                           (when (and (seq? form)
+                                      (contains? def-ops (first form))
+                                      (symbol? (second form)))
+                             (second form))))
+                   (read-forms source))]
+    (if (seq read)
+      read
+      (scan-def-names source))))
+
+(defn- matching-paren-end
+  "Index after the list that starts at `start`, or nil."
+  [s start]
+  (when (and (string? s) (< start (count s)) (= \( (nth s start)))
+    (let [n (count s)]
+      (loop [i start
+             depth 0
+             str? false
+             esc? false
+             comment? false]
+        (if (>= i n)
+          nil
+          (let [c (nth s i)]
+            (cond
+              comment?
+              (recur (inc i) depth false false
+                     (not (or (= c \newline) (= c \return))))
+
+              (and str? esc?)
+              (recur (inc i) depth true false false)
+
+              (and str? (= c \\))
+              (recur (inc i) depth true true false)
+
+              (and str? (= c \"))
+              (recur (inc i) depth false false false)
+
+              str?
+              (recur (inc i) depth true false false)
+
+              (= c \;)
+              (recur (inc i) depth false false true)
+
+              (= c \")
+              (recur (inc i) depth true false false)
+
+              (= c \()
+              (recur (inc i) (inc depth) false false false)
+
+              (= c \))
+              (let [d (dec depth)]
+                (if (zero? d)
+                  (inc i)
+                  (recur (inc i) d false false false)))
+
+              :else
+              (recur (inc i) depth false false false))))))))
+
+(defn- ns-form-end
+  "Index after the first (ns ...) form, or nil."
+  [source]
+  (let [idx (or (str/index-of source "(ns ")
+                (str/index-of source "(ns\n")
+                (str/index-of source "(ns\t"))]
+    (when idx
+      (matching-paren-end source idx))))
+
+(defn with-forward-refs
+  "Insert (declare ...) after the ns form so SCI can resolve names the
+  ClojureScript compiler would intern before emitting the file."
+  [source]
+  (let [names (top-level-defs source)]
+    (if (empty? names)
+      source
+      (if-let [cut (ns-form-end source)]
+        (str (subs source 0 cut)
+             "\n\n(declare " (str/join " " names) ")\n"
+             (subs source cut))
+        (str "(declare " (str/join " " names) ")\n" source)))))
+
 (defn- path->ns-guess [path]
   (when (re-find #"\.(cljs?|cljc)$" (or path ""))
     (let [no-ext (str/replace path #"\.(cljs?|cljc)$" "")

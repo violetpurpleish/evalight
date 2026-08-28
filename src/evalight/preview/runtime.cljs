@@ -1,6 +1,7 @@
 (ns evalight.preview.runtime
   (:require [cljs.pprint :as pprint]
             [clojure.string :as str]
+            [evalight.ns-graph :as ns-graph]
             [replicant.dom :as r]
             [sci.core :as sci]))
 
@@ -70,7 +71,7 @@
   (let [ctx (ensure-ctx)]
     (try
       (doseq [{:keys [source path]} files]
-        (let [result (eval-string ctx source)]
+        (let [result (eval-string ctx (ns-graph/with-forward-refs source))]
           (when-not (:ok result)
             (throw (ex-info (str "Error in " path ": "
                                  (get-in result [:error :message]))
@@ -107,7 +108,11 @@
 
       :evalight/eval
       (let [ctx (ensure-ctx)
-            result (eval-string ctx (:code data))
+            ns-sym @!main
+            code (if ns-sym
+                   (str "(in-ns '" ns-sym ")\n" (:code data))
+                   (:code data))
+            result (eval-string ctx code)
             payload (cond-> {:type "evalight/result"
                               :id (:id data)
                               :ok (:ok result)

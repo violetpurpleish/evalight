@@ -160,7 +160,7 @@
        (set! (.-scrollTop node) (.-scrollHeight node)))}
     (if (seq (:entries repl))
       (for [{:keys [id kind text]} (:entries repl)]
-        [:div {:replicant/key id :class (str "repl-line is-" (name kind))}
+        [:div {:replicant/key id :class ["repl-line" (str "is-" (name kind))]}
          [:span.gutter (case kind :in "›" :err "!" "=")]
          [:pre text]])
       [:p.muted.empty "Evaluate a form with Ctrl-Enter. Results come from the live preview, so (bump) will move the lamp."])]
