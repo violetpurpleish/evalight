@@ -37,6 +37,9 @@ Bun.serve({
   hostname: "0.0.0.0",
   async fetch(req) {
     const url = new URL(req.url);
+    if (url.pathname === "/api/meta") {
+      return Response.json({ mode: "browser" });
+    }
     const rel = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.slice(1));
     const file = Bun.file(join(UI_ROOT, rel));
     if (await file.exists()) {

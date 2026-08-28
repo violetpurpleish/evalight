@@ -10,7 +10,17 @@
    :output-dir "public/js"
    :asset-path "/js"
    :modules {:main {:init-fn evalight.core/init}}
-   :devtools {:preloads []}}
+   :devtools {:preloads []}
+   :js-options
+   {:resolve
+    {"@codemirror/state" {:target :npm :require "@codemirror/state"}
+     "@codemirror/view" {:target :npm :require "@codemirror/view"}
+     "@codemirror/language" {:target :npm :require "@codemirror/language"}
+     "@codemirror/commands" {:target :npm :require "@codemirror/commands"}
+     "@codemirror/search" {:target :npm :require "@codemirror/search"}
+     "@codemirror/lint" {:target :npm :require "@codemirror/lint"}
+     "@lezer/common" {:target :npm :require "@lezer/common"}
+     "@lezer/highlight" {:target :npm :require "@lezer/highlight"}}}}
 
   :preview
   {:target :browser

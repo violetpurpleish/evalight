@@ -10,3 +10,4 @@ out/
 .calva/
 .clj-kondo/.cache
 .lsp/.cache
+agent-tools/

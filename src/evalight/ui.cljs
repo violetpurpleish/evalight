@@ -8,6 +8,17 @@
 (defn- dirty? [state path]
   (contains? (:dirty state) path))
 
+(defn- editor-mount [{:keys [replicant/node]}]
+  (editor/create! node)
+  (when-let [path (:active-file @state/app)]
+    (actions/open-file! path)))
+
+(defn- editor-unmount [_]
+  (editor/destroy!))
+
+(defn- preview-mount [{:keys [replicant/node]}]
+  (preview/attach! node actions/on-preview-event))
+
 (defn- file-row [state {:keys [path name]}]
   [:div.tree-row
    [:button.tree-item
@@ -138,7 +149,7 @@
         [:button.danger {:type "submit"} "Delete"]]])]])
 
 (defn repl-pane [{:keys [repl]}]
-  [:section.repl
+  [:section.repl {:replicant/key "repl-pane"}
    [:header.pane-head
     [:span "REPL"]
     [:span.ns (:ns repl)]
@@ -153,15 +164,16 @@
          [:span.gutter (case kind :in "›" :err "!" "=")]
          [:pre text]])
       [:p.muted.empty "Evaluate a form with Ctrl-Enter. Results come from the live preview, so (bump) will move the lamp."])]
-   [:form.repl-input {:on {:submit [:submit-repl]}}
+   [:form.repl-input
+    {:replicant/key "repl-form"
+     :on {:submit [:submit-repl]}}
     [:span.gutter "›"]
     [:input {:type "text"
              :name "expr"
-             :value (:input repl)
              :placeholder "(bump)"
              :autocomplete "off"
              :spellcheck "false"
-             :on {:input [:set-repl-input]}}]]])
+             :replicant/key "repl-expr"}]]])
 
 (defn preview-pane [{:keys [preview]}]
   [:section.preview
@@ -178,9 +190,8 @@
     [:iframe {:src "/preview.html"
               :sandbox "allow-scripts"
               :title "Live application preview"
-              :replicant/on-mount
-              (fn [{:keys [replicant/node]}]
-                (preview/attach! node actions/on-preview-event))}]]])
+              :replicant/key "preview-frame"
+              :replicant/on-mount preview-mount}]]])
 
 (defn editor-pane [state]
   [:section.editor
@@ -191,13 +202,8 @@
    (if (:active-file state)
      [:div.editor-host
       {:replicant/key "editor-host"
-       :replicant/on-mount
-       (fn [{:keys [replicant/node]}]
-         (editor/create! node)
-         (when-let [path (:active-file @state/app)]
-           (actions/open-file! path)))
-       :replicant/on-unmount
-       (fn [_] (editor/destroy!))}]
+       :replicant/on-mount editor-mount
+       :replicant/on-unmount editor-unmount}]
      [:div.empty-editor
       [:p "Open a file from the tree, or create one."]
       [:button.primary {:on {:click [:new-file-dialog]}} "New file"]])])

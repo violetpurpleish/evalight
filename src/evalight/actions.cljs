@@ -312,14 +312,10 @@
 (defn set-mobile-tab! [tab]
   (swap! state/app assoc :mobile-tab tab))
 
-(defn set-repl-input! [text]
-  (swap! state/app assoc-in [:repl :input] text))
-
-(defn submit-repl! []
-  (let [code (str/trim (or (get-in @state/app [:repl :input]) ""))]
+(defn submit-repl! [code]
+  (let [code (str/trim (or code ""))]
     (if (seq code)
-      (do (swap! state/app assoc-in [:repl :input] "")
-          (eval-code! code :repl))
+      (eval-code! code :repl)
       (p/ok nil))))
 
 (defn clear-repl! []
@@ -358,9 +354,14 @@
       :toggle-help (toggle-help!)
       :toggle-live (toggle-live!)
       :mobile-tab (set-mobile-tab! (first args))
-      :set-repl-input (when event
-                         (set-repl-input! (.-value (.-target event))))
-      :submit-repl (catch-ui (submit-repl!))
+      :submit-repl (when event
+                     (let [form (.-target event)
+                           input (when form (.querySelector form "input[name=expr]"))
+                           code (if input (.-value input) "")]
+                       (when input
+                         (set! (.-value input) "")
+                         (.focus input))
+                       (catch-ui (submit-repl! code))))
       :clear-repl (clear-repl!)
       :run (catch-ui (run-preview! {:reset? true}))
       :export (catch-ui (export-zip!))

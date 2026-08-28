@@ -10,7 +10,6 @@
             ["@codemirror/state" :as cm-state]
             ["@codemirror/view" :as view]
             ["@jurjanpaul/codemirror6-parinfer" :as parinfer]
-            ["@lezer/highlight" :as highlight]
             ["@nextjournal/clojure-mode" :as clj-mode]
             ["@nextjournal/clojure-mode/extensions/eval-region" :as eval-region]
             [evalight.paths :as paths]))
@@ -67,7 +66,9 @@
     (letfn [(walk [x]
               (cond
                 (nil? x) nil
-                (or (array? x) (sequential? x)) (doseq [y x] (walk y))
+                (array? x) (dotimes [i (alength x)] (walk (aget x i)))
+                (vector? x) (doseq [y x] (walk y))
+                (list? x) (doseq [y x] (walk y))
                 :else (.push out x)))]
       (walk xs)
       out)))
@@ -94,9 +95,9 @@
                    true)]
     (.highest cm-state/Prec
              (.of view/keymap
-                  (clj->js [{:key "Mod-Enter" :run run-cursor :shift run-top}
-                            {:key "Ctrl-Enter" :run run-cursor :shift run-top}
-                            {:key "Alt-Enter" :run run-cell}])))))
+                  #js [#js {:key "Mod-Enter" :run run-cursor :shift run-top}
+                       #js {:key "Ctrl-Enter" :run run-cursor :shift run-top}
+                       #js {:key "Alt-Enter" :run run-cell}])))))
 
 (defn- lang-ext [lang]
   (case lang
@@ -111,7 +112,7 @@
   (flatten-exts
    [(.-default_extensions clj-mode)
     (.of view/keymap (.-complete_keymap clj-mode))
-    (.extension eval-region (clj->js {:modifier (eval-modifier)}))
+    (.extension eval-region #js {:modifier (eval-modifier)})
     (eval-keymap on-eval)
     (.parinferExtension parinfer)]))
 
@@ -136,10 +137,10 @@
 (defn- make-state [path content]
   (let [{:keys [on-change on-eval]} @!handlers]
     (.create cm-state/EditorState
-             (clj->js {:doc (or content "")
-                       :extensions (extensions {:path path
-                                               :on-change on-change
-                                               :on-eval on-eval})}))))
+             #js {:doc (or content "")
+                  :extensions (extensions {:path path
+                                            :on-change on-change
+                                            :on-eval on-eval})})))
 
 (defn set-handlers! [handlers]
   (reset! !handlers handlers))
@@ -155,10 +156,14 @@
   (when-let [^js old @!view]
     (.destroy old)
     (reset! !view nil))
-  (let [state (make-state (or @!path "untitled.cljs") "")
-        v (view/EditorView. (clj->js {:state state :parent el}))]
-    (reset! !view v)
-    v))
+  (try
+    (let [state (make-state (or @!path "untitled.cljs") "")
+          v (view/EditorView. #js {:state state :parent el})]
+      (reset! !view v)
+      v)
+    (catch :default e
+      (js/console.error "CodeMirror failed to start" e)
+      nil)))
 
 (defn destroy! []
   (when-let [^js v @!view]

@@ -11,8 +11,7 @@
          :active-file nil
          :dirty #{}
          :repl {:ns "app.core"
-                :entries []
-                :input ""}
+                :entries []}
          :preview {:status :idle
                    :error nil
                    :live? true}
