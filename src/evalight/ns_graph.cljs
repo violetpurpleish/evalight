@@ -38,7 +38,7 @@
          :aliases (into {}
                         (keep (fn [{:keys [name as]}]
                                 (when as [as name]))
-                              specs))})))))
+                              specs))}))))
 
 (def ^:private def-ops #{'def 'defonce 'defn 'defn-})
 

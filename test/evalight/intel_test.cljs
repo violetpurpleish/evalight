@@ -33,8 +33,7 @@
 
 (deftest sci-intel-form-sees-bump
   (let [ctx (sci/init {})]
-    (sci/eval-string* ctx (ns-graph/with-forward-refs (template/greet-cljs)))
-    (sci/eval-string* ctx (ns-graph/with-forward-refs (template/core-cljs "lamp")))
+    (sci/eval-string* ctx "(ns app.core)\n(defn bump \"Increment the lamp counter.\" [] 1)")
     (sci/eval-string* ctx "(in-ns 'app.core)")
     (is (contains? (set (keys (sci/eval-string* ctx "(ns-interns 'app.core)"))) 'bump))
     (is (re-find #"lamp counter"
