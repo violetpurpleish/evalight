@@ -273,15 +273,15 @@ try {
       ?.click();
   });
   await page.waitForSelector(".ui-dialog .kit-list", { timeout: 4000 });
-  const afterDelete = await page.evaluate(() => {
+  const afterKitDelete = await page.evaluate(() => {
     const rows = [...document.querySelectorAll(".kit-list li")].map((li) => ({
       title: li.querySelector(".kit-title")?.textContent ?? "",
       action: li.querySelector(".ui-btn")?.textContent?.trim() ?? "",
     }));
     return Object.fromEntries(rows.map((r) => [r.title, r.action]));
   });
-  check("deleted Split shows Add", afterDelete.Split === "Add", JSON.stringify(afterDelete));
-  check("Button stays Restore after Split is gone", afterDelete.Button === "Restore", JSON.stringify(afterDelete));
+  check("deleted Split shows Add", afterKitDelete.Split === "Add", JSON.stringify(afterKitDelete));
+  check("Button stays Restore after Split is gone", afterKitDelete.Button === "Restore", JSON.stringify(afterKitDelete));
   await page.evaluate(() => {
     [...document.querySelectorAll(".ui-dialog .ui-btn")]
       .find((b) => b.textContent.trim() === "Done")
