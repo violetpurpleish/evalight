@@ -423,6 +423,27 @@ try {
   );
   check("help close is inside the popover", within(help.close, help.panel));
 
+  const helpCopy = await page.evaluate(() => {
+    const items = [...document.querySelectorAll(".help .shortcuts li")].map((li) => ({
+      keys: [...li.querySelectorAll("kbd")].map((k) => k.textContent).join("+"),
+    }));
+    return {
+      keys: items.map((i) => i.keys),
+      text: document.querySelector(".help")?.innerText ?? "",
+    };
+  });
+  check("help lists four shortcuts", helpCopy.keys.length === 4, helpCopy.keys.join(", "));
+  check("help lists Tab", helpCopy.keys.includes("Tab"));
+  check("help lists Shift+Tab", helpCopy.keys.includes("Shift+Tab"));
+  check("help lists Enter", helpCopy.keys.includes("Enter"));
+  check("help lists Ctrl+Enter", helpCopy.keys.includes("Ctrl+Enter"));
+  check("help does not teach Ctrl-Space", !/Ctrl.?Space/.test(helpCopy.text));
+  check("help does not teach Ctrl-.", !/Ctrl.?\./.test(helpCopy.text));
+  check("help does not teach Alt-/", !/Alt.?\//.test(helpCopy.text));
+  check("help does not teach Alt-Enter", !/Alt.?Enter/.test(helpCopy.text));
+  check("help does not teach Ctrl-Shift-Enter", !/Ctrl.?Shift.?Enter/.test(helpCopy.text));
+  check("help does not teach Escape then Tab", !/Escape/.test(helpCopy.text));
+
   await page.click(".help-close");
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
@@ -762,7 +783,29 @@ try {
     !onScreen.missing && onScreen.w > 16 && onScreen.h > 8 && onScreen.hit && !onScreen.inEditor,
     JSON.stringify(onScreen)
   );
+
+  await page.keyboard.press("Tab");
+  const afterTabAccept = await page.evaluate(() => {
+    const tip = document.querySelector(".cm-tooltip-autocomplete");
+    const text = document.querySelector(".cm-content")?.innerText ?? "";
+    const lines = text.split("\n");
+    if (lines.length && lines[lines.length - 1] === "") lines.pop();
+    const last = lines.at(-1) ?? "";
+    return {
+      listOpen: Boolean(tip),
+      last,
+      hasBump: /\bbump\b/.test(last),
+    };
+  });
+  check(
+    "Tab accepts the completion while the list is showing",
+    !afterTabAccept.listOpen && afterTabAccept.hasBump,
+    JSON.stringify(afterTabAccept)
+  );
   await page.keyboard.press("Escape");
+  await page.keyboard.down("Control");
+  await page.keyboard.press("z");
+  await page.keyboard.up("Control");
   await page.keyboard.down("Control");
   await page.keyboard.press("z");
   await page.keyboard.up("Control");
@@ -936,6 +979,26 @@ try {
     "Shift-Tab dedents the current line",
     (docLines(await editorText()).at(-1) ?? "") === lastBefore,
     JSON.stringify(docLines(await editorText()).at(-1))
+  );
+
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("xyzzy-indent");
+  await page.keyboard.press("Escape");
+  const extraIndented = docLines(await editorText()).at(-1) ?? "";
+  const extraLead = extraIndented.match(/^\s*/)[0];
+  check(
+    "typed line has extra indent to keep",
+    extraLead.length > 0 && extraIndented.trim() === "xyzzy-indent",
+    JSON.stringify(extraIndented)
+  );
+  await page.keyboard.press("Enter");
+  const afterEnter = docLines(await editorText()).at(-1) ?? "";
+  check(
+    "Enter keeps this line's indent instead of snapping to the tree",
+    afterEnter === extraLead,
+    JSON.stringify({ extraIndented, afterEnter, extraLead })
   );
 
   await page.keyboard.press("Escape").catch(() => {});

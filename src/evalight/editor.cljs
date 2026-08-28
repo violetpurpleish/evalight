@@ -12,6 +12,7 @@
             ["@codemirror/view" :as view]
             ["@lezer/highlight" :as lezer-hl]
             ["./cm6_parinfer.js" :as parinfer]
+            ["./cm6_smart_indent.js" :as smart-indent]
             ["./cm6_tab_indent.js" :as tab-indent]
             ["@nextjournal/clojure-mode" :as clj-mode]
             ["@nextjournal/clojure-mode/extensions/eval-region" :as eval-region]
@@ -196,18 +197,26 @@
                      #js {:key "Ctrl-." :run ac/startCompletion}
                      #js {:key "Alt-/" :run ac/startCompletion}])))
 
-(defn- without-tab [keymap]
-  "clojure-mode binds Tab to format-all. Parinfer owns indent instead."
-  (.filter keymap (fn [^js b] (not= (.-key b) "Tab"))))
+(defn- without-format-changed-lines [exts]
+  "clojure-mode default_extensions ends with ext_format_changed_lines,
+  a transaction filter that re-indents from the tree after most edits.
+  That fights Parinfer (and undoes Tab). On 0.3.3 the filter is last."
+  (let [arr (if (array? exts) exts #js [exts])]
+    (if (>= (alength arr) 5)
+      (.slice arr 0 4)
+      arr)))
 
 (defn- tab-indent-keymap []
-  (.high cm-state/Prec
-         (.of view/keymap #js [(.-tabIndentKeymap tab-indent)])))
+  (.highest cm-state/Prec
+            (.of view/keymap (.-tabIndentKeymap tab-indent))))
 
 (defn- clojure-exts [on-eval]
+  ;; complete_keymap is paredit + enter-and-indent + format-all.
+  ;; Leave it off: Parinfer owns structure, Tab/Shift-Tab indent, and
+  ;; defaultKeymap's insertNewlineAndIndent uses the smart-indent service.
   (flatten-exts
-   [(.-default_extensions clj-mode)
-    (.of view/keymap (without-tab (.-complete_keymap clj-mode)))
+   [(without-format-changed-lines (.-default_extensions clj-mode))
+    (.clojureSmartIndentExtension smart-indent language/indentService)
     (.extension eval-region #js {:modifier (eval-modifier)})
     (eval-keymap on-eval)
     (ac/autocompletion #js {:override #js [complete-source]

@@ -1,11 +1,12 @@
 // Tab / Shift-Tab indent the current line (or selection).
-// CodeMirror's indentMore uses userEvent "input.indent", which
-// clojure-mode's format-changed-lines filter treats as "reindent from
-// the tree." That snaps the line back and Parinfer never sees the indent
-// you typed. "noformat" skips that filter; Parinfer still runs because
-// the document changed.
+// When the completion list is showing, Tab accepts the hint first
+// (VS Code-style). Shift-Tab always returns true so focus stays in
+// the editor. userEvent "noformat" is a backstop if clojure-mode's
+// format-changed-lines filter is ever reinstalled; Parinfer still
+// runs because the document changed.
 import { indentUnit, getIndentUnit, indentString } from "@codemirror/language";
 import { countColumn, EditorSelection } from "@codemirror/state";
+import { acceptCompletion } from "@codemirror/autocomplete";
 
 function changeBySelectedLine(state, f) {
   let atLine = -1;
@@ -75,11 +76,14 @@ function indentLess({ state, dispatch }) {
   return true;
 }
 
-const tabIndentKeymap = {
-  key: "Tab",
-  preventDefault: true,
-  run: indentMore,
-  shift: indentLess,
-};
+function runTab(view) {
+  if (acceptCompletion(view)) return true;
+  return indentMore(view);
+}
+
+const tabIndentKeymap = [
+  { key: "Tab", run: runTab, preventDefault: true },
+  { key: "Shift-Tab", run: indentLess, preventDefault: true },
+];
 
 export { indentLess, indentMore, tabIndentKeymap };

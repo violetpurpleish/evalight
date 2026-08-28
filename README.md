@@ -37,13 +37,13 @@ Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts
 
 A first visit creates a `lamp` project in the [Origin Private File System](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system). Closing the tab does not lose it.
 
-- Edit ClojureScript with CodeMirror 6, [clojure-mode](https://github.com/nextjournal/clojure-mode), and [Parinfer](https://github.com/jurjanpaul/codemirror6-parinfer). **Tab** and **Shift-Tab** indent or dedent the current line; Parinfer moves the parentheses to match. Escape then Tab leaves the editor.
-- **Ctrl-Enter** evaluates the form at the cursor against the live preview. **Ctrl-Shift-Enter** evaluates the top-level form. **Alt-Enter** evaluates the file.
+- Edit ClojureScript with CodeMirror 6 and [Parinfer](https://github.com/shaunlebron/parinfer) in smart mode. Type like Python: indent is what you edit, parentheses follow. **Tab** indents the current line, or accepts a completion when the list is showing. **Shift-Tab** dedents. **Enter** starts a new line at this indent so Parinfer keeps owning structure.
+- **Ctrl-Enter** evaluates the form at the cursor against the live preview.
 - In the REPL, **Enter** evaluates and **Shift-Enter** inserts a new line.
 - The preview runs in a sandboxed iframe. User code is interpreted by [SCI](https://github.com/babashka/sci), with `replicant.dom` available so the same namespaces work in the playground and in a compiled local build.
 - Drag the divider between Files, the editor, and Preview to resize the columns. Double-click a divider to restore its default width. Hide Files or Preview from that pane's header; a thin rail on that edge brings it back. Hiding Preview keeps the iframe loaded, so the REPL still talks to the running program.
 - **Delete project** removes the current browser project after a confirmation. Local mode has no such button, because that folder is yours on disk.
-- Ctrl-Space (or Ctrl-.) asks the live preview for completions. Hover a symbol to see its docstring and arglists. Both come from the running program, not a separate language server.
+- Hover a symbol to see its docstring and arglists. Completions come from the running program, not a separate language server.
 - **Add UI** in the Files pane copies a Replicant control into `src/ui`. Those files are source, not a package. If a control is already in the project, Restore writes the original file back over your edits. Delete a file you do not want. New projects already include the kit.
 - **Export ZIP** downloads the project tree as it exists on disk.
 

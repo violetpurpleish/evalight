@@ -95,17 +95,12 @@
      (icons/close)]]
    [:p "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler."]
    [:ul.shortcuts
-    (shortcut ["Enter"] "Evaluate in the REPL")
-    (shortcut ["Shift" "Enter"] "New line in the REPL")
-    (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")
-    (shortcut ["Ctrl" "Shift" "Enter"] "Evaluate the top-level form")
-    (shortcut ["Alt" "Enter"] "Evaluate the whole file")
-    (shortcut ["Ctrl" "Space"] "Completions from the live preview")
-    (shortcut ["Ctrl" "."] "Completions, if Ctrl-Space is taken")
-    (shortcut ["Tab"] "Indent this line; Parinfer moves the parentheses")
-    (shortcut ["Shift" "Tab"] "Dedent the line")]
-   [:p.muted "Escape, then Tab, moves focus out of the editor."]
-   [:p.muted "Hover a symbol in the editor for its docstring. Completions come from the running preview, the same image the REPL talks to."]
+    (shortcut ["Tab"] "Indent this line, or accept a completion when the list is showing")
+    (shortcut ["Shift" "Tab"] "Dedent. Parinfer moves the parentheses.")
+    (shortcut ["Enter"] "New line in the editor. Evaluate in the REPL.")
+    (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")]
+   [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
+   [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
    [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
    [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a normal zip of those files — the same tree you would open locally."]])
 
