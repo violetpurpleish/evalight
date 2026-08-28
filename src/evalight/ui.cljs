@@ -249,21 +249,21 @@
      {:style {:width (str w "px")
               :flex-basis (str w "px")}}
      [:header.pane-head
-      [:span "Preview"]
-      [:label.live
-       [:input {:type "checkbox"
-                :checked (boolean (:live? preview))
-                :on {:change [:toggle-live]}}]
-       "Live"]
-      (when (= :loading (:status preview))
-        [:span.muted "loading"])
-      (when (:error preview)
-        [:span.preview-error {:title (:error preview)} "error"])
       [:button.icon-btn.pane-hide
        {:on {:click [:toggle-preview-pane]}
         :title "Hide preview"
         :aria-label "Hide preview"}
-       (icons/panel-right)]]
+       (icons/panel-right)]
+      [:span "Preview"]
+      (when (= :loading (:status preview))
+        [:span.muted "loading"])
+      (when (:error preview)
+        [:span.preview-error {:title (:error preview)} "error"])
+      [:label.live
+       [:input {:type "checkbox"
+                :checked (boolean (:live? preview))
+                :on {:change [:toggle-live]}}]
+       "Live"]]
    [:div.preview-frame
     (when-let [err (:error preview)]
       [:div.preview-banner
@@ -311,18 +311,6 @@
         (for [name (:projects state)]
           [:option {:value name :replicant/key name} name])]])]
    [:nav.actions
-    [:button.icon-btn.layout-toggle
-     {:aria-pressed (boolean (get-in state [:layout :files-open?]))
-      :aria-label (if (get-in state [:layout :files-open?]) "Hide files" "Show files")
-      :title (if (get-in state [:layout :files-open?]) "Hide files" "Show files")
-      :on {:click [:toggle-files]}}
-     (icons/panel-left)]
-    [:button.icon-btn.layout-toggle
-     {:aria-pressed (boolean (get-in state [:layout :preview-open?]))
-      :aria-label (if (get-in state [:layout :preview-open?]) "Hide preview" "Show preview")
-      :title (if (get-in state [:layout :preview-open?]) "Hide preview" "Show preview")
-      :on {:click [:toggle-preview-pane]}}
-     (icons/panel-right)]
     (when (= :browser (:mode state))
       [:button.ghost {:on {:click [:new-project-dialog]}} "New project"])
     (when (= :browser (:mode state))
@@ -376,6 +364,15 @@
     [:div.toast {:class (name (:kind notice))}
      (:text notice)]))
 
+(defn- pane-rail [side]
+  (let [files? (= side :files)]
+    [:button.pane-rail
+     {:class (if files? "pane-rail-files" "pane-rail-preview")
+      :title (if files? "Show files" "Show preview")
+      :aria-label (if files? "Show files" "Show preview")
+      :on {:click (if files? [:toggle-files] [:toggle-preview-pane])}}
+     (if files? (icons/panel-left) (icons/panel-right))]))
+
 (defn- splitter [pane]
   (let [files? (= pane :files)]
     [:div.splitter
@@ -397,13 +394,15 @@
        {:class [(when-not files-open? "is-files-closed")
                 (when-not preview-open? "is-preview-closed")
                 (when dragging? "is-dragging")]}
+       (when-not files-open? (pane-rail :files))
        (sidebar state)
        (splitter :files)
        [:div.main
         (editor-pane state)
         (repl-pane state)]
        (splitter :preview)
-       (preview-pane state)]
+       (preview-pane state)
+       (when-not preview-open? (pane-rail :preview))]
       (mobile-tabs state)]
      (when (:help? state) (help-panel))
      (when (:dialog state)

@@ -41,7 +41,7 @@ A first visit creates a `lamp` project in the [Origin Private File System](https
 - **Ctrl-Enter** evaluates the form at the cursor against the live preview. **Ctrl-Shift-Enter** evaluates the top-level form. **Alt-Enter** evaluates the file.
 - In the REPL, **Enter** evaluates and **Shift-Enter** inserts a new line.
 - The preview runs in a sandboxed iframe. User code is interpreted by [SCI](https://github.com/babashka/sci), with `replicant.dom` available so the same namespaces work in the playground and in a compiled local build.
-- Drag the divider between Files, the editor, and Preview to resize the columns. Double-click a divider to restore its default width. The header can hide Files or Preview, and each of those panes has the same control. Hiding Preview keeps the iframe loaded, so the REPL still talks to the running program.
+- Drag the divider between Files, the editor, and Preview to resize the columns. Double-click a divider to restore its default width. Hide Files or Preview from that pane's header; a thin rail on that edge brings it back. Hiding Preview keeps the iframe loaded, so the REPL still talks to the running program.
 - **Delete project** removes the current browser project after a confirmation. Local mode has no such button, because that folder is yours on disk.
 - Ctrl-Space (or Ctrl-.) asks the live preview for completions. Hover a symbol to see its docstring and arglists. Both come from the running program, not a separate language server.
 - **Add UI** in the Files pane copies a Replicant control into `src/ui`. Those files are source, not a package. If a control is already in the project, Restore writes the original file back over your edits. Delete a file you do not want. New projects already include the kit.

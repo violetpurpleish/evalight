@@ -495,15 +495,17 @@ try {
     previews: document.querySelectorAll("section.preview").length,
     filesSplit: Boolean(document.querySelector(".splitter-files")),
     previewSplit: Boolean(document.querySelector(".splitter-preview")),
-    hideFiles: Boolean(document.querySelector(".layout-toggle[aria-label='Hide files']")),
-    hidePreview: Boolean(document.querySelector(".layout-toggle[aria-label='Hide preview']")),
+    hideFiles: Boolean(document.querySelector(".sidebar [aria-label='Hide files']")),
+    hidePreview: Boolean(document.querySelector("section.preview [aria-label='Hide preview']")),
+    hideInToolbar: Boolean(document.querySelector(".top [aria-label='Hide files'], .top [aria-label='Hide preview']")),
   }));
   check("files pane is a single sidebar", paneCount.sidebars === 1, `count=${paneCount.sidebars}`);
   check("preview pane is a single section", paneCount.previews === 1, `count=${paneCount.previews}`);
   check("files splitter is present", paneCount.filesSplit);
   check("preview splitter is present", paneCount.previewSplit);
-  check("header can hide files", paneCount.hideFiles);
-  check("header can hide preview", paneCount.hidePreview);
+  check("files pane can hide files", paneCount.hideFiles);
+  check("preview pane can hide preview", paneCount.hidePreview);
+  check("toolbar does not hide the sidebars", !paneCount.hideInToolbar);
 
   const filesBefore = await page.$eval(".sidebar", (el) => el.getBoundingClientRect().width);
   const filesSplit = await page.$(".splitter-files");
@@ -541,7 +543,7 @@ try {
     );
   }
 
-  await page.click(".layout-toggle[aria-label='Hide files']");
+  await page.click(".sidebar [aria-label='Hide files']");
   await page.waitForFunction(
     () => {
       const el = document.querySelector(".sidebar");
@@ -554,7 +556,7 @@ try {
     return {
       width: el ? el.offsetWidth : 0,
       display: el ? getComputedStyle(el).display : "missing",
-      canShow: Boolean(document.querySelector(".layout-toggle[aria-label='Show files']")),
+      canShow: Boolean(document.querySelector(".pane-rail[aria-label='Show files']")),
     };
   });
   check(
@@ -562,14 +564,14 @@ try {
     filesHidden.width === 0 || filesHidden.display === "none",
     JSON.stringify(filesHidden)
   );
-  check("header can show files again", filesHidden.canShow);
-  await page.click(".layout-toggle[aria-label='Show files']");
+  check("a files rail can show the pane again", filesHidden.canShow);
+  await page.click(".pane-rail[aria-label='Show files']");
   await page.waitForFunction(
     () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
   );
 
-  await page.click(".layout-toggle[aria-label='Hide preview']");
+  await page.click("section.preview [aria-label='Hide preview']");
   await page.waitForFunction(
     () => {
       const el = document.querySelector("section.preview");
@@ -584,7 +586,7 @@ try {
       width: pane ? pane.offsetWidth : 0,
       display: pane ? getComputedStyle(pane).display : "missing",
       iframe: Boolean(iframe),
-      canShow: Boolean(document.querySelector(".layout-toggle[aria-label='Show preview']")),
+      canShow: Boolean(document.querySelector(".pane-rail[aria-label='Show preview']")),
     };
   });
   check(
@@ -593,7 +595,7 @@ try {
     JSON.stringify(previewHidden)
   );
   check("preview iframe stays mounted while the pane is hidden", previewHidden.iframe);
-  check("header can show preview again", previewHidden.canShow);
+  check("a preview rail can show the pane again", previewHidden.canShow);
 
   await page.focus("textarea[name=expr]");
   await page.evaluate(() => {
@@ -612,7 +614,7 @@ try {
     (await page.$eval(".repl-log", (el) => el.innerText)).includes("42")
   );
 
-  await page.click(".layout-toggle[aria-label='Show preview']");
+  await page.click(".pane-rail[aria-label='Show preview']");
   await page.waitForFunction(
     () => (document.querySelector("section.preview")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
