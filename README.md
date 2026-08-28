@@ -1,0 +1,77 @@
+# Evalight
+
+A small, live ClojureScript environment that starts in the browser.
+
+Open the site and write ClojureScript immediately. There is no account, no project wizard, and no local toolchain required for the first session. The running preview *is* the program: evaluate a form and it talks to that live image, in the spirit of Nightlight, Lisp machines, and Smalltalk.
+
+When a project outgrows the playground, export it as a ZIP. The zip is a normal directory — source, `shadow-cljs.edn`, `package.json`, a README — not an Evalight-specific document. Extract it, then keep editing the same files either with shadow-cljs or by pointing Evalight's local mode at the folder.
+
+## Run it
+
+Evalight uses [Bun](https://bun.sh) and a JDK (for shadow-cljs).
+
+```sh
+bun install
+bun run dev
+```
+
+Then open [http://127.0.0.1:48721](http://127.0.0.1:48721).
+
+| Script | What it does |
+| --- | --- |
+| `bun run dev` | Watch-compile the IDE and the preview runtime |
+| `bun run release` | Production build into `public/js` |
+| `bun run local [dir]` | Same UI, filesystem API over a real directory |
+| `bun test` | Node tests for path/namespace helpers |
+
+## Using the workshop
+
+A first visit creates a `lamp` project in the [Origin Private File System](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system). Closing the tab does not lose it.
+
+- Edit ClojureScript with CodeMirror 6, [clojure-mode](https://github.com/nextjournal/clojure-mode), and [Parinfer](https://github.com/jurjanpaul/codemirror6-parinfer). Indentation drives the parentheses.
+- **Ctrl-Enter** evaluates the form at the cursor against the live preview. **Ctrl-Shift-Enter** evaluates the top-level form. **Alt-Enter** evaluates the file.
+- The preview runs in a sandboxed iframe. User code is interpreted by [SCI](https://github.com/babashka/sci), with `replicant.dom` available so the same namespaces work in the playground and in a compiled local build.
+- **Export ZIP** downloads the project tree as it exists on disk.
+
+Try `(bump)` in the REPL after the lamp preview has loaded.
+
+## From playground to a real project
+
+Export, unzip, then:
+
+```sh
+cd lamp
+bun install
+bun run dev
+```
+
+That compiles the app with shadow-cljs at http://localhost:3456.
+
+To keep using Evalight on those files:
+
+```sh
+# from this Evalight checkout
+bun run local /path/to/lamp
+```
+
+The UI is the same. The filesystem protocol is implemented by a tiny Bun server instead of OPFS.
+
+## Architecture
+
+One UI, two filesystem backends.
+
+```
+evalight.fs.protocol
+  ├─ evalight.fs.opfs     browser playground
+  └─ evalight.fs.http     local mode (`scripts/local-server.mjs`)
+```
+
+The rest of the application (tree, editor, preview, export) talks only to the protocol: list, read, write, mkdir, rename, delete.
+
+The preview is a second shadow-cljs build (`:preview`). It hosts an SCI interpreter and a copy of Replicant. Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
+
+## Tests
+
+```sh
+bun test
+```

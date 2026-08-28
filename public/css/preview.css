@@ -1,0 +1,16 @@
+:root {
+  --paper: #f4ecd8;
+  --ink: #1c1610;
+  --gold: #c4922a;
+  --muted: #7a6a52;
+  --line: #e0d4b8;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: "Figtree", "Source Sans 3", system-ui, sans-serif;
+  background: radial-gradient(1200px 600px at 20% -10%, #fff6e3, var(--paper));
+  color: var(--ink);
+}
+#app { min-height: 100%; }
