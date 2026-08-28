@@ -182,6 +182,27 @@ try {
       "cljs caret did not move on click",
     );
     assert.ok(afterCursor, "cljs caret should move");
+    await page.keyboard.type("QQQ");
+    const typed = await until(
+      async () => {
+        const t = await page.$eval(".cm-content", (el) => el.innerText);
+        return t.includes("QQQ") ? t : null;
+      },
+      3000,
+      "typed QQQ did not appear",
+    );
+    assert.ok(!typed.startsWith("QQQ"), "QQQ should not land at the start of the file");
+    await page.keyboard.down("Control");
+    await page.keyboard.press("z");
+    await page.keyboard.up("Control");
+    await until(
+      async () => {
+        const t = await page.$eval(".cm-content", (el) => el.innerText);
+        return t.includes("QQQ") ? null : true;
+      },
+      3000,
+      "Ctrl-Z did not undo QQQ",
+    );
     const chrome = await page.evaluate(() => ({
       exportZip: [...document.querySelectorAll("nav.actions button")].map((b) => b.textContent.trim()),
       help: null,

@@ -5,19 +5,15 @@
  :nrepl {:port 7888}
  :node-modules {:managed-by :bun}
  :builds
- {  :app
+ { :app
   {:target :browser
    :output-dir "public/js"
    :asset-path "/js"
    :modules {:main {:init-fn evalight.core/init}}
    :devtools {:preloads []}
-   ;; :simple keeps CodeMirror method names. Advanced renamed
-   ;; Transaction.isUserEvent in src/evalight/cm6_parinfer.js, so
-   ;; clicking a ClojureScript buffer threw and the caret stayed at 0.
-   :compiler-options {:optimizations :simple}
-   ;; Parinfer (and other CM plugins) pin their own @codemirror/*
-   ;; copies. Redirect every import to the top-level CJS file so
-   ;; EditorState.create sees one Extension class.
+   ;; Watch stays :none. Release uses :simple so Closure does not rename
+   ;; CodeMirror methods that src/evalight/cm6_parinfer.js calls.
+   :release {:compiler-options {:optimizations :simple}}
    :js-options
    {:resolve
     {"@codemirror/state" {:target :file :file "node_modules/@codemirror/state/dist/index.cjs"}
@@ -54,7 +50,7 @@
    :asset-path "/js"
    :modules {:main {:init-fn evalight.core/init}}
    :devtools {:preloads []}
-   :compiler-options {:optimizations :simple}
+   :release {:compiler-options {:optimizations :simple}}
    :js-options
    {:resolve
     {"@codemirror/state" {:target :file :file "node_modules/@codemirror/state/dist/index.cjs"}

@@ -47,19 +47,19 @@ const invertParinferError = invertedEffects.of((tr) => {
     return [];
 });
 function cmPosToParinferYx(doc, pos) {
-    const line = doc.lineAt(pos);
+    const line = doc["lineAt"](pos);
     const y = line.number - 1;
     const x = pos - line.from;
     return [y, x];
 }
 function parinferYxToCmPos(doc, y, x) {
-    return doc.line(y + 1).from + x;
+    return doc["line"](y + 1).from + x;
 }
 function cmChangeSetToParinferChanges(oldDoc, cmChanges) {
     const parinferChanges = [];
-    cmChanges.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    cmChanges["iterChanges"]((fromA, toA, _fromB, _toB, inserted) => {
         const [fromAy, fromAx] = cmPosToParinferYx(oldDoc, fromA);
-        const oldText = oldDoc.sliceString(fromA, toA);
+        const oldText = oldDoc["sliceString"](fromA, toA);
         parinferChanges.push({
             lineNo: fromAy,
             x: fromAx,
@@ -99,9 +99,9 @@ function applyParinferSmartWithDiff(transaction) {
     const oldCursor = startState.selection.main.head;
     const oldDoc = startState.doc;
     const [oldY, oldX] = cmPosToParinferYx(oldDoc, oldCursor);
-    const newDoc = transaction.newDoc;
+    const newDoc = transaction["newDoc"];
     const newText = newDoc.toString();
-    const newSelection = transaction.newSelection.main;
+    const newSelection = transaction["newSelection"].main;
     const newCursor = newSelection.head;
     const [newY, newX] = cmPosToParinferYx(newDoc, newCursor);
     const parinferChanges = cmChangeSetToParinferChanges(oldDoc, transaction.changes);
@@ -120,7 +120,7 @@ function applyParinferSmartWithDiff(transaction) {
     }
     const cmChanges = parinferResultToCmChanges(result, newText);
     const newTransaction = transaction.state.update({ changes: cmChanges, filter: false });
-    const newPos = parinferYxToCmPos(newTransaction.newDoc, result.cursorLine, result.cursorX);
+    const newPos = parinferYxToCmPos(newTransaction["newDoc"], result.cursorLine, result.cursorX);
     const effect = maybeErrorEffect(startState, null);
     return Object.assign({ changes: cmChanges, selection: EditorSelection.cursor(newPos), sequential: true }, (effect ? { effects: [effect] } : null));
 }
@@ -140,12 +140,15 @@ function effectivelyEnabled(tr) {
 }
 function insertedIdentifierChar(tr) {
     if (!tr.docChanged) return false;
-    if (!(tr.isUserEvent("input.type") || tr.isUserEvent("input.type.compose")))
+    // Quoted: Closure advanced renamed isUserEvent on our call sites
+    // while leaving it on CodeMirror's Transaction, so clicks threw
+    // and the caret never moved.
+    if (!(tr["isUserEvent"]("input.type") || tr["isUserEvent"]("input.type.compose")))
         return false;
     let ok = true;
     let count = 0;
     let text = "";
-    tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    tr.changes["iterChanges"]((fromA, toA, _fromB, _toB, inserted) => {
         count++;
         text = typeof inserted === "string" ? inserted : inserted.toString();
         if (fromA !== toA || text.length !== 1) ok = false;
@@ -155,23 +158,33 @@ function insertedIdentifierChar(tr) {
 
 function needToApplyParinfer(tr) {
     if (!effectivelyEnabled(tr)) return false;
+    if (tr["isUserEvent"]("undo") || tr["isUserEvent"]("redo")) return false;
     if (insertedIdentifierChar(tr)) return false;
-    return tr.docChanged || tr.isUserEvent("select");
+    // Clicks are userEvent "select". Re-running smart mode on them
+    // overwrote the new caret, often with line 0, and typing then
+    // landed somewhere else. Undo also looked like a doc change and
+    // Parinfer put the text back.
+    return tr.docChanged;
 }
 function parinferTransactionFilter(initialConfig) {
     return EditorState.transactionFilter.of(tr => {
-        if (needToApplyParinfer(tr)) {
-            const parinferChanges = applyParinferSmartWithDiff(tr);
-            if (parinferChanges) {
-                if (parinferChanges.effects ||
-                    (parinferChanges.changes &&
-                        (!Array.isArray(parinferChanges.changes) ||
-                            parinferChanges.changes.length > 0))) {
-                    return [tr, parinferChanges];
+        try {
+            if (needToApplyParinfer(tr)) {
+                const parinferChanges = applyParinferSmartWithDiff(tr);
+                if (parinferChanges) {
+                    if (parinferChanges.effects ||
+                        (parinferChanges.changes &&
+                            (!Array.isArray(parinferChanges.changes) ||
+                                parinferChanges.changes.length > 0))) {
+                        return [tr, parinferChanges];
+                    }
                 }
             }
+            return maybeInitialize(tr, initialConfig);
+        } catch (err) {
+            console.error("parinfer filter", err);
+            return tr;
         }
-        return maybeInitialize(tr, initialConfig);
     });
 }
 function errorToDiagnostics(doc, error) {
