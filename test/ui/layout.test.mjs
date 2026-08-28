@@ -97,6 +97,27 @@ try {
   await page.waitForSelector("#project-select, .project-name", { timeout: 10000 });
   await new Promise((r) => setTimeout(r, 1500));
 
+  const pageScroll = await page.evaluate(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const shell = document.querySelector(".shell");
+    return {
+      htmlOverflow: getComputedStyle(html).overflow,
+      bodyOverflow: getComputedStyle(body).overflow,
+      scrollHeight: Math.max(html.scrollHeight, body.scrollHeight),
+      innerHeight: window.innerHeight,
+      shellHeight: shell?.getBoundingClientRect().height ?? 0,
+    };
+  });
+  check(
+    "the workshop is not a scrolling document",
+    pageScroll.htmlOverflow.includes("hidden") &&
+      pageScroll.bodyOverflow.includes("hidden") &&
+      pageScroll.scrollHeight <= pageScroll.innerHeight + 2 &&
+      Math.abs(pageScroll.shellHeight - pageScroll.innerHeight) <= 2,
+    JSON.stringify(pageScroll)
+  );
+
   const names = await page.$$eval(".tree-name", (els) => els.map((e) => e.textContent));
   const fileIdx = names.findIndex((n) => n === "core.cljs" || n.endsWith(".cljs"));
   assert.ok(fileIdx >= 0, `expected a cljs file in the tree, got ${names.join(", ")}`);

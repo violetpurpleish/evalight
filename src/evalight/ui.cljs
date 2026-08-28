@@ -391,19 +391,20 @@
 (defn workspace [state]
   (let [{:keys [files-open? preview-open? dragging?]} (:layout state)]
     [:div.shell {:class (str "tab-" (name (:mobile-tab state)))}
-     (header state)
-     [:div.stage
-      {:class [(when-not files-open? "is-files-closed")
-               (when-not preview-open? "is-preview-closed")
-               (when dragging? "is-dragging")]}
-      (sidebar state)
-      (splitter :files)
-      [:div.main
-       (editor-pane state)
-       (repl-pane state)]
-      (splitter :preview)
-      (preview-pane state)]
-     (mobile-tabs state)
+     [:div.workspace
+      (header state)
+      [:div.stage
+       {:class [(when-not files-open? "is-files-closed")
+                (when-not preview-open? "is-preview-closed")
+                (when dragging? "is-dragging")]}
+       (sidebar state)
+       (splitter :files)
+       [:div.main
+        (editor-pane state)
+        (repl-pane state)]
+       (splitter :preview)
+       (preview-pane state)]
+      (mobile-tabs state)]
      (when (:help? state) (help-panel))
      (when (:dialog state)
        (dialog state))
