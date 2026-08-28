@@ -1,26 +1,22 @@
-import { expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { join } from "node:path";
 import { packEvalight, withEvalightScript } from "../../scripts/evalight-pack.mjs";
 
 const root = join(import.meta.dir, "../..");
 
-test("pack includes the embedded server and workshop HTML", async () => {
-  const files = await packEvalight(root, { requireJs: false });
-  expect(files["evalight/server.mjs"]).toContain("bun evalight/server.mjs");
-  expect(files["evalight/server.mjs"]).toContain("SKIP");
-  expect(files["evalight/public/index.html"]).toContain("/js/main.js");
-  expect(files["evalight/public/preview.html"]).toContain("preview");
-  expect(files["evalight/public/css/evalight.css"]).toBeTruthy();
-  expect(files["evalight/public/js/main.js"]).toBeUndefined();
-});
+const files = await packEvalight(root, { requireJs: false });
+assert.ok(files["evalight/server.mjs"].includes("bun evalight/server.mjs"));
+assert.ok(files["evalight/server.mjs"].includes("SKIP_ROOT"));
+assert.ok(files["evalight/public/index.html"].includes("/js/main.js"));
+assert.ok(files["evalight/public/preview.html"].includes("preview"));
+assert.ok(files["evalight/public/css/evalight.css"]);
+assert.equal(files["evalight/public/js/main.js"], undefined);
 
-test("withEvalightScript adds bun run evalight", () => {
-  const out = withEvalightScript(`{"name":"lamp","scripts":{"dev":"shadow-cljs watch app"}}`);
-  const pkg = JSON.parse(out);
-  expect(pkg.scripts.evalight).toBe("bun evalight/server.mjs");
-  expect(pkg.scripts.dev).toBe("shadow-cljs watch app");
-});
+const out = withEvalightScript(`{"name":"lamp","scripts":{"dev":"shadow-cljs watch app"}}`);
+const pkg = JSON.parse(out);
+assert.equal(pkg.scripts.evalight, "bun evalight/server.mjs");
+assert.equal(pkg.scripts.dev, "shadow-cljs watch app");
 
-test("withEvalightScript leaves broken JSON alone", () => {
-  expect(withEvalightScript("{not json")).toBe("{not json");
-});
+assert.equal(withEvalightScript("{not json"), "{not json");
+
+console.log("pack.test.mjs ok");
