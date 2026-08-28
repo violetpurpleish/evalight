@@ -1003,9 +1003,68 @@ try {
   );
 
   await page.keyboard.press("Escape").catch(() => {});
+
+  // Narrow preview: Help used to sit above the modal and steal Cancel.
+  await page.setViewport({ width: 900, height: 800 });
   await page.click("button.icon-btn[title='Help']");
   await page.waitForSelector(".help", { timeout: 3000 });
-  await page.click(".help-close");
+  await page.click("button[aria-label='Delete project']");
+  await page.waitForSelector(".ui-dialog", { timeout: 4000 });
+
+  const stacking = await page.evaluate(() => {
+    const overlay = document.querySelector(".ui-overlay");
+    const help = document.querySelector(".help");
+    const cancel = document.querySelector(".ui-dialog .ui-btn-ghost");
+    const r = cancel.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return {
+      overlayZ: Number(getComputedStyle(overlay).zIndex),
+      helpZ: Number(getComputedStyle(help).zIndex),
+      x,
+      y,
+      hitDialog: Boolean(hit?.closest(".ui-dialog")),
+      hitHelp: Boolean(hit?.closest(".help")),
+      hitText: hit && `${hit.tagName}.${String(hit.className).slice(0, 40)}`,
+    };
+  });
+  check(
+    "modal stacks above help",
+    stacking.overlayZ > stacking.helpZ,
+    JSON.stringify(stacking)
+  );
+  check(
+    "Cancel is the hit target while Help is open",
+    stacking.hitDialog && !stacking.hitHelp,
+    JSON.stringify(stacking)
+  );
+  await page.mouse.click(stacking.x, stacking.y);
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+  const afterCancel = await page.evaluate(() => ({
+    help: Boolean(document.querySelector(".help")),
+    dialog: Boolean(document.querySelector(".ui-dialog")),
+  }));
+  check(
+    "Cancel closes the project dialog, not Help",
+    afterCancel.help && !afterCancel.dialog,
+    JSON.stringify(afterCancel)
+  );
+
+  const helpClose = await page.evaluate(() => {
+    const close = document.querySelector(".help-close");
+    const r = close.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return {
+      x,
+      y,
+      hitHelp: Boolean(hit?.closest(".help")),
+    };
+  });
+  check("Help close is clickable after the dialog", helpClose.hitHelp, JSON.stringify(helpClose));
+  await page.mouse.click(helpClose.x, helpClose.y);
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
   await page.click("button[aria-label='Delete project']");

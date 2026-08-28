@@ -84,7 +84,7 @@
    [:span label]])
 
 (defn help-panel []
-  [:aside.help
+  [:aside.help {:replicant/key :help-panel}
    [:header.help-head
     [:h2 "Living with the program"]
     [:button.icon-btn.help-close

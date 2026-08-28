@@ -7,7 +7,8 @@
   never have to stopPropagation to reach the button."
   [{:keys [open? on-close title] :as props} & children]
   (when (or (not (contains? props :open?)) open?)
-    [:div.ui-overlay {:role "presentation"}
+    [:div.ui-overlay {:role "presentation"
+                      :replicant/key :ui-dialog}
      (when on-close
        [:div.ui-backdrop {:on {:click on-close}}])
      (into

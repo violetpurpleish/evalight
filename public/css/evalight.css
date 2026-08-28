@@ -375,7 +375,9 @@ code, pre { font-family: var(--mono); }
   z-index: 200;
   overflow: visible;
 }
-.ui-overlay { z-index: 320; }
+/* Modal above help. Help at 330 used to cover Cancel on narrow previews,
+   and those clicks toggled Help instead of closing the dialog. */
+.ui-overlay { z-index: 400; }
 .cm-tooltip-autocomplete > ul {
   max-height: 16rem;
   background: var(--panel-2);
@@ -491,7 +493,7 @@ code, pre { font-family: var(--mono); }
   border-radius: 16px;
   padding: 1rem 1.1rem 1.15rem;
   box-shadow: var(--shadow);
-  z-index: 330;
+  z-index: 300;
   pointer-events: auto;
 }
 .help-head { display: flex; align-items: flex-start; gap: 0.75rem; padding-right: 2rem; }
@@ -570,7 +572,7 @@ kbd {
   border: 1px solid var(--line);
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
-  z-index: 340;
+  z-index: 410;
 }
 .toast.err { border-color: var(--ember); color: #ffd1c2; }
 

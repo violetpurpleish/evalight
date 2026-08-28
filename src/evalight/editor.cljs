@@ -240,7 +240,10 @@
   (or (.getElementById js/document "cm-tooltips")
       (let [el (.createElement js/document "div")]
         (set! (.-id el) "cm-tooltips")
-        (.appendChild (or (.querySelector js/document ".shell") (.-body js/document)) el)
+        ;; Body, not .shell: Replicant owns .shell's children. An extra
+        ;; node there gets reused as help/dialog and handlers cross-wire
+        ;; (Cancel then toggles Help). Completions still stack via z-index.
+        (.appendChild (.-body js/document) el)
         el)))
 
 (defn extensions [{:keys [path on-change on-eval]}]

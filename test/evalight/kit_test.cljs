@@ -23,7 +23,7 @@
 (deftest dialog-close-hits-a-backdrop-not-the-panel
   (let [[tag attrs backdrop panel] (dialog/dialog {:on-close [:close] :title "Hi"} "body")]
     (is (= :div.ui-overlay tag))
-    (is (nil? (:on attrs)))
+    (is (= :ui-dialog (:replicant/key attrs)))
     (is (= :div.ui-backdrop (first backdrop)))
     (is (= {:on {:click [:close]}} (select-keys (second backdrop) [:on])))
     (is (= :div.ui-dialog (first panel)))
