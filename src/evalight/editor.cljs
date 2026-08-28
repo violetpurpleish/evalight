@@ -211,6 +211,13 @@
     (view/hoverTooltip hover-source #js {:hoverTime 380})
     (.parinferExtension parinfer)]))
 
+(defn- tooltip-host []
+  (or (.getElementById js/document "cm-tooltips")
+      (let [el (.createElement js/document "div")]
+        (set! (.-id el) "cm-tooltips")
+        (.appendChild (or (.querySelector js/document ".shell") (.-body js/document)) el)
+        el)))
+
 (defn extensions [{:keys [path on-change on-eval]}]
   (let [lang (language-for path)]
     (flatten-exts
@@ -220,7 +227,7 @@
       (view/highlightActiveLine)
       (view/highlightActiveLineGutter)
       (view/drawSelection)
-      (view/tooltips #js {:parent (.-body js/document)})
+      (view/tooltips #js {:parent (tooltip-host)})
       (.of (.-scrollMargins view/EditorView)
            (fn [_] #js {:top 12 :bottom 48}))
       (language/foldGutter)

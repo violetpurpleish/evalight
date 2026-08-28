@@ -342,6 +342,14 @@ code, pre { font-family: var(--mono); }
   border-radius: 8px;
   box-shadow: var(--shadow);
   z-index: 200;
+  pointer-events: auto;
+}
+#cm-tooltips {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  overflow: visible;
 }
 .cm-tooltip-autocomplete > ul {
   max-height: 16rem;

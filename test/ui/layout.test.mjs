@@ -105,6 +105,7 @@ try {
       htmlOverflow: getComputedStyle(html).overflow,
       bodyOverflow: getComputedStyle(body).overflow,
       scrollHeight: Math.max(html.scrollHeight, body.scrollHeight),
+      bodyScroll: body.scrollHeight,
       innerHeight: window.innerHeight,
       shellHeight: shell?.getBoundingClientRect().height ?? 0,
     };
