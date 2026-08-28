@@ -41,3 +41,15 @@
 (deftest with-ui-css-inserts-href
   (is (re-find #"public/css/ui.css"
                (kit/with-ui-css "{:name \"x\" :main app.core :preview {:css [\"public/style.css\"]}}"))))
+
+(deftest present-ids-from-paths
+  (is (= #{"button" "dialog"}
+         (kit/present-ids ["src/ui/button.cljs" "src/ui/dialog.cljs" "src/app/core.cljs"])))
+  (is (= #{} (kit/present-ids [])))
+  (is (not (contains? (kit/present-ids ["src/ui/core.cljs"]) "button"))))
+
+(deftest own-file-is-just-the-control
+  (let [file (kit/own-file "button")]
+    (is (= "src/ui/button.cljs" (:path file)))
+    (is (re-find #"\(ns ui.button" (:content file)))
+    (is (nil? (kit/own-file "nope")))))

@@ -368,7 +368,6 @@
                    (.then (ensure-ui-css-listed! fs)
                           (fn [_] acc))))
           (.then (fn [acc]
-                   (swap! state/app assoc :dialog nil)
                    (swap! state/app update :expanded conj "src" "src/ui" "public" "public/css")
                    (.then (refresh-tree!)
                           (fn [_]
@@ -376,6 +375,29 @@
                             (if (every? #{:exists} acc)
                               (flash! (str (:title item) " is already in this project."))
                               (flash! (str "Added " (:title item))))))))))))
+
+(defn restore-ui-component!
+  "Overwrite this control's file with the original kit source."
+  [id]
+  (let [file (kit/own-file id)
+        path (:path file)
+        content (:content file)]
+    (if-not file
+      (p/ok (flash! "Unknown control." :err))
+      (do
+        (when (= path (editor/current-path))
+          (when-let [t @!save-timer]
+            (js/clearTimeout t))
+          (reset! !save-timer nil))
+        (-> (fs/write-file (now-fs) path content)
+            (.then (fn [_]
+                     (if (= path (editor/current-path))
+                       (editor/load-fresh! path content)
+                       (editor/drop-path! path))
+                     (swap! state/app update :dirty disj path)
+                     (flash! (str "Restored " (:title file)))
+                     (schedule-live-reload!)
+                     (refresh-tree!))))))))
 
 (defn set-dialog! [dialog]
   (swap! state/app assoc :dialog dialog))
@@ -545,6 +567,7 @@
                                             :last? (= 1 (count (:projects @state/app)))})
       :add-ui-dialog (set-dialog! {:kind :add-ui})
       :add-ui (catch-ui (add-ui-component! (first args)))
+      :restore-ui (catch-ui (restore-ui-component! (first args)))
       :close-dialog (close-dialog!)
       :toggle-help (toggle-help!)
       :toggle-live (toggle-live!)

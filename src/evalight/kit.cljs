@@ -76,6 +76,25 @@
              :content (get sources (:path item))})
           (filter #(get sources (:path %)) with-css))))
 
+(defn own-file
+  "The catalog file for `id`, without dependencies."
+  [id]
+  (when-let [item (by-id (str id))]
+    (when-let [content (get sources (:path item))]
+      {:path (:path item)
+       :content content
+       :title (:title item)
+       :id (:id item)})))
+
+(defn present-ids
+  "Catalog ids whose own file is in `paths`."
+  [paths]
+  (let [paths (set paths)]
+    (into #{}
+          (keep (fn [{:keys [id path]}]
+                  (when (contains? paths path) id))
+                catalog))))
+
 (defn css-hrefs [edn-text]
   (let [paths (or (when (seq edn-text)
                     (try

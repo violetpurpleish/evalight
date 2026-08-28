@@ -100,22 +100,36 @@
     (shortcut ["Ctrl" "."] "Completions, if Ctrl-Space is taken")
     (shortcut ["Tab"] "Parinfer follows indentation")]
    [:p.muted "Hover a symbol in the editor for its docstring. Completions come from the running preview, the same image the REPL talks to."]
-   [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. The files are yours to edit."]
+   [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
    [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a normal zip of those files — the same tree you would open locally."]])
 
-(defn dialog [{:keys [kind value path] :as d}]
-  (if (= kind :add-ui)
-    (ui-dialog/dialog {:on-close [:close-dialog] :title "Add UI"}
-      [:p.muted "Each control is a ClojureScript file. Adding one copies it into this project, with anything it needs."]
-      [:ul.kit-list
-       (for [{:keys [id title blurb]} kit/catalog]
-         [:li {:replicant/key id}
-          [:div
-           [:div.kit-title title]
-           [:p.muted blurb]]
-          (btn/button {:size :sm :on {:click [:add-ui id]}} "Add")])]
-      (ui-dialog/actions
-       (btn/button {:on {:click [:close-dialog]}} "Done")))
+(defn- tree-file-paths [nodes]
+  (mapcat (fn [n]
+            (if (= :dir (:type n))
+              (tree-file-paths (:children n))
+              [(:path n)]))
+          nodes))
+
+(defn dialog [state]
+  (let [{:keys [kind value path] :as d} (:dialog state)]
+    (if (= kind :add-ui)
+    (let [present (kit/present-ids (tree-file-paths (:tree state)))]
+      (ui-dialog/dialog {:on-close [:close-dialog] :title "Add UI"}
+        [:p.muted "Each control is a ClojureScript file. Add copies it into this project. Restore puts the original kit file back."]
+        [:ul.kit-list
+         (for [{:keys [id title blurb]} kit/catalog]
+           [:li {:replicant/key id}
+            [:div
+             [:div.kit-title title]
+             [:p.muted blurb]]
+            (if (contains? present id)
+              (btn/button {:size :sm
+                           :title "Replace this file with the original kit source"
+                           :on {:click [:restore-ui id]}}
+                "Restore")
+              (btn/button {:size :sm :on {:click [:add-ui id]}} "Add"))])]
+        (ui-dialog/actions
+         (btn/button {:on {:click [:close-dialog]}} "Done"))))
     (ui-dialog/dialog {:on-close [:close-dialog]}
       [:form
        {:on {:submit (case kind
@@ -194,7 +208,7 @@
            (btn/button {:variant :danger :class "danger" :type "submit"
                         :replicant/on-mount (fn [{:keys [replicant/node]}]
                                               (.focus node))}
-                       "Delete project"))])])))
+                       "Delete project"))])]))))
 
 (defn repl-pane [{:keys [repl]}]
   [:section.repl {:replicant/key "repl-pane"}
@@ -391,8 +405,8 @@
       (preview-pane state)]
      (mobile-tabs state)
      (when (:help? state) (help-panel))
-     (when-let [d (:dialog state)]
-       (dialog d))
+     (when (:dialog state)
+       (dialog state))
      (notice state)]))
 
 (defn view [state]

@@ -203,17 +203,89 @@ try {
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
   const kitDialog = await page.evaluate(() => {
     const panel = document.querySelector(".ui-dialog");
+    const rows = [...panel.querySelectorAll("li")].map((li) => ({
+      title: li.querySelector(".kit-title")?.textContent ?? "",
+      action: li.querySelector(".ui-btn")?.textContent?.trim() ?? "",
+    }));
     return {
       title: panel?.querySelector("h2")?.textContent ?? "",
-      items: [...panel.querySelectorAll(".kit-title")].map((el) => el.textContent),
+      items: rows.map((r) => r.title),
+      actions: Object.fromEntries(rows.map((r) => [r.title, r.action])),
     };
   });
   check("Add UI dialog title", kitDialog.title === "Add UI", kitDialog.title);
   check("Add UI lists Button", kitDialog.items.includes("Button"), kitDialog.items.join(", "));
   check("Add UI lists Split", kitDialog.items.includes("Split"), kitDialog.items.join(", "));
+  check(
+    "installed Button is Restore, not Add",
+    kitDialog.actions.Button === "Restore",
+    JSON.stringify(kitDialog.actions)
+  );
+  check(
+    "installed Split is Restore, not Add",
+    kitDialog.actions.Split === "Restore",
+    JSON.stringify(kitDialog.actions)
+  );
+  check(
+    "Add UI has no Add buttons on a fresh lamp",
+    Object.values(kitDialog.actions).every((a) => a === "Restore"),
+    JSON.stringify(kitDialog.actions)
+  );
+  await page.evaluate(() => {
+    const rows = [...document.querySelectorAll(".kit-list li")];
+    const button = rows.find((li) => li.querySelector(".kit-title")?.textContent === "Button");
+    [...(button?.querySelectorAll(".ui-btn") ?? [])]
+      .find((b) => b.textContent.trim() === "Restore")
+      ?.click();
+  });
+  await page.waitForFunction(
+    () => (document.querySelector(".toast")?.textContent ?? "").includes("Restored Button"),
+    { timeout: 4000 }
+  );
+  check(
+    "Restore keeps the Add UI dialog open",
+    Boolean(await page.$(".ui-dialog")),
+    "dialog closed after Restore"
+  );
   await page.evaluate(() => {
     const buttons = [...document.querySelectorAll(".ui-dialog .ui-btn")];
     buttons.find((b) => b.textContent.trim() === "Done")?.click();
+  });
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+
+  await page.evaluate(() => {
+    const row = [...document.querySelectorAll(".tree-row")].find(
+      (el) => el.querySelector(".tree-name")?.textContent === "split.cljs"
+    );
+    row?.querySelector('[aria-label="Delete"]')?.click();
+  });
+  await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
+  await page.click(".ui-dialog .ui-btn-danger");
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+  await page.waitForFunction(
+    () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "split.cljs"),
+    { timeout: 6000 }
+  );
+
+  await page.evaluate(() => {
+    [...document.querySelectorAll(".tree-tools .tiny")]
+      .find((el) => el.textContent.trim() === "UI")
+      ?.click();
+  });
+  await page.waitForSelector(".ui-dialog .kit-list", { timeout: 4000 });
+  const afterDelete = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll(".kit-list li")].map((li) => ({
+      title: li.querySelector(".kit-title")?.textContent ?? "",
+      action: li.querySelector(".ui-btn")?.textContent?.trim() ?? "",
+    }));
+    return Object.fromEntries(rows.map((r) => [r.title, r.action]));
+  });
+  check("deleted Split shows Add", afterDelete.Split === "Add", JSON.stringify(afterDelete));
+  check("Button stays Restore after Split is gone", afterDelete.Button === "Restore", JSON.stringify(afterDelete));
+  await page.evaluate(() => {
+    [...document.querySelectorAll(".ui-dialog .ui-btn")]
+      .find((b) => b.textContent.trim() === "Done")
+      ?.click();
   });
   await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
 
