@@ -196,19 +196,27 @@
                 :on {:input [:repl-expr-input]
                      :keydown [:repl-expr-keydown]}}]]])
 
-(defn preview-pane [{:keys [preview]}]
-  [:section.preview
-   [:header.pane-head
-    [:span "Preview"]
-    [:label.live
-     [:input {:type "checkbox"
-              :checked (boolean (:live? preview))
-              :on {:change [:toggle-live]}}]
-     "Live"]
-    (when (= :loading (:status preview))
-      [:span.muted "loading"])
-    (when (:error preview)
-      [:span.preview-error {:title (:error preview)} "error"])]
+(defn preview-pane [{:keys [preview layout]}]
+  (let [w (or (:preview-width layout) 360)]
+    [:section.preview
+     {:style {:width (str w "px")
+              :flex-basis (str w "px")}}
+     [:header.pane-head
+      [:span "Preview"]
+      [:label.live
+       [:input {:type "checkbox"
+                :checked (boolean (:live? preview))
+                :on {:change [:toggle-live]}}]
+       "Live"]
+      (when (= :loading (:status preview))
+        [:span.muted "loading"])
+      (when (:error preview)
+        [:span.preview-error {:title (:error preview)} "error"])
+      [:button.icon-btn.pane-hide
+       {:on {:click [:toggle-preview-pane]}
+        :title "Hide preview"
+        :aria-label "Hide preview"}
+       (icons/panel-right)]]
    [:div.preview-frame
     (when-let [err (:error preview)]
       [:div.preview-banner
@@ -218,7 +226,7 @@
               :sandbox "allow-scripts"
               :title "Live application preview"
               :replicant/key "preview-frame"
-              :replicant/on-mount preview-mount}]]])
+              :replicant/on-mount preview-mount}]]]))
 
 (defn editor-pane [state]
   [:section.editor
@@ -256,6 +264,18 @@
         (for [name (:projects state)]
           [:option {:value name :replicant/key name} name])]])]
    [:nav.actions
+    [:button.icon-btn.layout-toggle
+     {:aria-pressed (boolean (get-in state [:layout :files-open?]))
+      :aria-label (if (get-in state [:layout :files-open?]) "Hide files" "Show files")
+      :title (if (get-in state [:layout :files-open?]) "Hide files" "Show files")
+      :on {:click [:toggle-files]}}
+     (icons/panel-left)]
+    [:button.icon-btn.layout-toggle
+     {:aria-pressed (boolean (get-in state [:layout :preview-open?]))
+      :aria-label (if (get-in state [:layout :preview-open?]) "Hide preview" "Show preview")
+      :title (if (get-in state [:layout :preview-open?]) "Hide preview" "Show preview")
+      :on {:click [:toggle-preview-pane]}}
+     (icons/panel-right)]
     (when (= :browser (:mode state))
       [:button.ghost {:on {:click [:new-project-dialog]}} "New project"])
     [:button.ghost {:on {:click [:export]}} (icons/download) "Export ZIP"]
@@ -264,13 +284,21 @@
      (icons/help)]]])
 
 (defn sidebar [state]
-  [:aside.sidebar
-   [:header.pane-head
-    [:span "Files"]
-    [:div.tree-tools
-     [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
-     [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]]]
-   (file-tree state)])
+  (let [w (or (get-in state [:layout :files-width]) 220)]
+    [:aside.sidebar
+     {:style {:width (str w "px")
+              :flex-basis (str w "px")}}
+     [:header.pane-head
+      [:span "Files"]
+      [:div.tree-tools
+       [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
+       [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]
+       [:button.icon-btn.pane-hide
+        {:on {:click [:toggle-files]}
+         :title "Hide files"
+         :aria-label "Hide files"}
+        (icons/panel-left)]]]
+     (file-tree state)]))
 
 (defn mobile-tabs [{:keys [mobile-tab]}]
   [:nav.mobile-tabs
@@ -294,20 +322,38 @@
     [:div.toast {:class (name (:kind notice))}
      (:text notice)]))
 
+(defn- splitter [pane]
+  (let [files? (= pane :files)]
+    [:div.splitter
+     {:replicant/key (if files? "split-files" "split-preview")
+      :class (if files? "splitter-files" "splitter-preview")
+      :role "separator"
+      :aria-orientation "vertical"
+      :aria-label (if files? "Resize files" "Resize preview")
+      :title "Drag to resize. Double-click resets the width."
+      :on {:pointerdown (if files? [:resize-files] [:resize-preview])
+           :dblclick (if files? [:reset-files-width] [:reset-preview-width])}}]))
+
 (defn workspace [state]
-  [:div.shell {:class (str "tab-" (name (:mobile-tab state)))}
-   (header state)
-   [:div.stage
-    (sidebar state)
-    [:div.main
-     (editor-pane state)
-     (repl-pane state)]
-    (preview-pane state)]
-   (mobile-tabs state)
-   (when (:help? state) (help-panel))
-   (when-let [d (:dialog state)]
-     (dialog d))
-   (notice state)])
+  (let [{:keys [files-open? preview-open? dragging?]} (:layout state)]
+    [:div.shell {:class (str "tab-" (name (:mobile-tab state)))}
+     (header state)
+     [:div.stage
+      {:class [(when-not files-open? "is-files-closed")
+               (when-not preview-open? "is-preview-closed")
+               (when dragging? "is-dragging")]}
+      (sidebar state)
+      (splitter :files)
+      [:div.main
+       (editor-pane state)
+       (repl-pane state)]
+      (splitter :preview)
+      (preview-pane state)]
+     (mobile-tabs state)
+     (when (:help? state) (help-panel))
+     (when-let [d (:dialog state)]
+       (dialog d))
+     (notice state)]))
 
 (defn view [state]
   (case (:fs-status state)

@@ -320,6 +320,134 @@ try {
   );
   const squaredLog = await page.$eval(".repl-log", (el) => el.innerText);
   check("(squared 12) is 144", squaredLog.includes("144"), squaredLog.slice(0, 400));
+
+  const paneCount = await page.evaluate(() => ({
+    sidebars: document.querySelectorAll(".sidebar").length,
+    previews: document.querySelectorAll("section.preview").length,
+    filesSplit: Boolean(document.querySelector(".splitter-files")),
+    previewSplit: Boolean(document.querySelector(".splitter-preview")),
+    hideFiles: Boolean(document.querySelector(".layout-toggle[aria-label='Hide files']")),
+    hidePreview: Boolean(document.querySelector(".layout-toggle[aria-label='Hide preview']")),
+  }));
+  check("files pane is a single sidebar", paneCount.sidebars === 1, `count=${paneCount.sidebars}`);
+  check("preview pane is a single section", paneCount.previews === 1, `count=${paneCount.previews}`);
+  check("files splitter is present", paneCount.filesSplit);
+  check("preview splitter is present", paneCount.previewSplit);
+  check("header can hide files", paneCount.hideFiles);
+  check("header can hide preview", paneCount.hidePreview);
+
+  const filesBefore = await page.$eval(".sidebar", (el) => el.getBoundingClientRect().width);
+  const filesSplit = await page.$(".splitter-files");
+  const filesBox = await filesSplit.boundingBox();
+  check("files splitter has a hit area", Boolean(filesBox) && filesBox.width > 0);
+  if (filesBox) {
+    await page.mouse.move(filesBox.x + filesBox.width / 2, filesBox.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(filesBox.x + filesBox.width / 2 + 90, filesBox.y + 80, { steps: 12 });
+    await page.mouse.up();
+    await new Promise((r) => setTimeout(r, 80));
+    const filesAfter = await page.$eval(".sidebar", (el) => el.getBoundingClientRect().width);
+    check(
+      "files pane grows when the splitter is dragged right",
+      filesAfter >= filesBefore + 50,
+      `before=${filesBefore.toFixed(1)} after=${filesAfter.toFixed(1)}`
+    );
+  }
+
+  const previewBefore = await page.$eval("section.preview", (el) => el.getBoundingClientRect().width);
+  const previewSplit = await page.$(".splitter-preview");
+  const previewBox = await previewSplit.boundingBox();
+  check("preview splitter has a hit area", Boolean(previewBox) && previewBox.width > 0);
+  if (previewBox) {
+    await page.mouse.move(previewBox.x + previewBox.width / 2, previewBox.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(previewBox.x + previewBox.width / 2 - 90, previewBox.y + 80, { steps: 12 });
+    await page.mouse.up();
+    await new Promise((r) => setTimeout(r, 80));
+    const previewAfter = await page.$eval("section.preview", (el) => el.getBoundingClientRect().width);
+    check(
+      "preview pane grows when the splitter is dragged left",
+      previewAfter >= previewBefore + 50,
+      `before=${previewBefore.toFixed(1)} after=${previewAfter.toFixed(1)}`
+    );
+  }
+
+  await page.click(".layout-toggle[aria-label='Hide files']");
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector(".sidebar");
+      return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
+    },
+    { timeout: 4000 }
+  );
+  const filesHidden = await page.evaluate(() => {
+    const el = document.querySelector(".sidebar");
+    return {
+      width: el ? el.offsetWidth : 0,
+      display: el ? getComputedStyle(el).display : "missing",
+      canShow: Boolean(document.querySelector(".layout-toggle[aria-label='Show files']")),
+    };
+  });
+  check(
+    "hiding files collapses the sidebar",
+    filesHidden.width === 0 || filesHidden.display === "none",
+    JSON.stringify(filesHidden)
+  );
+  check("header can show files again", filesHidden.canShow);
+  await page.click(".layout-toggle[aria-label='Show files']");
+  await page.waitForFunction(
+    () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
+    { timeout: 4000 }
+  );
+
+  await page.click(".layout-toggle[aria-label='Hide preview']");
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector("section.preview");
+      return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
+    },
+    { timeout: 4000 }
+  );
+  const previewHidden = await page.evaluate(() => {
+    const pane = document.querySelector("section.preview");
+    const iframe = document.querySelector("section.preview iframe");
+    return {
+      width: pane ? pane.offsetWidth : 0,
+      display: pane ? getComputedStyle(pane).display : "missing",
+      iframe: Boolean(iframe),
+      canShow: Boolean(document.querySelector(".layout-toggle[aria-label='Show preview']")),
+    };
+  });
+  check(
+    "hiding preview collapses the pane",
+    previewHidden.width === 0 || previewHidden.display === "none",
+    JSON.stringify(previewHidden)
+  );
+  check("preview iframe stays mounted while the pane is hidden", previewHidden.iframe);
+  check("header can show preview again", previewHidden.canShow);
+
+  await page.focus("textarea[name=expr]");
+  await page.evaluate(() => {
+    const el = document.querySelector("textarea[name=expr]");
+    el.value = "";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.keyboard.type("(+ 20 22)");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () => (document.querySelector(".repl-log")?.innerText ?? "").includes("42"),
+    { timeout: 8000 }
+  );
+  check(
+    "REPL still evaluates while preview is hidden",
+    (await page.$eval(".repl-log", (el) => el.innerText)).includes("42")
+  );
+
+  await page.click(".layout-toggle[aria-label='Show preview']");
+  await page.waitForFunction(
+    () => (document.querySelector("section.preview")?.offsetWidth ?? 0) > 100,
+    { timeout: 4000 }
+  );
 } finally {
   await browser.close();
   await stop();

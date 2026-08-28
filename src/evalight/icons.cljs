@@ -58,3 +58,13 @@
        [:path {:d "M10 7V5h4v2"}]
        [:path {:d "M8 7l.7 12h6.6L16 7"}]
        [:path {:d "M10 11v5M14 11v5" :stroke-linecap "round"}]))
+
+(defn panel-left []
+  (svg {}
+       [:path {:d "M5 5h14v14H5V5Z"}]
+       [:path {:d "M10 5v14"}]))
+
+(defn panel-right []
+  (svg {}
+       [:path {:d "M5 5h14v14H5V5Z"}]
+       [:path {:d "M14 5v14"}]))

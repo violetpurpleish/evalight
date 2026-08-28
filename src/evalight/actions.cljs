@@ -312,6 +312,97 @@
 (defn set-mobile-tab! [tab]
   (swap! state/app assoc :mobile-tab tab))
 
+(def ^:private files-min 160)
+(def ^:private files-max 480)
+(def ^:private preview-min 200)
+(def ^:private preview-max 640)
+(def ^:private main-min 240)
+
+(defonce !drag (atom nil))
+
+(defn toggle-files! []
+  (swap! state/app update-in [:layout :files-open?] not))
+
+(defn toggle-preview-pane! []
+  (swap! state/app update-in [:layout :preview-open?] not))
+
+(defn- clamp-pane [pane w]
+  (let [{:keys [files-open? preview-open? files-width preview-width]} (:layout @state/app)
+        stage (some-> js/document (.querySelector ".stage") .-clientWidth)
+        other (cond
+                (and (= pane :files) preview-open?) preview-width
+                (and (= pane :preview) files-open?) files-width
+                :else 0)
+        lo (if (= pane :files) files-min preview-min)
+        hi-cap (if (= pane :files) files-max preview-max)
+        room (max lo (- (or stage 1200) other main-min 12))]
+    (-> w (max lo) (min hi-cap) (min room) js/Math.round)))
+
+(defn- apply-pane-el-width! [pane w]
+  (when-let [el (.querySelector js/document (if (= pane :files)
+                                              ".stage > .sidebar"
+                                              ".stage > .preview"))]
+    (let [px (str w "px")
+          style (.-style el)]
+      (set! (.-width style) px)
+      (set! (.-flexBasis style) px))))
+
+(defn- commit-drag-width! []
+  (when-let [{:keys [pane current-w]} @!drag]
+    (when current-w
+      (let [k (if (= pane :files) :files-width :preview-width)]
+        (apply-pane-el-width! pane current-w)
+        (swap! state/app assoc-in [:layout k] current-w)))))
+
+(defn pane-resize-move! [event]
+  (when-let [{:keys [pane id start-x start-w]} @!drag]
+    (when (or (nil? id) (= id (.-pointerId event)))
+      (.preventDefault event)
+      (let [dx (- (.-clientX event) start-x)
+            w (clamp-pane pane (if (= pane :files) (+ start-w dx) (- start-w dx)))]
+        (swap! !drag assoc :current-w w)
+        (apply-pane-el-width! pane w)))))
+
+(defn pane-resize-end! [event]
+  (when @!drag
+    (when (and event (.-pointerId event))
+      (try
+        (let [el (or (.-currentTarget event) (.-target event))]
+          (when (and el (.hasPointerCapture el (.-pointerId event)))
+            (.releasePointerCapture el (.-pointerId event))))
+        (catch :default _ nil)))
+    (commit-drag-width!)
+    (reset! !drag nil)
+    (swap! state/app assoc-in [:layout :dragging?] false)
+    (.removeEventListener js/window "pointermove" pane-resize-move!)
+    (.removeEventListener js/window "pointerup" pane-resize-end!)
+    (.removeEventListener js/window "pointercancel" pane-resize-end!)))
+
+(defn start-pane-resize! [pane event]
+  (when event
+    (.preventDefault event)
+    (when-let [el (.-currentTarget event)]
+      (try
+        (.setPointerCapture el (.-pointerId event))
+        (catch :default _ nil)))
+    (let [k (if (= pane :files) :files-width :preview-width)]
+      (reset! !drag {:pane pane
+                     :id (.-pointerId event)
+                     :start-x (.-clientX event)
+                     :start-w (get-in @state/app [:layout k])
+                     :current-w (get-in @state/app [:layout k])}))
+    (swap! state/app assoc-in [:layout :dragging?] true)
+    (.removeEventListener js/window "pointermove" pane-resize-move!)
+    (.removeEventListener js/window "pointerup" pane-resize-end!)
+    (.removeEventListener js/window "pointercancel" pane-resize-end!)
+    (.addEventListener js/window "pointermove" pane-resize-move!)
+    (.addEventListener js/window "pointerup" pane-resize-end!)
+    (.addEventListener js/window "pointercancel" pane-resize-end!)))
+
+(defn reset-pane-width! [pane]
+  (swap! state/app assoc-in [:layout (if (= pane :files) :files-width :preview-width)]
+         (if (= pane :files) 220 360)))
+
 (defn submit-repl! [code]
   (let [code (str/trim (or code ""))]
     (if (seq code)
@@ -372,6 +463,14 @@
       :close-dialog (close-dialog!)
       :toggle-help (toggle-help!)
       :toggle-live (toggle-live!)
+      :toggle-files (toggle-files!)
+      :toggle-preview-pane (toggle-preview-pane!)
+      :resize-files (when event (start-pane-resize! :files event))
+      :resize-preview (when event (start-pane-resize! :preview event))
+      :pane-resize-move (when event (pane-resize-move! event))
+      :pane-resize-end (pane-resize-end! event)
+      :reset-files-width (reset-pane-width! :files)
+      :reset-preview-width (reset-pane-width! :preview)
       :mobile-tab (set-mobile-tab! (first args))
       :submit-repl (when event
                      (let [form (.-target event)

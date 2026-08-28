@@ -19,7 +19,12 @@
          :help? false
          :parinfer :smart
          :mobile-tab :editor
-         :notice nil}))
+         :notice nil
+         :layout {:files-open? true
+                  :preview-open? true
+                  :files-width 220
+                  :preview-width 360
+                  :dragging? false}}))
 
 (defn get-state []
   @app)
