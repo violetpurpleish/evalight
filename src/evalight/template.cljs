@@ -1,5 +1,6 @@
 (ns evalight.template
-  (:require [evalight.kit :as kit]))
+  (:require [clojure.string :as str]
+            [evalight.kit :as kit]))
 
 (defn evalight-edn [project-name]
   (str "{:name " (pr-str project-name) "\n"
@@ -67,6 +68,16 @@
        "evaluate forms against the live preview. `bun run dev` compiles the\n"
        "same source with shadow-cljs. The namespaces (`replicant.dom`,\n"
        "`app.core`, …) are the same in both modes.\n"))
+
+(defn stale-evalight-readme?
+  "True for a lamp README that still tells you to clone Evalight."
+  [text]
+  (let [t (or text "")]
+    (and (str/includes? t "created in Evalight")
+         (or (str/includes? t "From a checkout of Evalight")
+             (str/includes? t "from an Evalight checkout")
+             (str/includes? t "Keep editing in Evalight")
+             (str/includes? t "bun run local /path")))))
 
 (defn public-html [project-name]
   (str "<!DOCTYPE html>\n"

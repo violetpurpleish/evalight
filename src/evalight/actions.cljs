@@ -184,6 +184,27 @@
                  "src/app/core.cljs"
                  (some :path (fs/flatten-files (:tree @state/app))))))))
 
+(defn- migrate-project-docs! [fs name]
+  (-> (fs/exists? fs "README.md")
+      (.then (fn [exists]
+               (if-not exists
+                 (p/ok nil)
+                 (.then (fs/read-file fs "README.md")
+                        (fn [text]
+                          (if-not (template/stale-evalight-readme? text)
+                            (p/ok nil)
+                            (fs/write-file fs "README.md" (template/readme name))))))))
+      (.then (fn [_] (fs/exists? fs "package.json")))
+      (.then (fn [exists]
+               (if-not exists
+                 (p/ok nil)
+                 (.then (fs/read-file fs "package.json")
+                        (fn [text]
+                          (let [next (export/with-evalight-script text)]
+                            (if (= next text)
+                              (p/ok nil)
+                              (fs/write-file fs "package.json" next))))))))))
+
 (defn open-project! [name]
   (let [mode (:mode @state/app)
         fs-p (if (= :local mode)
@@ -198,6 +219,7 @@
                    (fs/write-file ws "workspace.json"
                                  (js/JSON.stringify (clj->js {:active name})))
                    (p/ok nil))))
+        (.then (fn [_] (migrate-project-docs! (now-fs) name)))
         (.then (fn [_] (refresh-tree!)))
         (.then (fn [_] (preferred-file (now-fs))))
         (.then (fn [preferred]
@@ -536,9 +558,17 @@
 (defn export-zip! []
   (-> (save-current! {:reload? false})
       (.then (fn [_]
-               (let [name (or (:project @state/app) "evalight-project")]
+               (let [name (or (:project @state/app) "evalight-project")
+                     path (:active-file @state/app)]
                  (.then (export/download (now-fs) name)
-                        (fn [_] (flash! (str "Exported " name ".zip")))))))))
+                        (fn [_]
+                          (let [done (fn [] (flash! (str "Exported " name ".zip")))]
+                            (if (contains? #{"README.md" "package.json"} path)
+                              (.then (fs/read-file (now-fs) path)
+                                     (fn [content]
+                                       (editor/load-fresh! path content)
+                                       (done)))
+                              (done))))))))))
 
 (defn catch-ui [p]
   (when p

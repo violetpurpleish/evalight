@@ -2,7 +2,8 @@
   (:require ["jszip" :as JSZip]
             [clojure.string :as str]
             [evalight.fs :as fs]
-            [evalight.promise :as p]))
+            [evalight.promise :as p]
+            [evalight.template :as template]))
 
 (def ^:private static-pack
   [["/index.html" "evalight/public/index.html"]
@@ -93,22 +94,44 @@
                   (pack-from-static)
                   (throw e))))))
 
+(defn rewrite-docs
+  "Patch package.json and replace a README that still says to clone Evalight."
+  [files project-name]
+  (let [name (or project-name "lamp")
+        files (if (get files "package.json")
+                (assoc files "package.json"
+                       (with-evalight-script (get files "package.json")))
+                files)
+        readme (get files "README.md")]
+    (if (template/stale-evalight-readme? readme)
+      (assoc files "README.md" (template/readme name))
+      files)))
+
 (defn zip-project
   "Package every project file plus Evalight into a Blob."
-  [fs _project-name]
+  [fs project-name]
   (-> (p/all [(fs/read-all-files fs) (fetch-evalight-pack)])
       (.then (fn [pair]
-               (let [files (aget pair 0)
+               (let [original (aget pair 0)
+                     files (rewrite-docs original project-name)
                      pack (aget pair 1)
-                     merged (cond-> (merge files pack)
-                              (get files "package.json")
-                              (assoc "package.json"
-                                     (with-evalight-script (get files "package.json"))))
+                     writes (cond-> []
+                              (not= (get original "README.md") (get files "README.md"))
+                              (conj ["README.md" (get files "README.md")])
+                              (not= (get original "package.json") (get files "package.json"))
+                              (conj ["package.json" (get files "package.json")]))
+                     merged (merge files pack)
                      zip (new JSZip)]
                  (doseq [[path content] merged]
                    (.file zip path content))
-                 (.generateAsync zip #js {:type "blob"
-                                           :compression "DEFLATE"}))))))
+                 (-> (p/reduce-p
+                      (fn [_ [path content]]
+                        (fs/write-file fs path content))
+                      nil
+                      writes)
+                     (.then (fn [_]
+                              (.generateAsync zip #js {:type "blob"
+                                                          :compression "DEFLATE"})))))))))
 
 (defn download
   [fs project-name]

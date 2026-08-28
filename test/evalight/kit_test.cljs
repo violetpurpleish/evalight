@@ -1,5 +1,6 @@
 (ns evalight.kit-test
   (:require [cljs.test :refer [deftest is] :include-macros true]
+            [evalight.export :as export]
             [evalight.kit :as kit]
             [evalight.template :as template]
             [ui.button :as btn]
@@ -36,7 +37,25 @@
         readme (get files "README.md")]
     (is (re-find #"\"evalight\": \"bun evalight/server.mjs\"" pkg))
     (is (re-find #"bun run evalight" readme))
-    (is (nil? (re-find #"bun run local /path" readme)))))
+    (is (nil? (re-find #"bun run local /path" readme)))
+    (is (not (template/stale-evalight-readme? readme)))))
+
+(deftest stale-readme-is-the-old-clone-evalight-copy
+  (let [old (str "# lamp\n\n"
+                 "A ClojureScript project created in Evalight.\n\n"
+                 "## Keep editing in Evalight\n\n"
+                 "From a checkout of Evalight:\n\n"
+                 "```sh\n"
+                 "bun install\n"
+                 "bun run local /path/to/lamp\n"
+                 "```\n")
+        out (export/rewrite-docs {"README.md" old "package.json" "{\"scripts\":{}}"} "lamp")]
+    (is (template/stale-evalight-readme? old))
+    (is (not (template/stale-evalight-readme? (template/readme "lamp"))))
+    (is (not (template/stale-evalight-readme? "# Evalight\n\nbun run local /path/to/a/folder\n")))
+    (is (re-find #"bun run evalight" (get out "README.md")))
+    (is (nil? (re-find #"bun run local /path" (get out "README.md"))))
+    (is (re-find #"\"evalight\": \"bun evalight/server.mjs\"" (get out "package.json")))))
 
 (deftest template-ships-the-kit
   (let [files (template/files "lamp")]
