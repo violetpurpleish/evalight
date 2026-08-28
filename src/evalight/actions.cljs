@@ -200,7 +200,10 @@
                  (if preferred
                    (open-file! preferred)
                    (p/ok nil))))
-        (.then (fn [_] (run-preview! {:reset? true}))))))
+        (.then (fn [_]
+                 (if (= :ready (:fs-status @state/app))
+                   (run-preview! {:reset? true})
+                   (p/ok nil)))))))
 
 (defn create-project! [raw-name]
   (let [name (paths/slug raw-name)]
@@ -390,13 +393,17 @@
                  (p/ok nil))))
       (.then (fn [_]
                (swap! state/app assoc :fs-status :ready)
-               (run-preview! {:reset? true})))))
+               (run-preview! {:reset? false})
+               nil))))
 
 (defn- boot-browser []
   (if (opfs/available?)
     (do (swap! state/app assoc :mode :browser)
         (-> (seed-browser!)
-            (.then (fn [_] (swap! state/app assoc :fs-status :ready)))))
+            (.then (fn [_]
+                     (swap! state/app assoc :fs-status :ready)
+                     (run-preview! {:reset? false})
+                     nil))))
     (do (swap! state/app assoc :fs-status :error)
         (swap! state/app assoc :fs-error
                "This browser does not expose the Origin Private File System. Try a recent Chrome, Edge, Firefox, or Safari.")
@@ -406,10 +413,18 @@
   (swap! state/app assoc :fs-status :loading)
   (editor/set-handlers! {:on-change on-editor-change
                          :on-eval on-editor-eval})
+  (js/setTimeout
+   (fn []
+     (when (= :loading (:fs-status @state/app))
+       (swap! state/app assoc
+              :fs-status :error
+              :fs-error "Evalight could not finish starting. Check the browser console, or try Chrome, Edge, Firefox, or Safari.")))
+   8000)
   (-> (http-fs/server-meta)
       (.then (fn [meta]
                (if (= "local" (:mode meta))
                  (boot-local meta)
                  (boot-browser))))
       (.catch (fn [e]
-                (swap! state/app assoc :fs-status :error :fs-error (.-message e))))))
+                (js/console.error "Evalight failed to start" e)
+                (swap! state/app assoc :fs-status :error :fs-error (or (.-message e) (str e)))))))

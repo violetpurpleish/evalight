@@ -62,10 +62,14 @@
   ([base] (->HttpFS base)))
 
 (defn server-meta []
-  (-> (js/fetch "/api/meta")
-      (.then (fn [res]
-               (if (.-ok res)
-                 (.then (.json res)
-                        (fn [j] (js->clj j :keywordize-keys true)))
-                 nil)))
-      (.catch (fn [_] nil))))
+  (if-let [mode (some-> js/window .-EVALIGHT_MODE)]
+    (js/Promise.resolve {:mode mode})
+    (let [ctrl (js/AbortController.)]
+      (js/setTimeout #(.abort ctrl) 1200)
+      (-> (js/fetch "/api/meta" #js {:signal (.-signal ctrl)})
+          (.then (fn [res]
+                   (if (.-ok res)
+                     (.then (.json res)
+                            (fn [j] (js->clj j :keywordize-keys true)))
+                     nil)))
+          (.catch (fn [_] nil))))))

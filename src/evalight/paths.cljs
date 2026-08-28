@@ -8,7 +8,11 @@
 
 (defn join [& parts]
   (->> parts
-       (mapcat split)
+       (mapcat (fn [p]
+                 (cond
+                   (nil? p) []
+                   (sequential? p) (mapcat split p)
+                   :else (split p))))
        (str/join "/")))
 
 (defn normalize [path]

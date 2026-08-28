@@ -33,7 +33,13 @@
 (defn- wait-for [id]
   (js/Promise.
    (fn [resolve reject]
-     (swap! !pending assoc id {:resolve resolve :reject reject}))))
+     (swap! !pending assoc id {:resolve resolve :reject reject})
+     (js/setTimeout
+      (fn []
+        (when-let [{:keys [reject]} (get @!pending id)]
+          (swap! !pending dissoc id)
+          (reject (js/Error. "The preview sandbox did not respond."))))
+      20000))))
 
 (defn- handle-message [event]
   (let [data (js->clj (.-data event) :keywordize-keys true)
@@ -69,7 +75,11 @@
   (reset! !ready false)
   (when-not @!listening
     (.addEventListener js/window "message" handle-message)
-    (reset! !listening true)))
+    (reset! !listening true))
+  (js/setTimeout
+   (fn []
+     (post {:type "evalight/hello"}))
+   0))
 
 (defn reload-frame!
   "Force a fresh SCI image by reloading the iframe document."

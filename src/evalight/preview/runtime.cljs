@@ -87,6 +87,9 @@
 (defn- handle [data]
   (let [typ (keyword (:type data))]
     (case typ
+      :evalight/hello
+      (post {:type "evalight/ready"})
+
       :evalight/load
       (post (assoc (load-files (assoc data :reset true))
                    :type "evalight/loaded"

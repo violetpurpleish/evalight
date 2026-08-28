@@ -18,7 +18,8 @@
     (is (= ["src/app/greet.cljs" "src/app/core.cljs"] ordered))))
 
 (deftest path-helpers
-  (is (= "src/app/core.cljs" (paths/join "src" "app/core.cljs")))
+  (is (= "evalight/projects/lamp" (paths/join ["evalight" "projects" "lamp"])))
+  (is (= "evalight/projects/lamp" (paths/join "evalight" "projects" "lamp")))
   (is (= "core.cljs" (paths/basename "src/app/core.cljs")))
   (is (= "src/app" (paths/dirname "src/app/core.cljs")))
   (is (= "cljs" (paths/ext "src/app/core.cljs")))

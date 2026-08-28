@@ -29,19 +29,30 @@
 (defn- entry-type [handle]
   (if (= "directory" (.-kind handle)) :dir :file))
 
+(defn- rel-path [root-path]
+  (if (sequential? root-path)
+    (apply paths/join root-path)
+    (str root-path)))
+
 (defn- list-entries [dir path]
-  (let [iter (.values dir)]
-    (letfn [(step [acc]
-              (.then (.next iter)
-                     (fn [result]
-                       (if (.-done result)
-                         acc
-                         (let [handle (.-value result)
-                               name (.-name handle)]
-                           (step (conj acc {:name name
-                                            :type (entry-type handle)
-                                            :path (paths/join path name)})))))))]
-      (step []))))
+  (let [iter (cond
+                (fn? (.-entries dir)) (.entries dir)
+                (fn? (.-values dir)) (.values dir)
+                :else nil)]
+    (if (nil? iter)
+      (p/ok [])
+      (letfn [(step [acc]
+                (.then (.next iter)
+                       (fn [result]
+                         (if (.-done result)
+                           acc
+                           (let [v (.-value result)
+                                 handle (if (and v (.-kind v)) v (aget v 1))
+                                 name (or (.-name handle) (aget v 0))]
+                             (step (conj acc {:name name
+                                              :type (entry-type handle)
+                                              :path (paths/join path name)})))))))]
+        (step [])))))
 
 (defrecord OpfsFS [root]
   proto/FileSystem
@@ -91,8 +102,8 @@
                    (-> (.getFileHandle dir (paths/basename path))
                        (.then (fn [_] true))
                        (.catch (fn [_]
-                                 (-> (.getDirectoryHandle dir (paths/basename path))
-                                     (.then (fn [_] true))))))))
+                                 (.then (.getDirectoryHandle dir (paths/basename path))
+                                        (fn [_] true)))))))
           (.catch (fn [_] false))))))
 
 (defn available? []
@@ -105,7 +116,7 @@
     (throw (js/Error. "Origin Private File System is not available in this browser.")))
   (-> (.getDirectory js/navigator.storage)
       (.then (fn [root]
-               (get-dir root (paths/join root-path) true)))
+               (get-dir root (rel-path root-path) true)))
       (.then (fn [dir]
                (->OpfsFS dir)))))
 
