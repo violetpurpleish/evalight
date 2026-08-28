@@ -26,6 +26,12 @@
     (is (re-find #"ui.button" (get files "src/app/core.cljs")))
     (is (re-find #"public/css/ui.css" (get files "evalight.edn")))))
 
+(deftest lamp-rename-save-is-a-click-not-a-submit
+  (let [src (get (template/files "lamp") "src/app/core.cljs")]
+    (is (re-find #":type \"button\".*Save" src))
+    (is (nil? (re-find #"type \"submit\"" src)))
+    (is (re-find #"ui.core :as ui" src))))
+
 (deftest files-for-button-includes-core-and-css
   (let [paths (set (map :path (kit/files-for "button")))]
     (is (contains? paths "src/ui/core.cljs"))

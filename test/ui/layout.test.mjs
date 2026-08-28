@@ -217,6 +217,57 @@ try {
   });
   await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
 
+  const iframeEl = await page.$("section.preview iframe");
+  const lampFrame = iframeEl ? await iframeEl.contentFrame() : null;
+  if (!lampFrame) {
+    check("preview iframe is reachable for lamp Rename", false, "contentFrame() was null");
+  } else {
+    await lampFrame.waitForSelector("h1, .ui-btn", { timeout: 20000 });
+    const beforeTitle = await lampFrame.$eval("h1", (el) => el.textContent);
+    await lampFrame.evaluate(() => {
+      [...document.querySelectorAll(".ui-btn")]
+        .find((b) => (b.textContent || "").includes("Rename"))
+        ?.click();
+    });
+    await lampFrame.waitForSelector(".ui-dialog input[name=title]", { timeout: 6000 });
+    await lampFrame.evaluate(() => {
+      const input = document.querySelector(".ui-dialog input[name=title]");
+      if (input) {
+        input.value = "Beacon";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    await lampFrame.evaluate(() => {
+      [...document.querySelectorAll(".ui-dialog .ui-btn")]
+        .find((b) => (b.textContent || "").trim() === "Save")
+        ?.click();
+    });
+    try {
+      await lampFrame.waitForFunction(
+        () => document.querySelector("h1")?.textContent === "Beacon",
+        { timeout: 5000 }
+      );
+    } catch {
+      const dump = await lampFrame.evaluate(() => ({
+        h1: document.querySelector("h1")?.textContent,
+        dialog: Boolean(document.querySelector(".ui-dialog")),
+        save: [...document.querySelectorAll(".ui-dialog .ui-btn")].map((b) => b.textContent),
+      }));
+      check("lamp Rename Save updates the heading", false, JSON.stringify(dump));
+    }
+    const afterTitle = await lampFrame.$eval("h1", (el) => el.textContent).catch(() => "");
+    check(
+      "lamp Rename Save updates the heading",
+      afterTitle === "Beacon",
+      `before=${beforeTitle} after=${afterTitle}`
+    );
+    check(
+      "lamp Rename dialog closes after Save",
+      !(await lampFrame.$(".ui-dialog")),
+      "dialog still open"
+    );
+  }
+
   const project = await page.evaluate(() => {
     const wrap = document.querySelector(".project");
     const select = document.querySelector("#project-select, .project select");
