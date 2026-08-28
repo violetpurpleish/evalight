@@ -1041,14 +1041,14 @@ try {
   );
   await page.mouse.click(stacking.x, stacking.y);
   await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
-  const afterCancel = await page.evaluate(() => ({
+  const afterProjectCancel = await page.evaluate(() => ({
     help: Boolean(document.querySelector(".help")),
     dialog: Boolean(document.querySelector(".ui-dialog")),
   }));
   check(
     "Cancel closes the project dialog, not Help",
-    afterCancel.help && !afterCancel.dialog,
-    JSON.stringify(afterCancel)
+    afterProjectCancel.help && !afterProjectCancel.dialog,
+    JSON.stringify(afterProjectCancel)
   );
 
   const helpClose = await page.evaluate(() => {
