@@ -5,9 +5,10 @@
  * Do not copy public/js from `shadow-cljs watch`. That tree is ~50MB of
  * cljs-runtime. The workshop UI is a release build in evalight-ui/js.
  */
-import { mkdir, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readdir, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 const STATIC = [
   ["public/index.html", "evalight/public/index.html"],
@@ -22,6 +23,8 @@ const RELEASE = [
   ["evalight-ui/js/main.js", "evalight/public/js/main.js"],
   ["evalight-ui/js/preview/preview.js", "evalight/public/js/preview/preview.js"],
 ];
+
+const FINGERPRINT = "evalight-ui/js/.src-fingerprint";
 
 async function readText(root, rel) {
   const file = Bun.file(join(root, rel));
@@ -46,17 +49,53 @@ function compileWorkshop(root) {
   });
 }
 
+async function walkSourceFiles(root, dir, out) {
+  const names = (await readdir(dir)).sort();
+  for (const name of names) {
+    if (name === ".DS_Store") continue;
+    const p = join(dir, name);
+    const s = await stat(p);
+    if (s.isDirectory()) await walkSourceFiles(root, p, out);
+    else if (/\.(cljs|cljc|clj|edn|js)$/.test(name)) {
+      out.push(relative(root, p).replaceAll("\\", "/"));
+    }
+  }
+}
+
+export async function srcFingerprint(root) {
+  const h = createHash("sha1");
+  const files = [];
+  await walkSourceFiles(root, join(root, "src"), files);
+  files.push("shadow-cljs.edn");
+  for (const rel of files) {
+    h.update(rel);
+    h.update("\0");
+    h.update(await Bun.file(join(root, rel)).text());
+    h.update("\n");
+  }
+  return h.digest("hex");
+}
+
 let compiling = null;
 
-export async function ensureWorkshopUi(root) {
-  const main = Bun.file(join(root, "evalight-ui/js/main.js"));
-  if (await main.exists()) return;
+export async function ensureWorkshopUi(root, { force = false } = {}) {
+  const mainPath = join(root, "evalight-ui/js/main.js");
+  const fpPath = join(root, FINGERPRINT);
+  const fp = await srcFingerprint(root);
+  const exists = await Bun.file(mainPath).exists();
+  const prev = (await Bun.file(fpPath).exists()) ? (await Bun.file(fpPath).text()).trim() : "";
+  if (!force && exists && prev === fp) return fp;
   if (!compiling) {
-    compiling = compileWorkshop(root).finally(() => {
-      compiling = null;
-    });
+    compiling = compileWorkshop(root)
+      .then(async () => {
+        await Bun.write(fpPath, `${fp}\n`);
+      })
+      .finally(() => {
+        compiling = null;
+      });
   }
   await compiling;
+  return fp;
 }
 
 export async function copyEmbedServer(root) {

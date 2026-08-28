@@ -10,6 +10,11 @@ assert.ok(files["evalight/server.mjs"].includes("SKIP_ROOT"));
 assert.ok(files["evalight/public/index.html"].includes("/js/main.js"));
 assert.ok(files["evalight/public/preview.html"].includes("preview"));
 assert.ok(files["evalight/public/css/evalight.css"]);
+assert.ok(files["evalight/public/css/preview.css"]);
+assert.equal(
+  files["evalight/public/preview.css"],
+  undefined,
+);
 assert.equal(
   Object.keys(files).some((k) => k.includes("cljs-runtime")),
   false,
