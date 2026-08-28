@@ -157,6 +157,31 @@ try {
       "lamp click did not increment",
     );
     assert.equal(count, "1");
+    const beforeCursor = await page.evaluate(() => {
+      const r = document.querySelector(".cm-cursor")?.getBoundingClientRect();
+      return r ? { x: r.x, y: r.y } : null;
+    });
+    const clickAt = await page.evaluate(() => {
+      const lines = [...document.querySelectorAll(".cm-line")];
+      const line = lines[Math.min(6, lines.length - 1)] || lines[0];
+      const r = line.getBoundingClientRect();
+      return { x: r.x + Math.min(90, r.width / 2), y: r.y + r.height / 2 };
+    });
+    await page.mouse.click(clickAt.x, clickAt.y);
+    const afterCursor = await until(
+      async () => {
+        const r = await page.evaluate(() => {
+          const c = document.querySelector(".cm-cursor")?.getBoundingClientRect();
+          return c ? { x: c.x, y: c.y } : null;
+        });
+        if (!r || !beforeCursor) return null;
+        const moved = Math.abs(r.x - beforeCursor.x) > 4 || Math.abs(r.y - beforeCursor.y) > 4;
+        return moved ? r : null;
+      },
+      3000,
+      "cljs caret did not move on click",
+    );
+    assert.ok(afterCursor, "cljs caret should move");
     const chrome = await page.evaluate(() => ({
       exportZip: [...document.querySelectorAll("nav.actions button")].map((b) => b.textContent.trim()),
       help: null,
