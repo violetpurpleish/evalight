@@ -784,6 +784,7 @@ try {
     JSON.stringify(onScreen)
   );
 
+  await new Promise((r) => setTimeout(r, 120));
   await page.keyboard.press("Tab");
   const afterTabAccept = await page.evaluate(() => {
     const tip = document.querySelector(".cm-tooltip-autocomplete");

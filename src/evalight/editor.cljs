@@ -228,6 +228,7 @@
     (ac/autocompletion #js {:override #js [complete-source]
                             :activateOnTyping true
                             :activateOnTypingDelay 80
+                            :interactionDelay 0
                             :aboveCursor true
                             :icons true})
     (completion-keymap)
