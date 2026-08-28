@@ -507,6 +507,19 @@ try {
   check("deleted project is gone from the picker", !afterDelete.names.includes("doomed"), afterDelete.names.join(", "));
   check("another project is open after delete", Boolean(afterDelete.value) && afterDelete.value !== "doomed", afterDelete.value);
 
+  await page.waitForSelector(".cm-content", { timeout: 10000 });
+  await page.waitForFunction(
+    () => /\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 10000 }
+  );
+  await page.waitForFunction(
+    () => {
+      const head = document.querySelector("section.preview .pane-head");
+      return head && !/loading|error/i.test(head.innerText);
+    },
+    { timeout: 20000 }
+  );
+
   await page.click(".cm-content");
   await page.keyboard.down("Control");
   await page.keyboard.press("End");
