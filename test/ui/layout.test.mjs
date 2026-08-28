@@ -731,15 +731,13 @@ try {
   const afterLines = docLines(afterTab);
   const lastBefore = beforeLines.at(-1) ?? "";
   const lastAfter = afterLines.at(-1) ?? "";
-  check(
-    "Tab indents the current line",
+  assert.ok(
     /^\s+/.test(lastAfter) && lastAfter.trim() === lastBefore.trim(),
-    JSON.stringify({ lastBefore, lastAfter })
+    `Tab should indent the current line, got ${JSON.stringify({ lastBefore, lastAfter })}`
   );
-  check(
-    "Tab does not format the rest of the document",
+  assert.ok(
     beforeLines.slice(0, -1).join("\n") === afterLines.slice(0, -1).join("\n"),
-    `line counts ${beforeLines.length} -> ${afterLines.length}`
+    `Tab should not format the rest of the document (${beforeLines.length} -> ${afterLines.length} lines)`
   );
   check(
     "ns form stayed at column 0",
@@ -750,21 +748,26 @@ try {
   await page.keyboard.down("Shift");
   await page.keyboard.press("Tab");
   await page.keyboard.up("Shift");
-  check("Shift-Tab still keeps focus after indent", await editorFocus());
+  check(
+    "Shift-Tab still keeps focus after indent",
+    await editorFocus()
+  );
   check(
     "Shift-Tab dedents the current line",
     (docLines(await editorText()).at(-1) ?? "") === lastBefore,
     JSON.stringify(docLines(await editorText()).at(-1))
   );
 
-  await page.keyboard.down("Control");
-  await page.keyboard.press("End");
-  await page.keyboard.up("Control");
-  await page.keyboard.down("Shift");
-  await page.keyboard.press("Home");
-  await page.keyboard.up("Shift");
-  await page.keyboard.press("Backspace");
-  await page.keyboard.press("Backspace");
+  for (let i = 0; i < 16; i++) {
+    await page.keyboard.down("Control");
+    await page.keyboard.press("z");
+    await page.keyboard.up("Control");
+  }
+  check(
+    "undo removes the tab probe",
+    !(await editorText()).includes(";;tab-probe"),
+    (await editorText()).slice(-120)
+  );
 
   await page.click(".cm-content");
   await page.keyboard.down("Control");
