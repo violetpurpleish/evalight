@@ -4,7 +4,7 @@ A small, live ClojureScript environment that starts in the browser.
 
 Open the site and write ClojureScript immediately. There is no account, no project wizard, and no local toolchain required for the first session. The running preview *is* the program: evaluate a form and it talks to that live image, in the spirit of Nightlight, Lisp machines, and Smalltalk.
 
-When a project outgrows the playground, export it as a ZIP. The zip is a normal directory — source, `shadow-cljs.edn`, `package.json`, a README — not an Evalight-specific document. Extract it, then keep editing the same files either with shadow-cljs or by pointing Evalight's local mode at the folder.
+When a project outgrows the playground, export it as a ZIP. The zip is a normal directory — source, `shadow-cljs.edn`, `package.json`, a README — not an Evalight-specific document. Extract it, then keep using Evalight on that folder, or open it in any other editor.
 
 ## Run it
 
@@ -51,24 +51,16 @@ Try `(bump)` in the REPL after the lamp preview has loaded.
 
 ## From playground to a real project
 
-Export ZIP is the website, not this workshop. After unzip:
+Export, unzip, and keep using Evalight on those files:
 
 ```sh
-cd lamp
-bun install
-bun run dev
-```
-
-http://localhost:3456 is the lamp app — the same page Preview showed. There is no Evalight editor at that URL.
-
-To keep using this editor on those files, run Evalight in local mode from **this** repository:
-
-```sh
-# from the Evalight checkout, not from lamp/
+# from this Evalight checkout
 bun run local /path/to/lamp
 ```
 
-Then open http://127.0.0.1:48721. Same UI, real files on disk.
+Open http://127.0.0.1:48721. Same workshop, real files on disk.
+
+Or use any other editor. From the project folder, `bun install && bun run dev` compiles the app at http://localhost:3456 — the same page Preview showed.
 
 ## Architecture
 
