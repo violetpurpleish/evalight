@@ -87,7 +87,11 @@
   [:aside.help
    [:header.help-head
     [:h2 "Living with the program"]
-    [:button.icon-btn.help-close {:on {:click [:toggle-help]} :title "Close" :aria-label "Close help"}
+    [:button.icon-btn.help-close
+     {:type "button"
+      :on {:click [:toggle-help]}
+      :title "Close"
+      :aria-label "Close help"}
      (icons/close)]]
    [:p "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler."]
    [:ul.shortcuts

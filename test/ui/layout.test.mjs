@@ -423,11 +423,8 @@ try {
   );
   check("help close is inside the popover", within(help.close, help.panel));
 
-  await page.keyboard.press("Escape").catch(() => {});
-  if (await page.$(".help")) {
-    await page.click(".help-close");
-    await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
-  }
+  await page.click(".help-close");
+  await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
   await page.waitForSelector("textarea[name=expr]", { timeout: 5000 });
   await page.waitForFunction(
@@ -940,6 +937,17 @@ try {
     (docLines(await editorText()).at(-1) ?? "") === lastBefore,
     JSON.stringify(docLines(await editorText()).at(-1))
   );
+
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.click("button.icon-btn[title='Help']");
+  await page.waitForSelector(".help", { timeout: 3000 });
+  await page.click(".help-close");
+  await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
+
+  await page.click("button[aria-label='Delete project']");
+  await page.waitForSelector(".ui-dialog", { timeout: 4000 });
+  await page.click(".ui-dialog .ui-btn-ghost");
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
 } finally {
   await browser.close();
   await stop();

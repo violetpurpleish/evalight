@@ -3,7 +3,8 @@
             [evalight.kit :as kit]
             [evalight.template :as template]
             [ui.button :as btn]
-            [ui.core :as ui]))
+            [ui.core :as ui]
+            [ui.dialog :as dialog]))
 
 (deftest cx-drops-blank-and-names-keywords
   (is (= ["ui-btn" "ui-btn-primary"]
@@ -18,6 +19,15 @@
     (is (some #{"ui-btn-primary"} (:class attrs)))
     (is (some #{"lamp"} (:class attrs)))
     (is (= "Go" (last el)))))
+
+(deftest dialog-close-hits-a-backdrop-not-the-panel
+  (let [[tag attrs backdrop panel] (dialog/dialog {:on-close [:close] :title "Hi"} "body")]
+    (is (= :div.ui-overlay tag))
+    (is (nil? (:on attrs)))
+    (is (= :div.ui-backdrop (first backdrop)))
+    (is (= {:on {:click [:close]}} (select-keys (second backdrop) [:on])))
+    (is (= :div.ui-dialog (first panel)))
+    (is (nil? (:on (second panel))))))
 
 (deftest template-ships-the-kit
   (let [files (template/files "lamp")]

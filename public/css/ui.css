@@ -91,13 +91,19 @@
 .ui-overlay {
   position: fixed;
   inset: 0;
-  background: var(--ui-overlay);
   display: grid;
   place-items: center;
-  z-index: 20;
+  z-index: 40;
   padding: 1rem;
 }
+.ui-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--ui-overlay);
+}
 .ui-dialog {
+  position: relative;
+  z-index: 1;
   width: min(28rem, calc(100vw - 2rem));
   background: var(--ui-bg);
   color: var(--ui-fg);
@@ -105,6 +111,7 @@
   border-radius: 16px;
   padding: 1.1rem;
   box-shadow: var(--ui-shadow);
+  pointer-events: auto;
 }
 .ui-dialog-title {
   font-family: var(--ui-serif);
