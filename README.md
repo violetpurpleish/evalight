@@ -37,7 +37,7 @@ Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts
 
 A first visit creates a `lamp` project in the [Origin Private File System](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system). Closing the tab does not lose it.
 
-- Edit ClojureScript with CodeMirror 6, [clojure-mode](https://github.com/nextjournal/clojure-mode), and [Parinfer](https://github.com/jurjanpaul/codemirror6-parinfer). Indentation drives the parentheses.
+- Edit ClojureScript with CodeMirror 6, [clojure-mode](https://github.com/nextjournal/clojure-mode), and [Parinfer](https://github.com/jurjanpaul/codemirror6-parinfer). **Tab** and **Shift-Tab** indent or dedent the current line; Parinfer moves the parentheses to match. Escape then Tab leaves the editor.
 - **Ctrl-Enter** evaluates the form at the cursor against the live preview. **Ctrl-Shift-Enter** evaluates the top-level form. **Alt-Enter** evaluates the file.
 - In the REPL, **Enter** evaluates and **Shift-Enter** inserts a new line.
 - The preview runs in a sandboxed iframe. User code is interpreted by [SCI](https://github.com/babashka/sci), with `replicant.dom` available so the same namespaces work in the playground and in a compiled local build.

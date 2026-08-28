@@ -98,7 +98,9 @@
     (shortcut ["Alt" "Enter"] "Evaluate the whole file")
     (shortcut ["Ctrl" "Space"] "Completions from the live preview")
     (shortcut ["Ctrl" "."] "Completions, if Ctrl-Space is taken")
-    (shortcut ["Tab"] "Parinfer follows indentation")]
+    (shortcut ["Tab"] "Indent this line; Parinfer moves the parentheses")
+    (shortcut ["Shift" "Tab"] "Dedent the line")]
+   [:p.muted "Escape, then Tab, moves focus out of the editor."]
    [:p.muted "Hover a symbol in the editor for its docstring. Completions come from the running preview, the same image the REPL talks to."]
    [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
    [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a normal zip of those files — the same tree you would open locally."]])

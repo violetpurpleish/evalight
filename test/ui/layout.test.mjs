@@ -696,6 +696,78 @@ try {
 
   await page.click(".cm-content");
   await page.keyboard.down("Control");
+  await page.keyboard.press("Home");
+  await page.keyboard.up("Control");
+
+  const editorFocus = () =>
+    page.evaluate(() => Boolean(document.activeElement?.closest(".cm-editor")));
+  const editorText = () => page.$eval(".cm-content", (el) => el.innerText);
+
+  const beforeShift = await editorText();
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("Tab");
+  await page.keyboard.up("Shift");
+  check("Shift-Tab keeps focus in the editor", await editorFocus());
+  check(
+    "Shift-Tab at column 0 does not rewrite the file",
+    (await editorText()) === beforeShift,
+    "document changed on Shift-Tab"
+  );
+
+  await page.keyboard.down("Control");
+  await page.keyboard.press("End");
+  await page.keyboard.up("Control");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(";;tab-probe");
+  const docLines = (text) => {
+    const lines = text.split("\n");
+    if (lines.length && lines[lines.length - 1] === "") lines.pop();
+    return lines;
+  };
+  const beforeTab = await editorText();
+  const beforeLines = docLines(beforeTab);
+  await page.keyboard.press("Tab");
+  const afterTab = await editorText();
+  const afterLines = docLines(afterTab);
+  const lastBefore = beforeLines.at(-1) ?? "";
+  const lastAfter = afterLines.at(-1) ?? "";
+  check(
+    "Tab indents the current line",
+    /^\s+/.test(lastAfter) && lastAfter.trim() === lastBefore.trim(),
+    JSON.stringify({ lastBefore, lastAfter })
+  );
+  check(
+    "Tab does not format the rest of the document",
+    beforeLines.slice(0, -1).join("\n") === afterLines.slice(0, -1).join("\n"),
+    `line counts ${beforeLines.length} -> ${afterLines.length}`
+  );
+  check(
+    "ns form stayed at column 0",
+    afterLines.some((l) => /^\(ns app\.core/.test(l)),
+    afterLines.find((l) => l.includes("(ns ")) ?? "missing ns"
+  );
+
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("Tab");
+  await page.keyboard.up("Shift");
+  check("Shift-Tab still keeps focus after indent", await editorFocus());
+  check(
+    "Shift-Tab dedents the current line",
+    (docLines(await editorText()).at(-1) ?? "") === lastBefore,
+    JSON.stringify(docLines(await editorText()).at(-1))
+  );
+
+  await page.keyboard.down("Control");
+  await page.keyboard.press("End");
+  await page.keyboard.up("Control");
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("Home");
+  await page.keyboard.up("Shift");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+
+  await page.click(".cm-content");
+  await page.keyboard.down("Control");
   await page.keyboard.press("End");
   await page.keyboard.up("Control");
   await page.keyboard.press("Enter");

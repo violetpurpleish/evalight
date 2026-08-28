@@ -12,6 +12,7 @@
             ["@codemirror/view" :as view]
             ["@lezer/highlight" :as lezer-hl]
             ["./cm6_parinfer.js" :as parinfer]
+            ["./cm6_tab_indent.js" :as tab-indent]
             ["@nextjournal/clojure-mode" :as clj-mode]
             ["@nextjournal/clojure-mode/extensions/eval-region" :as eval-region]
             [evalight.intel :as intel]
@@ -195,10 +196,18 @@
                      #js {:key "Ctrl-." :run ac/startCompletion}
                      #js {:key "Alt-/" :run ac/startCompletion}])))
 
+(defn- without-tab [keymap]
+  "clojure-mode binds Tab to format-all. Parinfer owns indent instead."
+  (.filter keymap (fn [^js b] (not= (.-key b) "Tab"))))
+
+(defn- tab-indent-keymap []
+  (.high cm-state/Prec
+         (.of view/keymap #js [(.-tabIndentKeymap tab-indent)])))
+
 (defn- clojure-exts [on-eval]
   (flatten-exts
    [(.-default_extensions clj-mode)
-    (.of view/keymap (.-complete_keymap clj-mode))
+    (.of view/keymap (without-tab (.-complete_keymap clj-mode)))
     (.extension eval-region #js {:modifier (eval-modifier)})
     (eval-keymap on-eval)
     (ac/autocompletion #js {:override #js [complete-source]
@@ -235,6 +244,7 @@
       (.of view/keymap (.-historyKeymap commands))
       (.of view/keymap (.-defaultKeymap commands))
       (.of view/keymap (.-searchKeymap search))
+      (tab-indent-keymap)
       (on-change-ext on-change)
       (when (= lang :clojure) (clojure-exts on-eval))
       (lang-ext lang)])))
