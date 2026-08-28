@@ -78,7 +78,12 @@
                              :error (:error result)})))))
       (when (seq main)
         (sci/eval-string* ctx (str "(in-ns '" main ")"))
-        (reset! !main (symbol main)))
+        (reset! !main (symbol main))
+        (let [mounted (eval-string ctx "(when-let [f (resolve 'init)] (f))")]
+          (when-not (:ok mounted)
+            (throw (ex-info (str "Error in " main "/init: "
+                                 (get-in mounted [:error :message]))
+                            {:error (:error mounted)})))))
       {:ok true}
       (catch :default e
         {:ok false

@@ -184,9 +184,15 @@
               :checked (boolean (:live? preview))
               :on {:change [:toggle-live]}}]
      "Live"]
+    (when (= :loading (:status preview))
+      [:span.muted "loading"])
     (when (:error preview)
       [:span.preview-error {:title (:error preview)} "error"])]
    [:div.preview-frame
+    (when-let [err (:error preview)]
+      [:div.preview-banner
+       [:p "The lamp did not start."]
+       [:pre err]])
     [:iframe {:src "/preview.html"
               :sandbox "allow-scripts"
               :title "Live application preview"

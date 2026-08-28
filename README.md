@@ -76,7 +76,9 @@ evalight.fs.protocol
 
 The rest of the application (tree, editor, preview, export) talks only to the protocol: list, read, write, mkdir, rename, delete.
 
-The preview is a second shadow-cljs build (`:preview`). It hosts an SCI interpreter and a copy of Replicant. Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
+The preview is a second shadow-cljs build (`:preview`). It hosts an SCI interpreter and a copy of Replicant. The iframe is sandboxed with `allow-scripts` only, so user code cannot reach the IDE. That also means the shadow-cljs watch client has to stay off for this build: it would try to reload `preview.html` from a unique origin, the browser would block the navigation, and the lamp would never appear.
+
+Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
 
 ## Tests
 

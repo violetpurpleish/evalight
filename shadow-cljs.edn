@@ -29,7 +29,12 @@
   {:target :browser
    :output-dir "public/js/preview"
    :asset-path "/js/preview"
-   :modules {:preview {:init-fn evalight.preview.runtime/init}}}
+   :modules {:preview {:init-fn evalight.preview.runtime/init}}
+   ;; Sandboxed iframe (allow-scripts only). The watch client would
+   ;; document.location.reload() preview.html, which the browser
+   ;; rejects as a navigation from a unique origin, and the lamp
+   ;; never paints.
+   :devtools {:enabled false}}
 
   :test
   {:target :node-test

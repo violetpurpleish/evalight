@@ -82,15 +82,15 @@
    0))
 
 (defn reload-frame!
-  "Force a fresh SCI image by reloading the iframe document."
+  "Force a fresh SCI image by reloading the iframe document.
+  Assign a new URL from the parent. Do not blank src first: a
+  sandboxed frame cannot navigate itself, and an empty src is
+  not a useful intermediate document."
   []
   (reset! !ready false)
+  (reset! !queue [])
   (when-let [iframe @!iframe]
-    (let [src (.-src iframe)]
-      (set! (.-src iframe) "")
-      (js/requestAnimationFrame
-       (fn []
-         (set! (.-src iframe) (or (not-empty src) "/preview.html")))))))
+    (set! (.-src iframe) (str "/preview.html?t=" (js/Date.now)))))
 
 (defn parse-config [source]
   (try
