@@ -51,7 +51,7 @@ Try `(bump)` in the REPL after the lamp preview has loaded.
 
 ## From playground to a real project
 
-Export, unzip, then:
+Export ZIP is the website, not this workshop. After unzip:
 
 ```sh
 cd lamp
@@ -59,16 +59,16 @@ bun install
 bun run dev
 ```
 
-That compiles the app with shadow-cljs at http://localhost:3456.
+http://localhost:3456 is the lamp app — the same page Preview showed. There is no Evalight editor at that URL.
 
-To keep using Evalight on those files:
+To keep using this editor on those files, run Evalight in local mode from **this** repository:
 
 ```sh
-# from this Evalight checkout
+# from the Evalight checkout, not from lamp/
 bun run local /path/to/lamp
 ```
 
-The UI is the same. The filesystem protocol is implemented by a tiny Bun server instead of OPFS.
+Then open http://127.0.0.1:48721. Same UI, real files on disk.
 
 ## Architecture
 

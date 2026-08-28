@@ -39,6 +39,7 @@
         out (ns-graph/with-forward-refs src)]
     (is (= '[store view render bump toggle-about open-rename close-rename save-title retitle init]
            (ns-graph/top-level-defs src)))
+    (is (re-find #"\(declare bump toggle-about open-rename close-rename save-title retitle\)" src))
     (is (re-find #"\(declare store view render bump toggle-about open-rename close-rename save-title retitle init\)" out))))
 
 (deftest load-order-puts-dependencies-first
