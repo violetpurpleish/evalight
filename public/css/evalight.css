@@ -488,6 +488,9 @@ code, pre { font-family: var(--mono); }
   right: 1rem;
   top: 4.2rem;
   width: min(24rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 5.2rem);
+  display: flex;
+  flex-direction: column;
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -495,14 +498,20 @@ code, pre { font-family: var(--mono); }
   box-shadow: var(--shadow);
   z-index: 300;
   pointer-events: auto;
+  overflow: hidden;
 }
-.help-head { display: flex; align-items: flex-start; gap: 0.75rem; padding-right: 2rem; }
+.help-head { display: flex; align-items: flex-start; gap: 0.75rem; padding-right: 2rem; flex: 0 0 auto; }
 .help h2 { font-family: var(--serif); margin: 0; font-size: 1.2rem; flex: 1; min-width: 0; }
 .help-close {
   position: absolute;
   top: 0.55rem;
   right: 0.55rem;
   z-index: 1;
+}
+.help-body {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 .help p { color: var(--muted); line-height: 1.5; }
 .shortcuts { list-style: none; padding: 0; }

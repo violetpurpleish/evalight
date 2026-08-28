@@ -83,7 +83,7 @@
     (map (fn [k] [:kbd {:replicant/key k} k]) keys)]
    [:span label]])
 
-(defn help-panel []
+(defn help-panel [state]
   [:aside.help {:replicant/key :help-panel}
    [:header.help-head
     [:h2 "Living with the program"]
@@ -93,16 +93,19 @@
       :title "Close"
       :aria-label "Close help"}
      (icons/close)]]
-   [:p "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler."]
-   [:ul.shortcuts
-    (shortcut ["Tab"] "Indent this line, or accept a completion when the list is showing")
-    (shortcut ["Shift" "Tab"] "Dedent. Parinfer moves the parentheses.")
-    (shortcut ["Enter"] "New line in the editor. Evaluate in the REPL.")
-    (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")]
-   [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
-   [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
-   [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
-   [:p.muted "Projects in the browser live in the Origin Private File System. Export from this playground writes a zip of those files, with a freshly built Evalight in the folder. Unzip and `bun run evalight` to keep editing here. Export from an already-unzipped project copies that folder's Evalight; it does not rebuild it. `bun run dev` compiles the site at localhost:3456 if you want another editor."]])
+   [:div.help-body
+    [:p "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler."]
+    [:ul.shortcuts
+     (shortcut ["Tab"] "Indent this line, or accept a completion when the list is showing")
+     (shortcut ["Shift" "Tab"] "Dedent. Parinfer moves the parentheses.")
+     (shortcut ["Enter"] "New line in the editor. Evaluate in the REPL.")
+     (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")]
+    [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
+    [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
+    [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
+    (if (= :local (:mode state))
+      [:p.muted "These files are on disk. `bun run dev` compiles the site at localhost:3456 if you want another editor."]
+      [:p.muted "Projects live in this browser. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to keep using this workshop. `bun run dev` compiles the site at localhost:3456."])]])
 
 (defn- tree-file-paths [nodes]
   (mapcat (fn [n]
@@ -320,7 +323,8 @@
         :title "Delete project"
         :aria-label "Delete project"}
        (icons/trash)])
-    [:button.ghost {:on {:click [:export]}} (icons/download) "Export ZIP"]
+    (when (= :browser (:mode state))
+      [:button.ghost {:on {:click [:export]}} (icons/download) "Export ZIP"])
     [:button.primary {:on {:click [:run]}} (icons/play) "Run"]
     [:button.icon-btn {:on {:click [:toggle-help]} :title "Help"}
      (icons/help)]]])
@@ -405,7 +409,7 @@
        (preview-pane state)
        (when-not preview-open? (pane-rail :preview))]
       (mobile-tabs state)]
-     (when (:help? state) (help-panel))
+     (when (:help? state) (help-panel state))
      (when (:dialog state)
        (dialog state))
      (notice state)]))

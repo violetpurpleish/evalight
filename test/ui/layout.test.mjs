@@ -444,6 +444,46 @@ try {
   check("help does not teach Ctrl-Shift-Enter", !/Ctrl.?Shift.?Enter/.test(helpCopy.text));
   check("help does not teach Escape then Tab", !/Escape/.test(helpCopy.text));
 
+  const helpBox = await page.evaluate(() => {
+    const panel = document.querySelector(".help");
+    const r = panel.getBoundingClientRect();
+    return {
+      top: r.top,
+      bottom: r.bottom,
+      innerHeight: window.innerHeight,
+      overflow: getComputedStyle(panel).overflow,
+      bodyOverflow: getComputedStyle(panel.querySelector(".help-body")).overflow,
+    };
+  });
+  check(
+    "help popover stays in the viewport",
+    helpBox.top >= 0 && helpBox.bottom <= helpBox.innerHeight + 1,
+    JSON.stringify(helpBox)
+  );
+  check(
+    "help body can scroll if the copy is long",
+    /auto|scroll/.test(helpBox.bodyOverflow),
+    helpBox.bodyOverflow
+  );
+
+  await page.setViewport({ width: 900, height: 560 });
+  const helpShort = await page.evaluate(() => {
+    const panel = document.querySelector(".help");
+    const r = panel.getBoundingClientRect();
+    return {
+      top: r.top,
+      bottom: r.bottom,
+      height: r.height,
+      innerHeight: window.innerHeight,
+    };
+  });
+  check(
+    "help popover stays in a short viewport",
+    helpShort.top >= 0 && helpShort.bottom <= helpShort.innerHeight + 1,
+    JSON.stringify(helpShort)
+  );
+  await page.setViewport({ width: 1440, height: 900 });
+
   await page.click(".help-close");
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 

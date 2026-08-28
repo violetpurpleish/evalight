@@ -46,7 +46,7 @@ A first visit creates a `lamp` project in the [Origin Private File System](https
 - **Delete project** removes the current browser project after a confirmation. Local mode has no such button, because that folder is yours on disk.
 - Hover a symbol to see its docstring and arglists. Completions come from the running program, not a separate language server.
 - **Add UI** in the Files pane copies a Replicant control into `src/ui`. Those files are source, not a package. If a control is already in the project, Restore writes the original file back over your edits. Delete a file you do not want. New projects already include the kit.
-- **Export ZIP** from this playground (or `bun run dev`) downloads the project plus a freshly built Evalight. After unzip, `bun run evalight` is this workshop on those files. Export from an already-unzipped project copies the Evalight already in that folder; it cannot recompile it.
+- **Export ZIP** from the playground downloads the project plus a freshly built Evalight. After unzip, `bun run evalight` is this workshop on those files. That copy has no Export button: you are already on disk.
 
 Try `(bump)` in the REPL after the lamp preview has loaded.
 

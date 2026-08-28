@@ -563,10 +563,7 @@
                      path (:active-file @state/app)]
                  (.then (export/download (now-fs) name)
                         (fn [_]
-                          (let [done (fn []
-                                          (flash! (if (= :local (:mode @state/app))
-                                                     (str "Exported " name ".zip. This zip has the Evalight already in this folder.")
-                                                     (str "Exported " name ".zip"))))]
+                          (let [done (fn [] (flash! (str "Exported " name ".zip")))]
                             (if (contains? #{"README.md" "package.json"} path)
                               (.then (fs/read-file (now-fs) path)
                                      (fn [content]

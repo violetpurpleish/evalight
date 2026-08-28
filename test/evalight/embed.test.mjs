@@ -157,6 +157,29 @@ try {
       "lamp click did not increment",
     );
     assert.equal(count, "1");
+    const chrome = await page.evaluate(() => ({
+      exportZip: [...document.querySelectorAll("nav.actions button")].map((b) => b.textContent.trim()),
+      help: null,
+    }));
+    assert.equal(
+      chrome.exportZip.some((t) => /export/i.test(t)),
+      false,
+      "exported Evalight should not offer Export ZIP: " + chrome.exportZip.join(", "),
+    );
+    await page.click("button.icon-btn[title='Help']");
+    await page.waitForSelector(".help", { timeout: 3000 });
+    const helpFit = await page.evaluate(() => {
+      const panel = document.querySelector(".help");
+      const r = panel.getBoundingClientRect();
+      return {
+        top: r.top,
+        bottom: r.bottom,
+        innerHeight: window.innerHeight,
+        clipped: r.bottom > window.innerHeight + 1,
+      };
+    });
+    assert.equal(helpFit.clipped, false, JSON.stringify(helpFit));
+    await page.click(".help-close");
     console.log("embed.test.mjs ok", dump);
   } finally {
     await browser.close();
