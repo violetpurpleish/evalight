@@ -42,6 +42,7 @@ A first visit creates a `lamp` project in the [Origin Private File System](https
 - In the REPL, **Enter** evaluates and **Shift-Enter** inserts a new line.
 - The preview runs in a sandboxed iframe. User code is interpreted by [SCI](https://github.com/babashka/sci), with `replicant.dom` available so the same namespaces work in the playground and in a compiled local build.
 - Drag the divider between Files, the editor, and Preview to resize the columns. Double-click a divider to restore its default width. The header can hide Files or Preview, and each of those panes has the same control. Hiding Preview keeps the iframe loaded, so the REPL still talks to the running program.
+- **Delete project** removes the current browser project after a confirmation. Local mode has no such button, because that folder is yours on disk.
 - **Export ZIP** downloads the project tree as it exists on disk.
 
 Try `(bump)` in the REPL after the lamp preview has loaded.

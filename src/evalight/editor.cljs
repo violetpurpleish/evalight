@@ -198,6 +198,10 @@
   (reset! !view nil)
   (reset! !path nil))
 
+(defn clear-buffers! []
+  (reset! !states {})
+  (reset! !path nil))
+
 (defn save-current-state! []
   (when (and @!view @!path)
     (swap! !states assoc @!path (.-state ^js @!view))))

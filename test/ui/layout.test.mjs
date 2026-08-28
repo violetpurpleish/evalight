@@ -448,6 +448,64 @@ try {
     () => (document.querySelector("section.preview")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
   );
+
+  const currentProject = await page.$eval("#project-select", (el) => el.value);
+  check("delete project button is present", Boolean(await page.$("button[aria-label='Delete project']")));
+  await page.click("button[aria-label='Delete project']");
+  await page.waitForSelector(".modal", { timeout: 4000 });
+  const deleteDialog = await page.evaluate(() => {
+    const modal = document.querySelector(".modal");
+    return {
+      title: modal?.querySelector("h2")?.textContent ?? "",
+      text: modal?.innerText ?? "",
+      confirm: modal?.querySelector("button.danger")?.textContent?.trim() ?? "",
+    };
+  });
+  check("delete project dialog title", deleteDialog.title === "Delete project", deleteDialog.title);
+  check(
+    "delete project dialog names the current project",
+    deleteDialog.text.includes(currentProject),
+    deleteDialog.text.slice(0, 300)
+  );
+  check("delete project confirm is a danger button", deleteDialog.confirm === "Delete project", deleteDialog.confirm);
+  await page.click(".modal button.ghost");
+  await page.waitForSelector(".modal", { hidden: true, timeout: 4000 });
+  const afterCancel = await page.$eval("#project-select", (el) => el.value);
+  check("cancel keeps the current project", afterCancel === currentProject, afterCancel);
+
+  await page.evaluate(() => {
+    const btn = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "New project");
+    btn?.click();
+  });
+  await page.waitForSelector(".modal input[name=name]", { timeout: 4000 });
+  await page.focus(".modal input[name=name]");
+  await page.keyboard.type("doomed");
+  await page.click(".modal button.primary");
+  await page.waitForFunction(
+    () => [...document.querySelectorAll("#project-select option")].some((o) => o.value === "doomed"),
+    { timeout: 15000 }
+  );
+  await page.waitForFunction(
+    () => document.querySelector("#project-select")?.value === "doomed",
+    { timeout: 10000 }
+  );
+
+  await page.click("button[aria-label='Delete project']");
+  await page.waitForSelector(".modal button.danger", { timeout: 4000 });
+  await page.click(".modal button.danger");
+  await page.waitForFunction(
+    () => !document.querySelector(".modal") && document.querySelector("#project-select")?.value !== "doomed",
+    { timeout: 15000 }
+  );
+  const afterDelete = await page.evaluate(() => {
+    const select = document.querySelector("#project-select");
+    return {
+      value: select?.value ?? "",
+      names: [...document.querySelectorAll("#project-select option")].map((o) => o.value),
+    };
+  });
+  check("deleted project is gone from the picker", !afterDelete.names.includes("doomed"), afterDelete.names.join(", "));
+  check("another project is open after delete", Boolean(afterDelete.value) && afterDelete.value !== "doomed", afterDelete.value);
 } finally {
   await browser.close();
   await stop();

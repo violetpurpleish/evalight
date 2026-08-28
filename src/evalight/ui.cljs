@@ -95,7 +95,7 @@
     (shortcut ["Tab"] "Parinfer follows indentation")]
    [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a normal zip of those files — the same tree you would open locally."]])
 
-(defn dialog [{:keys [kind value path]}]
+(defn dialog [{:keys [kind value path] :as d}]
   [:div.modal-backdrop {:on {:click [:close-dialog]}}
    [:form.modal
     {:on {:click (fn [e] (.stopPropagation e))
@@ -104,7 +104,8 @@
                     :new-folder [:submit-new-folder]
                     :new-project [:submit-new-project]
                     :rename [:submit-rename]
-                    :delete [:confirm-delete])}}
+                    :delete [:confirm-delete]
+                    :delete-project [:confirm-delete-project])}}
     (case kind
       :new-file
       [:div
@@ -161,7 +162,20 @@
        [:p "Delete " [:code path] "? This cannot be undone."]
        [:div.modal-actions
         [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
-        [:button.danger {:type "submit"} "Delete"]]])]])
+        [:button.danger {:type "submit"} "Delete"]]]
+
+      :delete-project
+      [:div
+       [:h2 "Delete project"]
+       [:p "Delete " [:code (:name d)] " from this browser? The files are gone for good."]
+       (when (:last? d)
+         [:p.muted "This is the only project, so a new lamp will take its place."])
+       [:div.modal-actions
+        [:button.ghost {:type "button" :on {:click [:close-dialog]}} "Cancel"]
+        [:button.danger {:type "submit"
+                         :replicant/on-mount (fn [{:keys [replicant/node]}]
+                                               (.focus node))}
+         "Delete project"]]])]])
 
 (defn repl-pane [{:keys [repl]}]
   [:section.repl {:replicant/key "repl-pane"}
@@ -278,6 +292,12 @@
      (icons/panel-right)]
     (when (= :browser (:mode state))
       [:button.ghost {:on {:click [:new-project-dialog]}} "New project"])
+    (when (= :browser (:mode state))
+      [:button.icon-btn.delete-project
+       {:on {:click [:delete-project-dialog]}
+        :title "Delete project"
+        :aria-label "Delete project"}
+       (icons/trash)])
     [:button.ghost {:on {:click [:export]}} (icons/download) "Export ZIP"]
     [:button.primary {:on {:click [:run]}} (icons/play) "Run"]
     [:button.icon-btn {:on {:click [:toggle-help]} :title "Help"}

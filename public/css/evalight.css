@@ -105,6 +105,10 @@ code, pre { font-family: var(--mono); }
   font-weight: 600;
 }
 .danger { background: var(--ember); border-color: var(--ember); color: white; }
+.icon-btn.delete-project:hover {
+  border-color: var(--ember);
+  color: #ffd1c2;
+}
 .icon-btn { padding: 0.38rem; }
 .icon-btn svg, .ghost svg, .primary svg { width: 1rem; height: 1rem; }
 .layout-toggle[aria-pressed="true"] {

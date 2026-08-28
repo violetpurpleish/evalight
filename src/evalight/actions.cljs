@@ -189,6 +189,7 @@
     (-> fs-p
         (.then (fn [project-fs]
                  (reset! !fs project-fs)
+                 (editor/clear-buffers!)
                  (swap! state/app assoc :project name :active-file nil :dirty #{} :tree [])
                  (if-let [ws @!workspace]
                    (fs/write-file ws "workspace.json"
@@ -279,6 +280,38 @@
                  (swap! state/app assoc :active-file nil))
                (refresh-tree!)))
       (.then (fn [_] (flash! (str "Deleted " path))))))
+
+(defn- seed-lamp! []
+  (-> (opfs/open ["evalight" "projects" "lamp"])
+      (.then (fn [dest] (write-template! dest "lamp")))
+      (.then (fn [_] (refresh-projects!)))
+      (.then (fn [_] (open-project! "lamp")))))
+
+(defn delete-project! [project-name]
+  (let [name (or project-name (:project @state/app))]
+    (cond
+      (not= :browser (:mode @state/app))
+      (p/ok (flash! "Local mode opens a folder on disk. Delete that folder there." :err))
+
+      (str/blank? name)
+      (p/ok (flash! "No project to delete." :err))
+
+      (nil? @!workspace)
+      (p/ok (flash! "Browser projects need OPFS." :err))
+
+      :else
+      (do
+        (swap! state/app assoc :dialog nil)
+        (-> (fs/delete @!workspace (paths/join "projects" name))
+            (.then (fn [_]
+                     (editor/clear-buffers!)
+                     (swap! state/app assoc :active-file nil :dirty #{} :tree [] :project nil)
+                     (refresh-projects!)))
+            (.then (fn [names]
+                     (if (seq names)
+                       (open-project! (first names))
+                       (seed-lamp!))))
+            (.then (fn [_] (flash! (str "Deleted " name)))))))))
 
 (defn rename-path! [from to]
   (let [to (paths/normalize to)]
@@ -460,6 +493,9 @@
       :new-project-dialog (set-dialog! {:kind :new-project :value ""})
       :rename-dialog (set-dialog! {:kind :rename :from (first args) :value (first args)})
       :delete-dialog (set-dialog! {:kind :delete :path (first args)})
+      :delete-project-dialog (set-dialog! {:kind :delete-project
+                                            :name (:project @state/app)
+                                            :last? (= 1 (count (:projects @state/app)))})
       :close-dialog (close-dialog!)
       :toggle-help (toggle-help!)
       :toggle-live (toggle-live!)
@@ -502,6 +538,8 @@
                           (catch-ui (rename-path! from v))))
       :confirm-delete (catch-ui (delete-path! (or (first args)
                                                      (:path (:dialog @state/app)))))
+      :confirm-delete-project (catch-ui (delete-project! (or (first args)
+                                                             (:name (:dialog @state/app)))))
       nil)))
 
 (defn- boot-local [meta]
