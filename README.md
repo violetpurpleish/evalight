@@ -15,6 +15,14 @@ bun install
 bun run dev
 ```
 
+`bun install` must finish before `bun run dev`. It collapses nested `@codemirror` copies; without that, the editor fails to start (`multiple instances of @codemirror/state`) and files will not open. If you already have `node_modules` from an older checkout:
+
+```sh
+rm -rf node_modules public/js .shadow-cljs
+bun install
+bun run dev
+```
+
 Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts shadow-cljs in watch mode and serves the UI from `public/`.
 
 | Script | What it does |

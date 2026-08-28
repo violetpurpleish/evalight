@@ -9,7 +9,7 @@
             ["@codemirror/search" :as search]
             ["@codemirror/state" :as cm-state]
             ["@codemirror/view" :as view]
-            ["@jurjanpaul/codemirror6-parinfer" :as parinfer]
+            ["./cm6_parinfer.js" :as parinfer]
             ["@nextjournal/clojure-mode" :as clj-mode]
             ["@nextjournal/clojure-mode/extensions/eval-region" :as eval-region]
             [evalight.paths :as paths]))
