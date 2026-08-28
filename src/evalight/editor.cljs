@@ -9,6 +9,7 @@
             ["@codemirror/search" :as search]
             ["@codemirror/state" :as cm-state]
             ["@codemirror/view" :as view]
+            ["@lezer/highlight" :as lezer-hl]
             ["./cm6_parinfer.js" :as parinfer]
             ["@nextjournal/clojure-mode" :as clj-mode]
             ["@nextjournal/clojure-mode/extensions/eval-region" :as eval-region]
@@ -60,6 +61,32 @@
                                      :background "transparent"}
             ".cm-scroller" {:overflow "auto"}
             "&.cm-focused" {:outline "none"}})))
+
+(def highlight-style
+  "Highlight colors for the dark workshop background. CodeMirror's
+  defaultHighlightStyle is a light-theme palette and disappears here."
+  (let [t (.-tags lezer-hl)]
+    (.define language/HighlightStyle
+             #js [#js {:tag (.-keyword t) :color "#f0c674"}
+                  #js {:tag #js [(.-atom t) (.-null t) (.-bool t)] :color "#ffb086"}
+                  #js {:tag (.-string t) :color "#9dcf7a"}
+                  #js {:tag (.-number t) :color "#ffd27a"}
+                  #js {:tag #js [(.-comment t) (.-lineComment t) (.-blockComment t)]
+                       :color "#b09f85"
+                       :fontStyle "italic"}
+                  #js {:tag (.-emphasis t) :color "#b8d39a" :fontStyle "italic"}
+                  #js {:tag (.definition t (.-variableName t)) :color "#c5e4ff"}
+                  #js {:tag (.-variableName t) :color "#efe6d6"}
+                  #js {:tag #js [(.-typeName t) (.-tagName t) (.-className t)] :color "#7ec8e3"}
+                  #js {:tag #js [(.-propertyName t) (.-attributeName t)] :color "#e4c99a"}
+                  #js {:tag (.-regexp t) :color "#7eb8c9"}
+                  #js {:tag #js [(.-operator t) (.-punctuation t)] :color "#d8ccb4"}
+                  #js {:tag #js [(.-bracket t) (.-paren t) (.-squareBracket t) (.-brace t)]
+                       :color "#cbbfa6"}
+                  #js {:tag (.-heading t) :color "#f0c674" :fontWeight "bold"}
+                  #js {:tag #js [(.-link t) (.-url t)] :color "#7ec8e3"}
+                  #js {:tag (.-invalid t) :color "#ff8a78"}
+                  #js {:tag (.-meta t) :color "#c4b496"}])))
 
 (defn- flatten-exts [xs]
   (let [out #js []]
@@ -126,7 +153,7 @@
       (view/highlightActiveLineGutter)
       (view/drawSelection)
       (language/foldGutter)
-      (language/syntaxHighlighting language/defaultHighlightStyle #js {:fallback true})
+      (language/syntaxHighlighting highlight-style #js {:fallback true})
       (.of view/keymap (.-historyKeymap commands))
       (.of view/keymap (.-defaultKeymap commands))
       (.of view/keymap (.-searchKeymap search))
