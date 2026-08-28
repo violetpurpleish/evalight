@@ -33,6 +33,7 @@
    [:button.tree-item
     {:on {:click [:open-file path]}
      :class (when (= path (:active-file state)) "is-active")}
+    [:span.twisty.tree-leaf {:aria-hidden "true"}]
     (icons/file)
     [:span.tree-name name]
     (when (dirty? state path)

@@ -100,6 +100,35 @@ try {
   const names = await page.$$eval(".tree-name", (els) => els.map((e) => e.textContent));
   const fileIdx = names.findIndex((n) => n === "core.cljs" || n.endsWith(".cljs"));
   assert.ok(fileIdx >= 0, `expected a cljs file in the tree, got ${names.join(", ")}`);
+
+  const indent = await page.evaluate(() => {
+    const lefts = {};
+    for (const el of document.querySelectorAll(".tree-name")) {
+      lefts[el.textContent] = el.getBoundingClientRect().left;
+    }
+    return lefts;
+  });
+  const step = (child, parent, min = 14) => {
+    const a = indent[child];
+    const b = indent[parent];
+    check(
+      `${child} is indented under ${parent}`,
+      Number.isFinite(a) && Number.isFinite(b) && a - b >= min,
+      `${child}=${a} ${parent}=${b} delta=${(a - b).toFixed(1)}`
+    );
+  };
+  step("index.html", "public");
+  step("app", "src");
+  step("core.cljs", "app");
+  step("core.cljs", "src", 28);
+  if (Number.isFinite(indent[".gitignore"]) && Number.isFinite(indent.public)) {
+    check(
+      "root files align with root folders",
+      Math.abs(indent[".gitignore"] - indent.public) < 10,
+      `gitignore=${indent[".gitignore"]} public=${indent.public}`
+    );
+  }
+
   const rows = await page.$$(".tree-row");
   await rows[fileIdx].hover();
   await new Promise((r) => setTimeout(r, 120));
