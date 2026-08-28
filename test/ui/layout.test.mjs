@@ -540,10 +540,84 @@ try {
     els.map((e) => e.textContent)
   );
   check("live completions include bump", labels.some((t) => /bump/i.test(t)), labels.join(" | "));
+  const onScreen = await page.evaluate(() => {
+    const tip = document.querySelector(".cm-tooltip-autocomplete");
+    if (!tip) return { missing: true };
+    const r = tip.getBoundingClientRect();
+    const x = r.left + Math.min(24, r.width / 2);
+    const y = r.top + Math.min(12, r.height / 2);
+    const hit = document.elementFromPoint(x, y);
+    return {
+      w: r.width,
+      h: r.height,
+      top: r.top,
+      parent: tip.parentElement?.tagName,
+      hit: Boolean(hit && tip.contains(hit)),
+    };
+  });
+  check(
+    "completion list is visible on screen",
+    !onScreen.missing && onScreen.w > 16 && onScreen.h > 8 && onScreen.hit,
+    JSON.stringify(onScreen)
+  );
   await page.keyboard.press("Escape");
   await page.keyboard.down("Control");
   await page.keyboard.press("z");
   await page.keyboard.up("Control");
+
+  const bumpPos = await page.evaluate(() => {
+    const root = document.querySelector(".cm-content");
+    if (!root) return null;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const i = node.textContent.indexOf("bump");
+      if (i < 0) continue;
+      const range = document.createRange();
+      range.setStart(node, i);
+      range.setEnd(node, i + 4);
+      const r = range.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }
+    return null;
+  });
+  check("found bump in the editor to hover", Boolean(bumpPos), JSON.stringify(bumpPos));
+  if (bumpPos) {
+    await page.mouse.move(8, 8);
+    await page.mouse.move(bumpPos.x, bumpPos.y);
+    try {
+      await page.waitForSelector(".cm-evalight-doc", { timeout: 5000 });
+    } catch (err) {
+      throw new Error("Hover docs did not appear over bump");
+    }
+    const hover = await page.evaluate(() => {
+      const tip = document.querySelector(".cm-evalight-doc");
+      if (!tip) return { missing: true };
+      const r = tip.getBoundingClientRect();
+      const x = r.left + Math.min(24, r.width / 2);
+      const y = r.top + Math.min(12, r.height / 2);
+      const hit = document.elementFromPoint(x, y);
+      return {
+        w: r.width,
+        h: r.height,
+        top: r.top,
+        parent: tip.closest(".cm-tooltip")?.parentElement?.tagName,
+        text: tip.textContent,
+        hit: Boolean(hit && tip.contains(hit)),
+      };
+    });
+    check(
+      "hover docs are visible on screen",
+      !hover.missing && hover.w > 16 && hover.h > 8 && hover.hit,
+      JSON.stringify(hover)
+    );
+    check(
+      "hover docs mention bump",
+      /bump/i.test(hover.text ?? ""),
+      hover.text
+    );
+  }
 } finally {
   await browser.close();
   await stop();

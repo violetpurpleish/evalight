@@ -174,11 +174,10 @@
 (defn- hover-source [^js view pos _side]
   (when-let [tok (symbol-at (.-state view) pos)]
     (when-let [info (intel/lookup (:text tok))]
-      (when (or (seq (:doc info)) (seq (:arglists info)))
-        #js {:pos (:from tok)
-             :end (:to tok)
-             :above true
-             :create (fn [_] #js {:dom (doc-el info)})}))))
+      #js {:pos (:from tok)
+           :end (:to tok)
+           :above true
+           :create (fn [_] #js {:dom (doc-el info)})})))
 
 (defn- lang-ext [lang]
   (case lang
@@ -211,6 +210,7 @@
       (view/highlightActiveLine)
       (view/highlightActiveLineGutter)
       (view/drawSelection)
+      (view/tooltips #js {:parent (.-body js/document)})
       (language/foldGutter)
       (language/syntaxHighlighting highlight-style #js {:fallback true})
       (.of view/keymap (.-historyKeymap commands))

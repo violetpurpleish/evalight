@@ -26,10 +26,17 @@
 
 (deftest live-intel-wins-over-source
   (intel/index-sources!
-   [{:path "src/app/core.cljs" :source "(ns app.core)\n(defn bump [])"}]
+   [{:path "src/app/core.cljs" :source "(ns app.core)\n(defn bump \"from source\" [] 1)"}]
    "app.core")
   (intel/set-live! [{:name "bump" :kind "var" :ns "app.core" :doc "from SCI"}] "app.core")
   (is (= "from SCI" (:doc (intel/lookup "bump")))))
+
+(deftest live-intel-keeps-source-docs
+  (intel/index-sources!
+   [{:path "src/app/core.cljs" :source "(ns app.core)\n(defn bump \"Increment the lamp.\" [] 1)"}]
+   "app.core")
+  (intel/set-live! [{:name "bump" :kind "var" :ns "app.core"}] "app.core")
+  (is (re-find #"Increment" (:doc (intel/lookup "bump")))))
 
 (deftest sci-intel-form-sees-bump
   (let [ctx (sci/init {})]

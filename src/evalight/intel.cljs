@@ -63,10 +63,21 @@
           :live (vec items)
           :ns (or ns-name (:ns @!catalog)))))
 
+(defn- blend [live source]
+  (if-not live
+    source
+    (cond-> live
+      (and (not (seq (:doc live))) (seq (:doc source))) (assoc :doc (:doc source))
+      (and (not (seq (:arglists live))) (seq (:arglists source))) (assoc :arglists (:arglists source)))))
+
 (defn- merged-items []
   (let [{:keys [live source]} @!catalog
-        seen (into #{} (map :name live))]
-    (into (vec live) (remove #(contains? seen (:name %)) source))))
+        live-by (into {} (map (juxt :name identity) live))
+        source-by (into {} (map (juxt :name identity) source))]
+    (vec
+     (concat
+      (map (fn [item] (blend item (get source-by (:name item)))) live)
+      (remove #(contains? live-by (:name %)) source)))))
 
 (defn candidates
   "Up to 50 names that start with `prefix` (case-insensitive)."
