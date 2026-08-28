@@ -16,6 +16,15 @@
 (defn- editor-unmount [_]
   (editor/destroy!))
 
+(defn- resize-repl-field! [el]
+  (when el
+    (let [style (.-style el)]
+      (set! (.-height style) "auto")
+      (set! (.-height style) (str (min (.-scrollHeight el) 160) "px")))))
+
+(defn- repl-expr-mount [{:keys [replicant/node]}]
+  (resize-repl-field! node))
+
 (defn- preview-mount [{:keys [replicant/node]}]
   (preview/attach! node actions/on-preview-event))
 
@@ -77,6 +86,8 @@
      (icons/close)]]
    [:p "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler."]
    [:ul.shortcuts
+    (shortcut ["Enter"] "Evaluate in the REPL")
+    (shortcut ["Shift" "Enter"] "New line in the REPL")
     (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")
     (shortcut ["Ctrl" "Shift" "Enter"] "Evaluate the top-level form")
     (shortcut ["Alt" "Enter"] "Evaluate the whole file")
@@ -166,17 +177,23 @@
         [:div {:replicant/key id :class ["repl-line" (str "is-" (name kind))]}
          [:span.gutter (case kind :in "›" :err "!" "=")]
          [:pre text]])
-      [:p.muted.empty "Evaluate a form with Ctrl-Enter. Results come from the live preview, so (bump) will move the lamp."])]
+      [:p.muted.empty "Enter evaluates. Shift-Enter adds a line. Results come from the live preview, so (bump) will move the lamp."])]
    [:form.repl-input
     {:replicant/key "repl-form"
      :on {:submit [:submit-repl]}}
     [:span.gutter "›"]
-    [:input {:type "text"
-             :name "expr"
-             :placeholder "(bump)"
-             :autocomplete "off"
-             :spellcheck "false"
-             :replicant/key "repl-expr"}]]])
+    [:textarea {:name "expr"
+                :rows 1
+                :placeholder "(bump)"
+                :autocomplete "off"
+                :autocorrect "off"
+                :autocapitalize "off"
+                :spellcheck "false"
+                :aria-label "REPL expression"
+                :replicant/key "repl-expr"
+                :replicant/on-mount repl-expr-mount
+                :on {:input [:repl-expr-input]
+                     :keydown [:repl-expr-keydown]}}]]])
 
 (defn preview-pane [{:keys [preview]}]
   [:section.preview

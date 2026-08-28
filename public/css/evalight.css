@@ -238,16 +238,25 @@ code, pre { font-family: var(--mono); }
 .repl-input {
   display: flex;
   gap: 0.4rem;
-  align-items: center;
+  align-items: flex-start;
   padding: 0.45rem 0.7rem 0.6rem;
   border-top: 1px solid var(--line);
 }
-.repl-input input {
+.repl-input .gutter { padding-top: 0.12rem; line-height: 1.4; }
+.repl-input textarea {
   flex: 1;
+  min-width: 0;
+  min-height: 1.4em;
+  max-height: 10em;
+  resize: none;
+  overflow-y: auto;
   background: transparent;
   border: 0;
   outline: none;
   font-family: var(--mono);
+  line-height: 1.4;
+  padding: 0;
+  field-sizing: content;
 }
 
 .preview-frame { position: relative; flex: 1; min-height: 0; min-width: 0; background: var(--paper); overflow: hidden; }

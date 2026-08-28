@@ -39,6 +39,7 @@ A first visit creates a `lamp` project in the [Origin Private File System](https
 
 - Edit ClojureScript with CodeMirror 6, [clojure-mode](https://github.com/nextjournal/clojure-mode), and [Parinfer](https://github.com/jurjanpaul/codemirror6-parinfer). Indentation drives the parentheses.
 - **Ctrl-Enter** evaluates the form at the cursor against the live preview. **Ctrl-Shift-Enter** evaluates the top-level form. **Alt-Enter** evaluates the file.
+- In the REPL, **Enter** evaluates and **Shift-Enter** inserts a new line.
 - The preview runs in a sandboxed iframe. User code is interpreted by [SCI](https://github.com/babashka/sci), with `replicant.dom` available so the same namespaces work in the playground and in a compiled local build.
 - **Export ZIP** downloads the project tree as it exists on disk.
 

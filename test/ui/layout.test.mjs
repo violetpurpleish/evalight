@@ -200,6 +200,73 @@ try {
     `fromRight=${help.fromRight.toFixed(1)} fromTop=${help.fromTop.toFixed(1)}`
   );
   check("help close is inside the popover", within(help.close, help.panel));
+
+  await page.keyboard.press("Escape").catch(() => {});
+  if (await page.$(".help")) {
+    await page.click(".help-close");
+    await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
+  }
+
+  await page.waitForSelector("textarea[name=expr]", { timeout: 5000 });
+  await page.waitForFunction(
+    () => {
+      const head = document.querySelector("section.preview .pane-head");
+      return head && !/loading|error/i.test(head.innerText);
+    },
+    { timeout: 20000 }
+  );
+
+  await page.focus("textarea[name=expr]");
+  await page.evaluate(() => {
+    const el = document.querySelector("textarea[name=expr]");
+    el.value = "";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.keyboard.type("(defn squared [n]");
+  await page.keyboard.down("Shift");
+  await page.keyboard.press("Enter");
+  await page.keyboard.up("Shift");
+  await page.keyboard.type("(* n n))");
+
+  const drafted = await page.$eval("textarea[name=expr]", (el) => el.value);
+  assert.match(drafted, /\(defn squared \[n\]\n/, `expected a newline in the REPL draft, got ${JSON.stringify(drafted)}`);
+  const linesBefore = await page.$$eval(".repl-line", (els) => els.length);
+  check("Shift-Enter does not add a REPL result", linesBefore === 0, `lines=${linesBefore}`);
+
+  await page.keyboard.press("Enter");
+  try {
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".repl-line.is-out, .repl-line.is-err")].length > 0,
+      { timeout: 10000 }
+    );
+  } catch (err) {
+    const dump = await page.evaluate(() => ({
+      field: document.querySelector("textarea[name=expr]")?.value,
+      log: document.querySelector(".repl-log")?.innerText,
+      active: document.activeElement && document.activeElement.tagName,
+    }));
+    throw new Error(`REPL did not evaluate after Enter: ${JSON.stringify(dump)}`);
+  }
+  const afterSubmit = await page.evaluate(() => ({
+    field: document.querySelector("textarea[name=expr]")?.value ?? "",
+    log: document.querySelector(".repl-log")?.innerText ?? "",
+  }));
+  check("Enter evaluates and clears the field", afterSubmit.field.trim() === "", JSON.stringify(afterSubmit.field));
+  check(
+    "multiline defn did not error",
+    !/unable to resolve|error in/i.test(afterSubmit.log),
+    afterSubmit.log.slice(0, 400)
+  );
+
+  await page.focus("textarea[name=expr]");
+  await page.keyboard.type("(squared 12)");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () => (document.querySelector(".repl-log")?.innerText ?? "").includes("144"),
+    { timeout: 8000 }
+  );
+  const squaredLog = await page.$eval(".repl-log", (el) => el.innerText);
+  check("(squared 12) is 144", squaredLog.includes("144"), squaredLog.slice(0, 400));
 } finally {
   await browser.close();
   await stop();

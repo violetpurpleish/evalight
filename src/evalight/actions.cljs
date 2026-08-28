@@ -318,6 +318,25 @@
       (eval-code! code :repl)
       (p/ok nil))))
 
+(defn- resize-repl-field! [el]
+  (when el
+    (let [style (.-style el)]
+      (set! (.-height style) "auto")
+      (set! (.-height style) (str (min (.-scrollHeight el) 160) "px")))))
+
+(defn repl-expr-input! [event]
+  (resize-repl-field! (.-target event)))
+
+(defn repl-expr-keydown! [event]
+  (when (and (= "Enter" (.-key event))
+             (not (.-isComposing event))
+             (or (not (.-shiftKey event))
+                 (.-ctrlKey event)
+                 (.-metaKey event)))
+    (.preventDefault event)
+    (when-let [form (.closest (.-target event) "form")]
+      (.requestSubmit form))))
+
 (defn clear-repl! []
   (swap! state/app assoc-in [:repl :entries] []))
 
@@ -356,12 +375,15 @@
       :mobile-tab (set-mobile-tab! (first args))
       :submit-repl (when event
                      (let [form (.-target event)
-                           input (when form (.querySelector form "input[name=expr]"))
+                           input (when form (.querySelector form "[name=expr]"))
                            code (if input (.-value input) "")]
                        (when input
                          (set! (.-value input) "")
+                         (set! (.-height (.-style input)) "")
                          (.focus input))
                        (catch-ui (submit-repl! code))))
+      :repl-expr-input (when event (repl-expr-input! event))
+      :repl-expr-keydown (when event (repl-expr-keydown! event))
       :clear-repl (clear-repl!)
       :run (catch-ui (run-preview! {:reset? true}))
       :export (catch-ui (export-zip!))
