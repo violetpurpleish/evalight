@@ -143,7 +143,11 @@ try {
     const split = errors.filter((e) => /split is not a function|re-seq must match/.test(e));
     assert.equal(split.join("\n"), "", split.join("\n"));
     assert.equal(banner, null, JSON.stringify(dump));
-    await preview.click("button.lamp");
+    await preview.evaluate(() => {
+      const btn = document.querySelector("button.lamp");
+      if (!btn) throw new Error("no lamp button");
+      btn.click();
+    });
     const count = await until(
       async () => {
         const t = await preview.$eval(".count", (el) => el.textContent).catch(() => "");
