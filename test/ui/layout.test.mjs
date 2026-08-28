@@ -674,27 +674,52 @@ try {
   await page.keyboard.press("z");
   await page.keyboard.up("Control");
 
-  const bumpPos = await page.evaluate(() => {
-    const root = document.querySelector(".cm-content");
-    if (!root) return null;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      const i = node.textContent.indexOf("bump");
-      if (i < 0) continue;
-      const line = node.parentElement?.closest(".cm-line");
-      if (!/\(defn\s+bump/.test(line?.textContent ?? "")) continue;
-      line.scrollIntoView({ block: "center" });
-      const range = document.createRange();
-      range.setStart(node, i);
-      range.setEnd(node, i + 4);
-      const r = range.getBoundingClientRect();
-      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-    }
-    return null;
+  await page.evaluate(() => {
+    const row = [...document.querySelectorAll(".tree-row")].find((el) => {
+      if (el.querySelector(".tree-name")?.textContent !== "core.cljs") return false;
+      const dir = el
+        .closest(".tree-children")
+        ?.previousElementSibling
+        ?.querySelector(".tree-name")
+        ?.textContent;
+      return dir === "app";
+    });
+    row?.querySelector(".tree-item")?.click();
   });
-  check("found bump in the editor to hover", Boolean(bumpPos), JSON.stringify(bumpPos));
-  if (bumpPos) {
+  await page.waitForFunction(
+    () => /app\/core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 8000 }
+  );
+
+  let bumpPos = null;
+  for (let top = 0; top <= 3600 && !bumpPos; top += 140) {
+    await page.evaluate((y) => {
+      const s = document.querySelector(".cm-scroller");
+      if (s) s.scrollTop = y;
+    }, top);
+    await new Promise((r) => setTimeout(r, 40));
+    bumpPos = await page.evaluate(() => {
+      const root = document.querySelector(".cm-content");
+      if (!root) return null;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const i = node.textContent.indexOf("bump");
+        if (i < 0) continue;
+        const line = node.parentElement?.closest(".cm-line");
+        if (!/\(defn\s+bump/.test(line?.textContent ?? "")) continue;
+        const range = document.createRange();
+        range.setStart(node, i);
+        range.setEnd(node, Math.min(i + 4, node.textContent.length));
+        const r = range.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      }
+      return null;
+    });
+  }
+  check("found bump in the editor to hover", Boolean(bumpPos?.x), JSON.stringify(bumpPos));
+  if (bumpPos?.x) {
     await page.mouse.click(bumpPos.x, bumpPos.y);
     const hovered = await page.evaluate(() => {
       const root = document.querySelector(".cm-content");
