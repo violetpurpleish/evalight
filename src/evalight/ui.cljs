@@ -92,7 +92,9 @@
     (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")
     (shortcut ["Ctrl" "Shift" "Enter"] "Evaluate the top-level form")
     (shortcut ["Alt" "Enter"] "Evaluate the whole file")
+    (shortcut ["Ctrl" "Space"] "Completions from the live preview")
     (shortcut ["Tab"] "Parinfer follows indentation")]
+   [:p.muted "Hover a symbol in the editor for its docstring. Completions come from the running preview, the same image the REPL talks to."]
    [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a normal zip of those files — the same tree you would open locally."]])
 
 (defn dialog [{:keys [kind value path] :as d}]

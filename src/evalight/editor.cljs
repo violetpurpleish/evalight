@@ -1,5 +1,6 @@
 (ns evalight.editor
-  (:require ["@codemirror/commands" :as commands]
+  (:require ["@codemirror/autocomplete" :as ac]
+            ["@codemirror/commands" :as commands]
             ["@codemirror/lang-css" :as lang-css]
             ["@codemirror/lang-html" :as lang-html]
             ["@codemirror/lang-javascript" :as lang-js]
@@ -13,6 +14,7 @@
             ["./cm6_parinfer.js" :as parinfer]
             ["@nextjournal/clojure-mode" :as clj-mode]
             ["@nextjournal/clojure-mode/extensions/eval-region" :as eval-region]
+            [evalight.intel :as intel]
             [evalight.paths :as paths]))
 
 (defonce !view (atom nil))
@@ -126,6 +128,58 @@
                        #js {:key "Ctrl-Enter" :run run-cursor :shift run-top}
                        #js {:key "Alt-Enter" :run run-cell}]))))
 
+(defn- symbol-at [^js state pos]
+  (let [line (.lineAt (.-doc state) pos)
+        text (.-text line)
+        from (.-from line)
+        off (- pos from)
+        re (js/RegExp. "[A-Za-z*!?+\\-_$<>][\\w*!?+\\-_$<>./:-]*" "g")]
+    (loop []
+      (if-let [m (.exec re text)]
+        (let [start (.-index m)
+              s (aget m 0)
+              end (+ start (count s))]
+          (if (and (<= start off) (>= end off))
+            {:from (+ from start) :to (+ from end) :text s}
+            (recur)))
+        nil))))
+
+(defn- doc-el [{:keys [name ns arglists doc]}]
+  (let [root (js/document.createElement "div")]
+    (set! (.-className root) "cm-evalight-doc")
+    (let [head (js/document.createElement "div")]
+      (set! (.-className head) "cm-evalight-doc-head")
+      (set! (.-textContent head) (str name (when arglists (str "  " arglists))))
+      (.appendChild root head))
+    (when (seq ns)
+      (let [sub (js/document.createElement "div")]
+        (set! (.-className sub) "cm-evalight-doc-ns")
+        (set! (.-textContent sub) ns)
+        (.appendChild root sub)))
+    (when (seq doc)
+      (let [body (js/document.createElement "pre")]
+        (set! (.-textContent body) doc)
+        (.appendChild root body)))
+    root))
+
+(defn- complete-source [^js context]
+  (let [w (.matchBefore context #"[A-Za-z*!?+\-_$<>][\w*!?+\-_$<>./:-]*")]
+    (when (and w (or (.-explicit context) (pos? (count (.-text w)))))
+      (let [opts (intel/cm-options (.-text w))]
+        (when (seq opts)
+          #js {:from (.-from w)
+               :validFor #"[A-Za-z*!?+\-_$<>./:-]*"
+               :options (clj->js opts)})))))
+
+(defn- hover-source [^js view pos _side]
+  (when-let [tok (symbol-at (.-state view) pos)]
+    (when-let [info (intel/lookup (:text tok))]
+      (when (or (seq (:doc info)) (seq (:arglists info)))
+        #js {:pos (:from tok)
+             :end (:to tok)
+             :above true
+             :create (fn [_] #js {:dom (doc-el info)})}))))
+
 (defn- lang-ext [lang]
   (case lang
     :css (.css lang-css)
@@ -141,6 +195,11 @@
     (.of view/keymap (.-complete_keymap clj-mode))
     (.extension eval-region #js {:modifier (eval-modifier)})
     (eval-keymap on-eval)
+    (ac/autocompletion #js {:override #js [complete-source]
+                            :activateOnTyping true
+                            :icons true})
+    (.of view/keymap ac/completionKeymap)
+    (view/hoverTooltip hover-source #js {:hoverTime 380})
     (.parinferExtension parinfer)]))
 
 (defn extensions [{:keys [path on-change on-eval]}]

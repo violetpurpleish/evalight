@@ -7,7 +7,8 @@
 
 (deftest parse-ns-reads-requires
   (is (= {:name 'app.core
-          :requires ['app.greet 'replicant.dom]}
+          :requires ['app.greet 'replicant.dom]
+          :aliases {'greet 'app.greet 'r 'replicant.dom}}
          (ns-graph/parse-ns
           "(ns app.core\n  (:require [app.greet :as greet]\n            [replicant.dom :as r]))\n\n(defn init [])"))))
 

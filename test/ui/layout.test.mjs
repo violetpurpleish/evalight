@@ -506,6 +506,31 @@ try {
   });
   check("deleted project is gone from the picker", !afterDelete.names.includes("doomed"), afterDelete.names.join(", "));
   check("another project is open after delete", Boolean(afterDelete.value) && afterDelete.value !== "doomed", afterDelete.value);
+
+  await page.click(".cm-content");
+  await page.keyboard.down("Control");
+  await page.keyboard.press("End");
+  await page.keyboard.up("Control");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("bum");
+  try {
+    await page.waitForSelector(".cm-tooltip-autocomplete", { timeout: 8000 });
+  } catch (err) {
+    const dump = await page.evaluate(() => ({
+      file: document.querySelector(".file-path")?.textContent,
+      tooltip: Boolean(document.querySelector(".cm-tooltip")),
+      cm: document.querySelector(".cm-content")?.innerText?.slice(-80),
+    }));
+    throw new Error(`Completions did not appear: ${JSON.stringify(dump)}`);
+  }
+  const labels = await page.$$eval(".cm-tooltip-autocomplete li", (els) =>
+    els.map((e) => e.textContent)
+  );
+  check("live completions include bump", labels.some((t) => /bump/i.test(t)), labels.join(" | "));
+  await page.keyboard.press("Escape");
+  await page.keyboard.down("Control");
+  await page.keyboard.press("z");
+  await page.keyboard.up("Control");
 } finally {
   await browser.close();
   await stop();

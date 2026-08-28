@@ -66,7 +66,8 @@
 (defn- apply-preview-result [result]
   (if (:ok result)
     (do (swap! state/app assoc-in [:preview :status] :ok)
-        (swap! state/app assoc-in [:preview :error] nil))
+        (swap! state/app assoc-in [:preview :error] nil)
+        (preview/refresh-intel!))
     (do (swap! state/app assoc-in [:preview :status] :error)
         (swap! state/app assoc-in [:preview :error]
                (or (get-in result [:error :message]) "Preview failed to load."))))
@@ -144,7 +145,8 @@
                        (when (seq (:stdout result))
                          (repl-out (:stdout result)))
                        (if (:ok result)
-                         (repl-out (or (:value result) "nil"))
+                         (do (repl-out (or (:value result) "nil"))
+                             (preview/refresh-intel!))
                          (repl-err (or (get-in result [:error :message])
                                        "Evaluation failed.")))))
               (.catch (fn [e]

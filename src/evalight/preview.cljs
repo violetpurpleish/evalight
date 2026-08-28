@@ -1,6 +1,7 @@
 (ns evalight.preview
   (:require [cljs.reader :as reader]
             [evalight.fs :as fs]
+            [evalight.intel :as intel]
             [evalight.ns-graph :as ns-graph]
             [evalight.promise :as p]))
 
@@ -58,6 +59,11 @@
           (resolve data))
 
         :evalight/loaded
+        (when-let [{:keys [resolve]} (get @!pending (:id data))]
+          (swap! !pending dissoc (:id data))
+          (resolve data))
+
+        :evalight/intel
         (when-let [{:keys [resolve]} (get @!pending (:id data))]
           (swap! !pending dissoc (:id data))
           (resolve data))
@@ -143,6 +149,7 @@
          result (wait-for id)]
      (-> (project-payload fs)
          (.then (fn [payload]
+                  (intel/index-sources! (:files payload) (:main payload))
                   (send (assoc payload
                                  :type (if reset? "evalight/load" "evalight/reload")
                                  :id id))
@@ -153,3 +160,14 @@
         p (wait-for id)]
     (send {:type "evalight/eval" :id id :code code})
     p))
+
+(defn refresh-intel!
+  "Ask the live SCI image for interned names, arglists, and docstrings."
+  []
+  (let [id (next-id)
+        p (wait-for id)]
+    (send {:type "evalight/intel" :id id})
+    (.then p (fn [data]
+                (when (:ok data)
+                  (intel/set-live! (or (:items data) []) (:ns data)))
+                data))))

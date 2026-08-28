@@ -60,6 +60,54 @@
            :error (error->map e)
            :stdout @out})))))
 
+(def ^:private intel-form
+  "(let [n (ns-name *ns*)
+         interned (try (ns-interns n) (catch :default _ {}))
+         referred (try (ns-refers n) (catch :default _ {}))
+         aliases (try (ns-aliases n) (catch :default _ {}))
+         nss (try (all-ns) (catch :default _ []))
+         pack (fn [s v kind]
+                (let [m (or (meta v) {})]
+                  {:name (str s)
+                   :kind kind
+                   :ns (str (or (:ns m) n))
+                   :arglists (when-let [a (:arglists m)] (pr-str a))
+                   :doc (:doc m)
+                   :macro (boolean (:macro m))}))]
+     {:ns (str n)
+      :items
+      (vec
+       (concat
+        (map (fn [[s v]] (pack s v \"var\")) interned)
+        (keep (fn [[s v]]
+                (when-not (contains? interned s)
+                  (pack s v \"core\")))
+              referred)
+        (mapcat
+         (fn [[a t]]
+           (let [target (try (ns-interns t) (catch :default _ {}))
+                 nsn (str (try (ns-name t) (catch :default _ a)))]
+             (cons {:name (str a) :kind \"alias\" :ns nsn}
+                   (map (fn [[s v]]
+                          (assoc (pack s v \"var\") :name (str a \"/\" s)))
+                        target))))
+         aliases)
+        (map (fn [x] {:name (str (ns-name x)) :kind \"ns\"}) nss)))})")
+
+(defn- collect-intel [ctx ns-name]
+  (try
+    (when (and ns-name (sci/eval-string* ctx (str "(find-ns '" ns-name ")")))
+      (sci/eval-string* ctx (str "(in-ns '" ns-name ")")))
+    (let [data (sci/eval-string* ctx intel-form)]
+      {:ok true
+       :ns (or (:ns data) (str ns-name))
+       :items (vec (:items data))})
+    (catch :default e
+      {:ok false
+       :ns (str ns-name)
+       :items []
+       :error (error->map e)})))
+
 (defn- load-files [{:keys [files main css reset]}]
   (when reset
     (reset! !ctx (make-ctx))
@@ -120,6 +168,11 @@
                       (:ok result) (assoc :value (format-val (:value result)))
                       (not (:ok result)) (assoc :error (:error result)))]
         (post payload))
+
+      :evalight/intel
+      (post (assoc (collect-intel (ensure-ctx) (or (:ns data) (str @!main)))
+                   :type "evalight/intel"
+                   :id (:id data)))
 
       :evalight/reset
       (do (reset! !ctx (make-ctx))

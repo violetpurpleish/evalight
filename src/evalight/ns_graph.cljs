@@ -8,28 +8,37 @@
     (catch :default _
       nil)))
 
-(defn- require-libspec-name [spec]
+(defn- require-libspec [spec]
   (cond
-    (symbol? spec) spec
-    (and (vector? spec) (symbol? (first spec))) (first spec)
+    (symbol? spec) {:name spec}
+    (and (vector? spec) (symbol? (first spec)))
+    (let [opts (try (apply hash-map (rest spec))
+                    (catch :default _ {}))]
+      {:name (first spec)
+       :as (:as opts)})
     :else nil))
 
-(defn- ns-require-names [ns-form]
+(defn- ns-require-specs [ns-form]
   (->> ns-form
        (drop 2)
        (mapcat (fn [clause]
                  (when (and (sequential? clause)
                             (#{:require :require-macros} (first clause)))
-                   (keep require-libspec-name (rest clause)))))
+                   (keep require-libspec (rest clause)))))
        vec))
 
 (defn parse-ns
-  "Return {:name ns-sym :requires [ns-sym ...]} from a source string, or nil."
+  "Return {:name ns-sym :requires [ns-sym ...] :aliases {alias lib}} from source, or nil."
   [source]
   (let [form (read-first-form source)]
     (when (and (sequential? form) (= 'ns (first form)) (symbol? (second form)))
-      {:name (second form)
-       :requires (ns-require-names form)})))
+      (let [specs (ns-require-specs form)]
+        {:name (second form)
+         :requires (mapv :name specs)
+         :aliases (into {}
+                        (keep (fn [{:keys [name as]}]
+                                (when as [as name]))
+                              specs))})))))
 
 (def ^:private def-ops #{'def 'defonce 'defn 'defn-})
 
@@ -48,6 +57,16 @@
 (defn- scan-def-names [source]
   (->> (re-seq def-head (or source ""))
        (mapv (comp symbol second))))
+
+(def ^:private defn-doc-re
+  #"(?m)\((?:defn-|defn|defonce|def)\s+([A-Za-z*!?+\-_$<>][\w*!?+\-_$<>]*)\s+(?:\^[^\s()]+\s+)*\"((?:\\.|[^\"\\])*)\"")
+
+(defn def-docs
+  "Map of interned name (symbol) to docstring, when the def has one."
+  [source]
+  (into {}
+        (for [[_ nam doc] (re-seq defn-doc-re (or source ""))]
+          [(symbol nam) doc])))
 
 (defn top-level-defs
   "Symbols interned by top-level def/defn/defonce forms.
