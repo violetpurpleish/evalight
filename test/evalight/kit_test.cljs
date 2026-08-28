@@ -30,6 +30,14 @@
     (is (= :div.ui-dialog (first panel)))
     (is (nil? (:on (second panel))))))
 
+(deftest template-ships-evalight-in-the-project
+  (let [files (template/files "lamp")
+        pkg (get files "package.json")
+        readme (get files "README.md")]
+    (is (re-find #"\"evalight\": \"bun evalight/server.mjs\"" pkg))
+    (is (re-find #"bun run evalight" readme))
+    (is (nil? (re-find #"bun run local /path" readme)))))
+
 (deftest template-ships-the-kit
   (let [files (template/files "lamp")]
     (is (re-find #"\(ns ui.button" (get files "src/ui/button.cljs")))

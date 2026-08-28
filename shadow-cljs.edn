@@ -40,4 +40,30 @@
   {:target :node-test
    :output-to "out/node-tests.js"
    :ns-regexp "-test$"
-   :autorun true}}}
+   :autorun true}
+
+  ;; Self-contained workshop UI copied into an exported project.
+  ;; Watch builds load cljs-runtime; these release files do not.
+  :workshop
+  {:target :browser
+   :output-dir "evalight-ui/js"
+   :asset-path "/js"
+   :modules {:main {:init-fn evalight.core/init}}
+   :devtools {:preloads []}
+   :js-options
+   {:resolve
+    {"@codemirror/state" {:target :file :file "node_modules/@codemirror/state/dist/index.cjs"}
+     "@codemirror/view" {:target :file :file "node_modules/@codemirror/view/dist/index.cjs"}
+     "@codemirror/commands" {:target :file :file "node_modules/@codemirror/commands/dist/index.cjs"}
+     "@codemirror/language" {:target :file :file "node_modules/@codemirror/language/dist/index.cjs"}
+     "@codemirror/lint" {:target :file :file "node_modules/@codemirror/lint/dist/index.cjs"}
+     "@codemirror/search" {:target :file :file "node_modules/@codemirror/search/dist/index.cjs"}
+     "@codemirror/merge" {:target :file :file "node_modules/@codemirror/merge/dist/index.cjs"}
+     "@codemirror/autocomplete" {:target :file :file "node_modules/@codemirror/autocomplete/dist/index.cjs"}}}}
+
+  :workshop-preview
+  {:target :browser
+   :output-dir "evalight-ui/js/preview"
+   :asset-path "/js/preview"
+   :modules {:preview {:init-fn evalight.preview.runtime/init}}
+   :devtools {:enabled false}}}}

@@ -1,6 +1,8 @@
 node_modules/
 .shadow-cljs/
 public/js/
+public/evalight-embed/
+evalight-ui/
 out/
 .cpcache/
 .nrepl-port

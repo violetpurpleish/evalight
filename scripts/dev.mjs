@@ -10,9 +10,13 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { copyEmbedServer, ensureWorkshopUi, handlePackRequest } from "./evalight-pack.mjs";
 
-const UI_ROOT = join(fileURLToPath(new URL("../public", import.meta.url)));
+const ROOT = join(fileURLToPath(new URL("..", import.meta.url)));
+const UI_ROOT = join(ROOT, "public");
 const PORT = Number(process.env.PORT || 48721);
+
+await copyEmbedServer(ROOT);
 
 function contentType(p) {
   if (p.endsWith(".js")) return "application/javascript; charset=utf-8";
@@ -40,6 +44,9 @@ Bun.serve({
     if (url.pathname === "/api/meta") {
       return Response.json({ mode: "browser" });
     }
+    if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
+      return handlePackRequest(ROOT);
+    }
     const rel = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.slice(1));
     const file = Bun.file(join(UI_ROOT, rel));
     if (await file.exists()) {
@@ -50,6 +57,12 @@ Bun.serve({
 });
 
 console.log(`Evalight  http://127.0.0.1:${PORT}`);
+
+setTimeout(() => {
+  ensureWorkshopUi(ROOT).catch((err) => {
+    console.warn("workshop UI for export:", err.message);
+  });
+}, 8000);
 
 function shutdown() {
   shadow.kill("SIGTERM");

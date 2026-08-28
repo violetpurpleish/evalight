@@ -4,7 +4,7 @@ A small, live ClojureScript environment that starts in the browser.
 
 Open the site and write ClojureScript immediately. There is no account, no project wizard, and no local toolchain required for the first session. The running preview *is* the program: evaluate a form and it talks to that live image, in the spirit of Nightlight, Lisp machines, and Smalltalk.
 
-When a project outgrows the playground, export it as a ZIP. The zip is a normal directory — source, `shadow-cljs.edn`, `package.json`, a README — not an Evalight-specific document. Extract it, then keep using Evalight on that folder, or open it in any other editor.
+When a project outgrows the playground, export it as a ZIP. The zip is a normal directory: source, `shadow-cljs.edn`, `package.json`, a README, and Evalight itself. Extract it and `bun run evalight` to keep using this workshop on those files, or open the folder in any other editor.
 
 ## Run it
 
@@ -29,6 +29,7 @@ Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts
 | --- | --- |
 | `bun run dev` | Watch-compile the IDE and the preview runtime |
 | `bun run release` | Production build into `public/js` |
+| `bun run embed` | Release-compile the UI that Export puts in the zip |
 | `bun run local [dir]` | Same UI, filesystem API over a real directory |
 | `bun run test` | Node tests, then Chrome layout checks |
 | `bun run test:ui` | Chrome layout checks only |
@@ -45,22 +46,23 @@ A first visit creates a `lamp` project in the [Origin Private File System](https
 - **Delete project** removes the current browser project after a confirmation. Local mode has no such button, because that folder is yours on disk.
 - Hover a symbol to see its docstring and arglists. Completions come from the running program, not a separate language server.
 - **Add UI** in the Files pane copies a Replicant control into `src/ui`. Those files are source, not a package. If a control is already in the project, Restore writes the original file back over your edits. Delete a file you do not want. New projects already include the kit.
-- **Export ZIP** downloads the project tree as it exists on disk.
+- **Export ZIP** downloads the project tree plus Evalight. After unzip, `bun run evalight` is this workshop on those files.
 
 Try `(bump)` in the REPL after the lamp preview has loaded.
 
 ## From playground to a real project
 
-Export, unzip, and keep using Evalight on those files:
+Export, unzip, and from the project folder:
 
 ```sh
-# from this Evalight checkout
-bun run local /path/to/lamp
+bun run evalight
 ```
 
-Open http://127.0.0.1:48721. Same workshop, real files on disk.
+Open http://127.0.0.1:48721. Evalight is already in the zip. You need [Bun](https://bun.sh). You do not need `bun install` for the workshop.
 
-Or use any other editor. From the project folder, `bun install && bun run dev` compiles the app at http://localhost:3456 — the same page Preview showed.
+`bun run dev` in that folder is the compiled site at http://localhost:3456, the same page Preview showed, if you want another editor.
+
+Working on Evalight itself, `bun run local /path/to/a/folder` still points this checkout at a directory on disk.
 
 ## Architecture
 
@@ -72,7 +74,7 @@ evalight.fs.protocol
   └─ evalight.fs.http     local mode (`scripts/local-server.mjs`)
 ```
 
-The rest of the application (tree, editor, preview, export) talks only to the protocol: list, read, write, mkdir, rename, delete.
+The rest of the application (tree, editor, preview, export) talks only to the protocol: list, read, write, mkdir, rename, delete. Export also asks the server for a release build of this UI and writes it into `evalight/` in the zip so `bun run evalight` works from the unzipped folder.
 
 The preview is a second shadow-cljs build (`:preview`). It hosts an SCI interpreter and a copy of Replicant. The iframe is sandboxed with `allow-scripts` only, so user code cannot reach the IDE. That also means the shadow-cljs watch client has to stay off for this build: it would try to reload `preview.html` from a unique origin, the browser would block the navigation, and the lamp would never appear.
 

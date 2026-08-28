@@ -102,7 +102,7 @@
    [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
    [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
    [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
-   [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a zip of those files. Keep using this editor with `bun run local /path/to/the/folder` from an Evalight checkout, or open the folder in any other editor."]])
+   [:p.muted "Projects in the browser live in the Origin Private File System. Export writes a zip of those files, with Evalight already in the folder. Unzip and `bun run evalight` to keep editing here. `bun run dev` compiles the site at localhost:3456 if you want another editor."]])
 
 (defn- tree-file-paths [nodes]
   (mapcat (fn [n]

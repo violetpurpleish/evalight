@@ -1,22 +1,20 @@
 #!/usr/bin/env bun
 /**
- * Local Evalight bridge.
+ * Evalight, running from inside a project.
  *
- * Serves the same browser UI, plus a tiny filesystem API rooted at a
- * real directory. The UI talks to this backend instead of OPFS.
+ * Serves the workshop UI from ./public and the filesystem API over the
+ * parent directory (the project). Skip the evalight/ folder in the tree
+ * so the tool does not list itself.
  *
- *   bun run local
- *   bun run local /path/to/project
+ *   bun evalight/server.mjs
  */
-
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { copyEmbedServer, handlePackRequest } from "./evalight-pack.mjs";
 
-const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const UI_ROOT = join(ROOT, "public");
-const FS_ROOT = resolve(process.argv[2] || process.cwd());
+const HERE = fileURLToPath(new URL(".", import.meta.url));
+const UI_ROOT = join(HERE, "public");
+const FS_ROOT = resolve(HERE, "..");
 const PORT = Number(process.env.PORT || 48721);
 const SKIP = new Set([
   "node_modules",
@@ -27,8 +25,6 @@ const SKIP = new Set([
   ".DS_Store",
 ]);
 const SKIP_ROOT = new Set(["evalight", "evalight-ui"]);
-
-await copyEmbedServer(ROOT);
 
 function safe(rel) {
   const full = resolve(FS_ROOT, rel || ".");
@@ -131,6 +127,22 @@ function contentType(p) {
   return "application/octet-stream";
 }
 
+async function packSelf() {
+  const files = {};
+  async function walk(dir, zipPrefix) {
+    for (const name of await readdir(dir)) {
+      if (name === ".DS_Store") continue;
+      const p = join(dir, name);
+      const s = await stat(p);
+      const zip = `${zipPrefix}/${name}`.replaceAll("\\", "/");
+      if (s.isDirectory()) await walk(p, zip);
+      else files[zip] = await readFile(p, "utf8");
+    }
+  }
+  await walk(HERE, "evalight");
+  return files;
+}
+
 Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
@@ -144,7 +156,11 @@ Bun.serve({
       });
     }
     if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
-      return handlePackRequest(ROOT);
+      try {
+        return json({ files: await packSelf() });
+      } catch (e) {
+        return error(500, e.message || String(e));
+      }
     }
     if (url.pathname.startsWith("/api/fs/")) {
       return handleFs(req, url);
@@ -158,6 +174,5 @@ Bun.serve({
   },
 });
 
-console.log(`Evalight local mode`);
-console.log(`  UI:  http://127.0.0.1:${PORT}`);
-console.log(`  FS:  ${FS_ROOT}`);
+console.log(`Evalight  http://127.0.0.1:${PORT}`);
+console.log(`  project  ${FS_ROOT}`);
