@@ -207,8 +207,14 @@
       arr)))
 
 (defn- tab-indent-keymap []
-  (.highest cm-state/Prec
-            (.of view/keymap (.-tabIndentKeymap tab-indent))))
+  "Tab accepts a completion while the list is showing (same
+  autocomplete module as autocompletion), otherwise indents.
+  Shift-Tab always dedents so focus stays in the editor."
+  [(.highest cm-state/Prec
+             (.of view/keymap
+                  #js [#js {:key "Tab" :run ac/acceptCompletion}]))
+   (.high cm-state/Prec
+          (.of view/keymap (.-tabIndentKeymap tab-indent)))])
 
 (defn- clojure-exts [on-eval]
   ;; complete_keymap is paredit + enter-and-indent + format-all.

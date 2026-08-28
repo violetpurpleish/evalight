@@ -1,12 +1,12 @@
 // Tab / Shift-Tab indent the current line (or selection).
-// When the completion list is showing, Tab accepts the hint first
-// (VS Code-style). Shift-Tab always returns true so focus stays in
-// the editor. userEvent "noformat" is a backstop if clojure-mode's
-// format-changed-lines filter is ever reinstalled; Parinfer still
-// runs because the document changed.
+// Tab that accepts a completion is bound in editor.cljs at a higher
+// precedence, using the same @codemirror/autocomplete instance as the
+// completion source — a second copy of acceptCompletion never sees the
+// open list. Shift-Tab always returns true so focus stays in the editor.
+// userEvent "noformat" is a backstop if clojure-mode's format-changed-lines
+// filter is ever reinstalled; Parinfer still runs because the document changed.
 import { indentUnit, getIndentUnit, indentString } from "@codemirror/language";
 import { countColumn, EditorSelection } from "@codemirror/state";
-import { acceptCompletion } from "@codemirror/autocomplete";
 
 function changeBySelectedLine(state, f) {
   let atLine = -1;
@@ -76,13 +76,8 @@ function indentLess({ state, dispatch }) {
   return true;
 }
 
-function runTab(view) {
-  if (acceptCompletion(view)) return true;
-  return indentMore(view);
-}
-
 const tabIndentKeymap = [
-  { key: "Tab", run: runTab, preventDefault: true },
+  { key: "Tab", run: indentMore, preventDefault: true },
   { key: "Shift-Tab", run: indentLess, preventDefault: true },
 ];
 
