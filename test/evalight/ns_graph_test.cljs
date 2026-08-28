@@ -5,6 +5,9 @@
             [evalight.template :as template]
             [sci.core :as sci]))
 
+(deftest def-docs-ignores-non-string-source
+  (is (= {} (ns-graph/def-docs {:path "src/app/core.cljs" :content "(defn foo [] \"x\")"}))))
+
 (deftest parse-ns-reads-requires
   (is (= {:name 'app.core
           :requires ['app.greet 'replicant.dom]

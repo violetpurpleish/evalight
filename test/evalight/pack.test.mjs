@@ -10,7 +10,10 @@ assert.ok(files["evalight/server.mjs"].includes("SKIP_ROOT"));
 assert.ok(files["evalight/public/index.html"].includes("/js/main.js"));
 assert.ok(files["evalight/public/preview.html"].includes("preview"));
 assert.ok(files["evalight/public/css/evalight.css"]);
-assert.equal(files["evalight/public/js/main.js"], undefined);
+assert.equal(
+  Object.keys(files).some((k) => k.includes("cljs-runtime")),
+  false,
+);
 
 const out = withEvalightScript(`{"name":"lamp","scripts":{"dev":"shadow-cljs watch app"}}`);
 const pkg = JSON.parse(out);

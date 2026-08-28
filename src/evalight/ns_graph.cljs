@@ -54,8 +54,11 @@
   "Top-level def/defn/defonce. defn- before defn, defonce before def."
   #"(?m)^\s*\((?:defn-|defn|defonce|def)\s+(?:\^[^\s]+\s+)*([A-Za-z*!?+\-_$<>][\w*!?+\-_$<>]*)")
 
+(defn- source-text [source]
+  (if (string? source) source ""))
+
 (defn- scan-def-names [source]
-  (->> (re-seq def-head (or source ""))
+  (->> (re-seq def-head (source-text source))
        (mapv (comp symbol second))))
 
 (def ^:private defn-doc-re
@@ -65,7 +68,7 @@
   "Map of interned name (symbol) to docstring, when the def has one."
   [source]
   (into {}
-        (for [[_ nam doc] (re-seq defn-doc-re (or source ""))]
+        (for [[_ nam doc] (re-seq defn-doc-re (source-text source))]
           [(symbol nam) doc])))
 
 (defn top-level-defs

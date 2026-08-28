@@ -35,27 +35,30 @@
   (-read-file [_ path]
     (-> (request "GET" (str base "/read?path=" (js/encodeURIComponent path)))
         (.then json)
-        (.then :content)))
+        ;; Do not pass a keyword to Promise.then. Advanced compilation
+        ;; drops Keyword.prototype.call, so .then(:content) is identity
+        ;; and CodeMirror gets the whole {:path :content} map.
+        (.then (fn [data] (:content data)))))
   (-write-file [_ path content]
     (-> (request "PUT" (str base "/write") {:path path :content content})
         (.then json)
-        (.then :path)))
+        (.then (fn [data] (:path data)))))
   (-mkdir [_ path]
     (-> (request "POST" (str base "/mkdir") {:path path})
         (.then json)
-        (.then :path)))
+        (.then (fn [data] (:path data)))))
   (-rename [_ from to]
     (-> (request "POST" (str base "/rename") {:from from :to to})
         (.then json)
-        (.then :to)))
+        (.then (fn [data] (:to data)))))
   (-delete [_ path]
     (-> (request "DELETE" (str base "/delete?path=" (js/encodeURIComponent path)))
         (.then json)
-        (.then :path)))
+        (.then (fn [data] (:path data)))))
   (-exists [_ path]
     (-> (request "GET" (str base "/exists?path=" (js/encodeURIComponent (or path ""))))
         (.then json)
-        (.then :exists))))
+        (.then (fn [data] (:exists data))))))
 
 (defn open
   ([] (open "/api/fs"))

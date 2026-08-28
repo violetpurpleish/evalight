@@ -269,9 +269,10 @@
       (lang-ext lang)])))
 
 (defn- make-state [path content]
-  (let [{:keys [on-change on-eval]} @!handlers]
+  (let [{:keys [on-change on-eval]} @!handlers
+        doc (if (string? content) content "")]
     (.create cm-state/EditorState
-             #js {:doc (or content "")
+             #js {:doc doc
                   :extensions (extensions {:path path
                                             :on-change on-change
                                             :on-eval on-eval})})))
