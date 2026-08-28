@@ -29,8 +29,10 @@
     (when (dirty? state path)
       [:span.dot {:title "Unsaved changes"}])]
    [:div.tree-ops
-    [:button.tiny {:on {:click [:rename-dialog path]} :title "Rename"} "Rename"]
-    [:button.tiny {:on {:click [:delete-dialog path]} :title "Delete"} "Delete"]]])
+    [:button.tiny {:on {:click [:rename-dialog path]} :title "Rename" :aria-label "Rename"}
+     (icons/pencil)]
+    [:button.tiny {:on {:click [:delete-dialog path]} :title "Delete" :aria-label "Delete"}
+     (icons/trash)]]])
 
 (defn- dir-row [state {:keys [path name children]}]
   (let [open? (contains? (:expanded state) path)]
@@ -41,7 +43,8 @@
        (icons/folder)
        [:span.tree-name name]]
       [:div.tree-ops
-       [:button.tiny {:on {:click [:delete-dialog path]} :title "Delete"} "Delete"]]]
+       [:button.tiny {:on {:click [:delete-dialog path]} :title "Delete" :aria-label "Delete"}
+        (icons/trash)]]]
      (when open?
        [:div.tree-children
         (for [child children]
@@ -70,7 +73,7 @@
   [:aside.help
    [:header.help-head
     [:h2 "Living with the program"]
-    [:button.icon-btn {:on {:click [:toggle-help]} :title "Close"}
+    [:button.icon-btn.help-close {:on {:click [:toggle-help]} :title "Close" :aria-label "Close help"}
      (icons/close)]]
    [:p "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler."]
    [:ul.shortcuts
@@ -227,10 +230,13 @@
    [:div.project
     (if (= :local (:mode state))
       [:span.project-name (:project state)]
-      [:select {:on {:change [:switch-project]}
-                :value (:project state)}
-       (for [name (:projects state)]
-         [:option {:value name :replicant/key name} name])])]
+      [:label.project-picker
+       [:span.sr-only "Project"]
+       [:select {:id "project-select"
+                 :on {:change [:switch-project]}
+                 :value (:project state)}
+        (for [name (:projects state)]
+          [:option {:value name :replicant/key name} name])]])]
    [:nav.actions
     (when (= :browser (:mode state))
       [:button.ghost {:on {:click [:new-project-dialog]}} "New project"])

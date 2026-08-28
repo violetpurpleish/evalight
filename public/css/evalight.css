@@ -56,16 +56,38 @@ code, pre { font-family: var(--mono); }
 .wordmark { font-family: var(--serif); font-size: 1.15rem; letter-spacing: 0.01em; }
 .tagline { margin: 0; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
 
-.project { flex: 1; min-width: 0; }
+.project { flex: 0 1 auto; min-width: 0; max-width: 16rem; }
+.project-picker { display: block; min-width: 0; }
 .project select,
 .project-name {
-  background: var(--panel-2);
+  display: block;
+  width: 100%;
+  min-width: 8rem;
+  max-width: 16rem;
+  background-color: var(--panel-2);
   border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.35rem 0.9rem;
+  border-radius: 8px;
+  padding: 0.38rem 1.75rem 0.38rem 0.7rem;
+}
+.project select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239a8b70' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M3 4.5 6 8l3-3.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 0.75rem;
+  cursor: pointer;
+}
+.project select:hover,
+.project select:focus {
+  border-color: var(--gold-dim);
+  outline: none;
+}
+.project-name {
+  padding-right: 0.7rem;
 }
 
-.actions { display: flex; gap: 0.45rem; align-items: center; }
+.actions { display: flex; gap: 0.45rem; align-items: center; margin-left: auto; }
 .ghost, .primary, .danger, .icon-btn, .tiny {
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -91,6 +113,11 @@ code, pre { font-family: var(--mono); }
   font-size: 0.7rem;
   color: var(--muted);
 }
+.tree-ops .tiny {
+  padding: 0.18rem;
+  border-radius: 6px;
+}
+.tree-ops .tiny svg { width: 0.85rem; height: 0.85rem; display: block; }
 
 .stage {
   min-height: 0;
@@ -143,25 +170,46 @@ code, pre { font-family: var(--mono); }
 
 .tree { overflow: auto; padding: 0.4rem 0.3rem 1rem; }
 .tree-children { padding-left: 0.85rem; }
-.tree-row { display: flex; align-items: center; }
+.tree-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
 .tree-item {
   flex: 1;
+  min-width: 0;
   background: none;
   border: 0;
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.22rem 0.4rem;
+  padding: 0.22rem 2.4rem 0.22rem 0.4rem;
   border-radius: 6px;
   text-align: left;
 }
 .tree-item svg { width: 0.95rem; height: 0.95rem; color: var(--muted); flex: none; }
 .tree-item.is-active { background: rgba(228, 179, 76, 0.12); color: var(--gold); }
-.tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .twisty { display: inline-block; width: 0.8rem; font-size: 0.7rem; transition: transform 120ms ease; }
 .twisty.is-open { transform: rotate(90deg); }
-.tree-ops { display: none; gap: 0.15rem; }
-.tree-row:hover .tree-ops { display: flex; }
+.tree-ops {
+  position: absolute;
+  right: 0.2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 0.1rem;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--panel) 32%);
+  padding-left: 0.65rem;
+}
+.tree-row:hover .tree-ops,
+.tree-row:focus-within .tree-ops {
+  opacity: 1;
+  pointer-events: auto;
+}
 .dot {
   width: 0.4rem; height: 0.4rem; border-radius: 99px;
   background: var(--gold); display: inline-block;
@@ -240,12 +288,17 @@ code, pre { font-family: var(--mono); }
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 1rem 1rem 1.1rem;
+  padding: 1rem 1.1rem 1.15rem;
   box-shadow: var(--shadow);
   z-index: 5;
 }
-.help-head { display: flex; align-items: center; }
-.help h2 { font-family: var(--serif); margin: 0; font-size: 1.2rem; }
+.help-head { display: flex; align-items: flex-start; gap: 0.75rem; padding-right: 2rem; }
+.help h2 { font-family: var(--serif); margin: 0; font-size: 1.2rem; flex: 1; min-width: 0; }
+.help-close {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+}
 .help p { color: var(--muted); line-height: 1.5; }
 .shortcuts { list-style: none; padding: 0; }
 .shortcuts li { display: flex; gap: 0.6rem; align-items: center; margin: 0.45rem 0; }
@@ -319,6 +372,17 @@ kbd {
 .mobile-tabs button.is-active { color: var(--gold); }
 
 .muted { color: var(--muted); }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 @media (max-width: 1024px) {
   .stage {

@@ -46,3 +46,15 @@
 (defn close []
   (svg {}
        [:path {:d "M7 7l10 10M17 7 7 17" :stroke-linecap "round"}]))
+
+(defn pencil []
+  (svg {}
+       [:path {:d "M13.5 5.5 18 10l-9.2 9.2H4.3v-4.5L13.5 5.5Z" :stroke-linejoin "round"}]
+       [:path {:d "m12 7 4.5 4.5" :stroke-linecap "round"}]))
+
+(defn trash []
+  (svg {}
+       [:path {:d "M5 7h14" :stroke-linecap "round"}]
+       [:path {:d "M10 7V5h4v2"}]
+       [:path {:d "M8 7l.7 12h6.6L16 7"}]
+       [:path {:d "M10 11v5M14 11v5" :stroke-linecap "round"}]))

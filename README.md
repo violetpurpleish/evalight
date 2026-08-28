@@ -30,7 +30,8 @@ Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts
 | `bun run dev` | Watch-compile the IDE and the preview runtime |
 | `bun run release` | Production build into `public/js` |
 | `bun run local [dir]` | Same UI, filesystem API over a real directory |
-| `bun test` | Node tests for path/namespace helpers |
+| `bun run test` | Node tests, then Chrome layout checks |
+| `bun run test:ui` | Chrome layout checks only |
 
 ## Using the workshop
 
@@ -83,5 +84,11 @@ Evalight itself is also ClojureScript, so opening this repository in local mode 
 ## Tests
 
 ```sh
-bun test
+bun run test
 ```
+
+That compiles the ClojureScript unit tests, then opens the workshop in headless Chrome and checks layout: file-row actions stay inside the sidebar, the help close control sits in the top-right of the popover, and the project picker is a compact custom select rather than a stretched native widget.
+
+`bun run test:ui` runs only the Chrome pass. It serves `public/` itself, so the IDE must already be compiled (`bun run dev` or `bun run release`). Point it at a running server with `EVALIGHT_URL=http://127.0.0.1:48721 bun run test:ui`.
+
+The workshop UI is handwritten CSS on [Replicant](https://github.com/cjohansen/replicant). There is no React and no component library. File actions, the help popover, and the project picker are ordinary DOM plus CSS, which is why the layout tests measure bounding boxes instead of asserting against a design system.
