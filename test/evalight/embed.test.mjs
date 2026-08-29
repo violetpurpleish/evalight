@@ -37,25 +37,34 @@ async function until(fn, ms, label) {
   throw new Error(label + " last=" + JSON.stringify(last));
 }
 
-async function cmPoint(page, { includes, clickText, avoid = [], atParen = false }) {
-  await page.evaluate(() => {
-    const already = /app\/core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? "");
-    if (already) return;
+async function openTreeFile(page, { name, dir }) {
+  const needle = dir ? `${dir}/${name}` : name;
+  const clicked = await page.evaluate(({ name, dir, needle }) => {
+    const path = document.querySelector(".file-path")?.textContent ?? "";
+    if (path.includes(needle)) return true;
     const row = [...document.querySelectorAll(".tree-row")].find((el) => {
-      if (el.querySelector(".tree-name")?.textContent !== "core.cljs") return false;
-      const dir = el
+      if (el.querySelector(".tree-name")?.textContent !== name) return false;
+      const parent = el
         .closest(".tree-children")
         ?.previousElementSibling
         ?.querySelector(".tree-name")
         ?.textContent;
-      return dir === "app";
+      return !dir || parent === dir;
     });
-    row?.querySelector(".tree-item")?.click();
-  });
+    if (!row) return false;
+    row.querySelector(".tree-item")?.click();
+    return true;
+  }, { name, dir, needle });
+  if (!clicked) throw new Error(`no tree row for ${needle}`);
   await page.waitForFunction(
-    () => /app\/core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    (n) => (document.querySelector(".file-path")?.textContent ?? "").includes(n),
     { timeout: 8000 },
+    needle,
   );
+}
+
+async function cmPoint(page, { includes, clickText, avoid = [], atParen = false, file = "core.cljs", dir = "app" }) {
+  await openTreeFile(page, { name: file, dir });
   let found = null;
   for (let top = 0; top <= 5000 && !found; top += 140) {
     await page.evaluate((y) => {
@@ -461,6 +470,38 @@ try {
       3000,
       "Ctrl-Z did not undo QQQ",
     );
+
+    const liveOn = await page.$(".live input[type=checkbox]");
+    if (liveOn && !(await liveOn.evaluate((el) => el.checked))) {
+      await liveOn.click();
+    }
+    const hello = await cmPoint(page, {
+      includes: "Hello,",
+      clickText: "Hello",
+      file: "greet.cljs",
+    });
+    await page.mouse.click(hello.x, hello.y, { clickCount: 2 });
+    await page.keyboard.type("LIVE-SAVE");
+    await until(
+      async () => {
+        const t = await page.$eval(".cm-content", (el) => el.innerText).catch(() => "");
+        return t.includes("LIVE-SAVE") ? t : null;
+      },
+      4000,
+      "LIVE-SAVE did not land in greet.cljs",
+    );
+    const lede = await until(
+      async () => {
+        const f = page.frames().find((fr) => (fr.url() || "").includes(String(APP_PORT)));
+        if (!f) return null;
+        const t = await f.$eval(".lede", (el) => el.textContent).catch(() => "");
+        return /LIVE-SAVE/.test(t) ? t : null;
+      },
+      30000,
+      "Live save did not refresh compiled preview",
+    );
+    assert.match(lede, /LIVE-SAVE/);
+
     const chrome = await page.evaluate(() => ({
       exportZip: [...document.querySelectorAll("nav.actions button")].map((b) => b.textContent.trim()),
       help: null,

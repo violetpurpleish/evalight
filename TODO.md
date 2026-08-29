@@ -31,6 +31,7 @@ Ports when Evalight starts its own watch (export / local):
 - [x] **Intel EDN reader tests.** The tiny reader used for compiler-env intel has unit cases (maps, keywords, vectors, strings, nil).
 - [x] **Evalight checkout is SCI.** `isUserProject` is false for this repo (`:workshop` in `shadow-cljs.edn`). Covered by a unit test.
 - [x] **Compiled editor keys.** Embed Chrome test hovers `bump`, Ctrl-Enters the **`(bump)` call** (not the `defn`), and checks completions. Ctrl-Enter on `(defn bump …)` only redefines the var; the lamp count does not change. Previously the test only called `/api/runtime/*`.
+- [x] **Save then compiled preview.** After the count assertions, Live goes back on. The test replaces `Hello` in `app.greet` with `LIVE-SAVE` and waits for that string in the preview lede. That is the Nightlight loop (save, shadow rebuild, iframe reload). Do not assert the lamp count across a Live reload. The atom resets.
 - [x] **`with-evalight-script` stays in two languages.** Browser zip rewrite cannot import the Node helper. Both copies are locked by the same fixture cases (cljs test + pack.test).
 
 ## Still duplicated on purpose
@@ -45,7 +46,6 @@ Do not "unify" these unless the constraint changes.
 
 ### Tests that are still thin
 
-- [ ] **Save then compiled preview.** Edit a `.cljs` file with Live on and assert the iframe updates (shadow rebuild + iframe reload). Ctrl-Enter already mutates the current heap; this would catch "save did not refresh Preview." Typing into the editor with Live on will save (~320ms) and reload the compiled iframe (~1400ms), which **resets** in-memory state such as the lamp count. Any test that both edits the buffer and asserts a count must finish the count assertion before the reload, or turn Live off.
 - [ ] **Attach to an existing watch.** If `bun run dev` is already running in the project, `bun run evalight` should attach to that nREPL instead of starting a second watch. Untested. Isolated overlay watch is what the embed test covers.
 - [ ] **Export ZIP from the playground UI.** Pack tests the Node packer. The JSZip path in `export.cljs` (`fetch-evalight-pack` + merge) is not driven in Chrome.
 
@@ -66,9 +66,8 @@ Do not "unify" these unless the constraint changes.
 
 ## Next steps (once this base holds)
 
-These are product, not cleanup. Do not start them as a way to avoid the items above.
+These are product, not cleanup.
 
-1. Save + Live compiled preview test (the last hole in the export loop).
-2. Decide whether attaching to an already-running `bun run dev` is worth the port/nREPL matching work.
-3. Chrome-drive Export ZIP from the playground if we care about the JSZip path.
-4. Help copy for compiler-env vs REPL-only defs, if people hit it.
+1. Decide whether attaching to an already-running `bun run dev` is worth the port/nREPL matching work.
+2. Chrome-drive Export ZIP from the playground if we care about the JSZip path.
+3. Help copy for compiler-env vs REPL-only defs, if people hit it.
