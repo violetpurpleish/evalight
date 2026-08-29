@@ -37,6 +37,49 @@ async function until(fn, ms, label) {
   throw new Error(label + " last=" + JSON.stringify(last));
 }
 
+async function cmPoint(page, { includes, clickText }) {
+  await page.$eval(".editor .cm-content", (el) => {
+    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  });
+  return until(async () => {
+    const found = await page.evaluate(({ includes, clickText }) => {
+      const root = document.querySelector(".editor") || document;
+      const lines = [...root.querySelectorAll(".cm-line")];
+      const line = lines.find((el) => (el.textContent || "").includes(includes));
+      if (!line) {
+        return {
+          ok: false,
+          sample: lines.slice(0, 24).map((el) => el.textContent),
+          doc: document.querySelector(".cm-content")?.innerText?.slice(0, 500) || "",
+        };
+      }
+      line.scrollIntoView({ block: "center", inline: "nearest" });
+      if (clickText) {
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+        let node;
+        while ((node = walker.nextNode())) {
+          const i = node.textContent.indexOf(clickText);
+          if (i < 0) continue;
+          const range = document.createRange();
+          range.setStart(node, i);
+          range.setEnd(node, Math.min(i + clickText.length, node.textContent.length));
+          const r = range.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) continue;
+          return { ok: true, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        }
+      }
+      const r = line.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return null;
+      return {
+        ok: true,
+        x: r.x + Math.min(56, Math.max(12, r.width / 3)),
+        y: r.y + r.height / 2,
+      };
+    }, { includes, clickText: clickText || null });
+    return found?.ok ? found : null;
+  }, 8000, `cm line ${includes}`);
+}
+
 async function writeLamp(dir) {
   await mkdir(join(dir, "src/app"), { recursive: true });
   await mkdir(join(dir, "public/css"), { recursive: true });
@@ -258,23 +301,7 @@ try {
       "REPL Enter (bump) did not mutate the compiled app",
     );
     assert.equal(afterRepl, "3");
-    let bumpDef = null;
-    for (let top = 0; top <= 4000 && !bumpDef; top += 160) {
-      await page.evaluate((y) => {
-        const scroller = document.querySelector(".cm-scroller");
-        if (scroller) scroller.scrollTop = y;
-      }, top);
-      bumpDef = await page.evaluate(() => {
-        for (const node of document.querySelectorAll(".cm-line")) {
-          if (!/\(defn\s+bump/.test(node.textContent || "")) continue;
-          const r = node.getBoundingClientRect();
-          if (r.height < 2 || r.bottom < 0 || r.top > window.innerHeight) continue;
-          return { x: r.x + 48, y: r.y + r.height / 2 };
-        }
-        return null;
-      });
-    }
-    assert.ok(bumpDef, "defn bump not visible");
+    const bumpDef = await cmPoint(page, { includes: "(defn bump", clickText: "bump" });
     await page.mouse.move(bumpDef.x, bumpDef.y);
     const hover = await until(
       async () => {
@@ -288,32 +315,7 @@ try {
     await page.keyboard.press("Escape");
 
     // Ctrl-Enter must eval the (bump) *call*. The defn only redefines it.
-    let bumpCall = null;
-    for (let top = 0; top <= 4000 && !bumpCall; top += 160) {
-      await page.evaluate((y) => {
-        const scroller = document.querySelector(".cm-scroller");
-        if (scroller) scroller.scrollTop = y;
-      }, top);
-      bumpCall = await page.evaluate(() => {
-        for (const line of document.querySelectorAll(".cm-line")) {
-          if (!(line.textContent || "").includes("(fn [_e] (bump))")) continue;
-          const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
-          let node;
-          while ((node = walker.nextNode())) {
-            const i = node.textContent.indexOf("(bump)");
-            if (i < 0) continue;
-            const range = document.createRange();
-            range.setStart(node, i);
-            range.setEnd(node, Math.min(i + 6, node.textContent.length));
-            const r = range.getBoundingClientRect();
-            if (r.height < 2 || r.bottom < 0 || r.top > window.innerHeight) continue;
-            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-          }
-        }
-        return null;
-      });
-    }
-    assert.ok(bumpCall, "(bump) call not visible");
+    const bumpCall = await cmPoint(page, { includes: "(fn [_e] (bump))", clickText: "(bump)" });
     await page.mouse.click(bumpCall.x, bumpCall.y);
     await page.keyboard.down("Control");
     await page.keyboard.press("Enter");
