@@ -1,0 +1,18 @@
+{
+  "name": "Evalight",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "export PATH=\"$HOME/.bun/bin:$PATH\"; bun run dev",
+      "description": "shadow-cljs watch (app + preview) serving the Evalight UI at http://127.0.0.1:48721"
+    }
+  ],
+  "ports": [
+    {
+      "name": "evalight",
+      "port": 48721
+    }
+  ]
+}
