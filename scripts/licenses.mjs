@@ -670,7 +670,7 @@ ${extras}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Open source licenses — Evalight</title>
+  <title>Open source licenses, Evalight</title>
   <style>
     :root {
       --bg: #14110d;
