@@ -1,7 +1,8 @@
 (ns ui.core
   "Tiny helpers shared by the other ui.* controls. This is source in
   your project, not a library. Change it. Delete a control you don't
-  want; leave this file if anything in src/ui still refers to it.")
+  want; leave this file if anything in src/ui still refers to it.
+  MIT, Copyright (c) 2026 violetpurpleish & contributors. See LICENSE.")
 
 (defn cx
   "Collect class names. nil, false, and \"\" are skipped."

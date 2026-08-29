@@ -224,6 +224,22 @@ try {
   );
   assert.equal(files["evalight/public/preview.css"], undefined);
 
+  assert.ok(
+    files["LICENSE"]?.includes("Copyright (c) 2026 violetpurpleish"),
+    "zip root LICENSE must be Evalight MIT, covering copied src/ui",
+  );
+  assert.ok(
+    files["evalight/public/licenses.html"]?.includes("org.babashka/sci"),
+    "workshop JS notices missing from zip",
+  );
+  assert.ok(files["evalight/public/licenses.html"].includes("@codemirror/state"));
+  assert.equal(files["THIRD_PARTY_LICENSES.md"], undefined);
+  assert.equal(
+    /puppeteer-core|shadow-cljs 2/.test(files["LICENSE"] || ""),
+    false,
+    "zip root LICENSE should not dump npm/Maven catalogs",
+  );
+
   const zips = new Set(fallbackManifest().files.map((f) => f.zip));
   for (const zipPath of zips) {
     assert.ok(files[zipPath] != null, `download missing ${zipPath}`);

@@ -38,7 +38,9 @@
     (is (re-find #"\"evalight\": \"bun evalight/server.mjs\"" pkg))
     (is (re-find #"bun run evalight" readme))
     (is (nil? (re-find #"bun run local /path" readme)))
-    (is (not (template/stale-evalight-readme? readme)))))
+    (is (not (template/stale-evalight-readme? readme)))
+    (is (re-find #"Copyright \(c\) 2026 violetpurpleish" (get files "LICENSE")))
+    (is (re-find #"evalight/public/licenses.html" readme))))
 
 (deftest stale-readme-is-the-old-clone-evalight-copy
   (let [old (str "# lamp\n\n"
@@ -55,7 +57,8 @@
     (is (not (template/stale-evalight-readme? "# Evalight\n\nbun run local /path/to/a/folder\n")))
     (is (re-find #"bun run evalight" (get out "README.md")))
     (is (nil? (re-find #"bun run local /path" (get out "README.md"))))
-    (is (re-find #"\"evalight\": \"bun evalight/server.mjs\"" (get out "package.json")))))
+    (is (re-find #"\"evalight\": \"bun evalight/server.mjs\"" (get out "package.json")))
+    (is (re-find #"violetpurpleish" (get out "LICENSE")))))
 
 (deftest template-ships-the-kit
   (let [files (template/files "lamp")]

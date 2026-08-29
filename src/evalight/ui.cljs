@@ -109,6 +109,9 @@
         [:p.muted "Attached to a shadow-cljs watch you already started (`bun run evalight --attach`). Preview is that app. Evalight will not start or stop the compiler, and Live stays off so it does not fight shadow autoload."]
         [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground. Live reloads that preview after you save; off keeps the current page. `bun run evalight --attach` joins a watch you already started instead of starting one."])
       [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop."])
+    [:p.muted
+     [:a.help-licenses {:href "/licenses.html" :target "_blank" :rel "noopener noreferrer"}
+      "Open Source Licenses"]]
     [:p.build-stamp {:title "Compiled UI id. If a cljs caret bug remains, this is not the build that fixed it."}
      build/id]]])
 

@@ -41,6 +41,8 @@ bun run dev
 | `bun run local [dir]` | Same UI, filesystem API over a real directory |
 | `bun run test` | Node tests, then Chrome layout checks |
 | `bun run test:ui` | Chrome layout checks only |
+| `bun run licenses` | Regenerate `THIRD_PARTY_LICENSES.md` and `public/licenses.html` |
+| `bun run licenses:check` | Fail if a shipped license is off the allowlist, or if those files are stale |
 
 ## Using the workshop
 
@@ -120,3 +122,15 @@ That compiles the ClojureScript unit tests, then opens the workshop in headless 
 `bun run test:ui` runs only the Chrome pass. It serves `public/` itself, so the IDE must already be compiled (`bun run dev` or `bun run release`). Point it at a running server with `EVALIGHT_URL=http://127.0.0.1:48721 bun run test:ui`.
 
 The workshop UI is Replicant plus a small kit in `src/ui` (button, dialog, popover, split, and so on). The same files are copied into new projects. There is no React and no installable widget package. File actions, the help panel, and the project picker are still measured in layout tests as ordinary DOM.
+
+Evalight, including that kit, is MIT. Copyright (c) 2026 violetpurpleish & contributors. See `LICENSE`.
+
+## Third-party licenses
+
+`bun run licenses` walks the npm modules the editor actually imports, plus the Clojure libraries compiled into the browser JS (Replicant, SCI, edamame, cljs.core, Google Closure Library). It writes `THIRD_PARTY_LICENSES.md` for the repo and `public/licenses.html` for the hosted app. Help, at the bottom of the popover, links to that page as **Open Source Licenses**.
+
+`bun run licenses --check` (also the first step of `bun run test`) fails if a shipped package uses an SPDX id that is not in `scripts/licenses-allowlist.json`, or if the generated files are stale. `OR` is allowed when any option is on the list. `AND` requires every part. JSZip is `(MIT OR GPL-3.0-or-later)`; Evalight elects MIT.
+
+Add a future license to `allowed` in `scripts/licenses-allowlist.json` only when you mean to ship it. If a POM or `package.json` is wrong, put the real text in `scripts/license-overrides/` and name it in `overrides`. Replicant's published POM says EPL but the GitHub LICENSE is MIT; that override is the example.
+
+An Export ZIP puts Evalight's MIT `LICENSE` at the project root (copied `src/ui`, lamp source, `evalight/*.mjs`). Third-party notices for the compiled workshop JS go in `evalight/public/licenses.html`. shadow-cljs and replicant listed in the exported `package.json` / `shadow-cljs.edn` are not bundled in the ZIP, so they are not dumped there.

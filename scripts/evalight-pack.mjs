@@ -31,6 +31,7 @@ export const PACK_STATIC = [
   { from: "public/css/ui.css", zip: "evalight/public/css/ui.css", url: "/css/ui.css" },
   { from: "public/css/evalight.css", zip: "evalight/public/css/evalight.css", url: "/css/evalight.css" },
   { from: "public/css/preview.css", zip: "evalight/public/css/preview.css", url: "/css/preview.css" },
+  { from: "public/licenses.html", zip: "evalight/public/licenses.html", url: "/licenses.html" },
 ];
 
 export const PACK_RELEASE = [

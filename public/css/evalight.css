@@ -525,6 +525,13 @@ code, pre { font-family: var(--mono); }
   overscroll-behavior: contain;
 }
 .help p { color: var(--muted); line-height: 1.5; }
+.help-licenses {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+.help-licenses:hover { color: var(--gold); }
 .shortcuts { list-style: none; padding: 0; }
 .shortcuts li { display: flex; gap: 0.6rem; align-items: center; margin: 0.45rem 0; }
 .keys { display: flex; gap: 0.2rem; }

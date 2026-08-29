@@ -455,6 +455,9 @@ try {
   check("help lists Shift+Tab", helpCopy.keys.includes("Shift+Tab"));
   check("help lists Enter", helpCopy.keys.includes("Enter"));
   check("help lists Ctrl+Enter", helpCopy.keys.includes("Ctrl+Enter"));
+  check("help links Open Source Licenses", /Open Source Licenses/.test(helpCopy.text));
+  const licenseHref = await page.evaluate(() => document.querySelector(".help-licenses")?.getAttribute("href"));
+  check("help licenses href is /licenses.html", licenseHref === "/licenses.html");
   check("help does not teach Ctrl-Space", !/Ctrl.?Space/.test(helpCopy.text));
   check("help does not teach Ctrl-.", !/Ctrl.?\./.test(helpCopy.text));
   check("help does not teach Alt-/", !/Alt.?\//.test(helpCopy.text));

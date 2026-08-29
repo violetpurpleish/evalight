@@ -93,13 +93,17 @@
                   (throw e))))))
 
 (defn rewrite-docs
-  "Patch package.json and replace a README that still says to clone Evalight."
+  "Patch package.json, replace a README that still says to clone Evalight,
+  and add LICENSE if the project has none."
   [files project-name]
   (let [name (or project-name "lamp")
         files (if (get files "package.json")
                 (assoc files "package.json"
                        (with-evalight-script (get files "package.json")))
                 files)
+        files (if (get files "LICENSE")
+                files
+                (assoc files "LICENSE" (template/license)))
         readme (get files "README.md")]
     (if (template/stale-evalight-readme? readme)
       (assoc files "README.md" (template/readme name))
@@ -117,7 +121,9 @@
                               (not= (get original "README.md") (get files "README.md"))
                               (conj ["README.md" (get files "README.md")])
                               (not= (get original "package.json") (get files "package.json"))
-                              (conj ["package.json" (get files "package.json")]))
+                              (conj ["package.json" (get files "package.json")])
+                              (not= (get original "LICENSE") (get files "LICENSE"))
+                              (conj ["LICENSE" (get files "LICENSE")]))
                      merged (merge files pack)
                      zip (new JSZip)]
                  (doseq [[path content] merged]

@@ -17,6 +17,9 @@ assert.ok(files["evalight/nrepl.mjs"].includes("bencode"));
 assert.ok(files["evalight/public/preview.html"].includes("preview"));
 assert.ok(files["evalight/public/css/evalight.css"]);
 assert.ok(files["evalight/public/css/preview.css"]);
+assert.ok(files["evalight/public/licenses.html"].includes("Open source licenses"));
+assert.ok(files["evalight/public/licenses.html"].includes("@codemirror/state"));
+assert.ok(files["evalight/public/licenses.html"].includes("org.babashka/sci"));
 assert.equal(
   files["evalight/public/preview.css"],
   undefined,

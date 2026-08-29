@@ -41,6 +41,25 @@
        ".nrepl-port\n"
        ".DS_Store\n"))
 
+(defn license []
+  (str "MIT License\n\n"
+       "Copyright (c) 2026 violetpurpleish & contributors\n\n"
+       "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+       "of this software and associated documentation files (the \"Software\"), to deal\n"
+       "in the Software without restriction, including without limitation the rights\n"
+       "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
+       "copies of the Software, and to permit persons to whom the Software is\n"
+       "furnished to do so, subject to the following conditions:\n\n"
+       "The above copyright notice and this permission notice shall be included in all\n"
+       "copies or substantial portions of the Software.\n\n"
+       "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+       "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+       "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+       "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
+       "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
+       "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
+       "SOFTWARE.\n"))
+
 (defn readme [project-name]
   (str "# " project-name "\n\n"
        "A ClojureScript project created in Evalight.\n\n"
@@ -73,7 +92,13 @@
        "bun run dev\n"
        "```\n\n"
        "Open http://localhost:3456. Use `--attach` if you want the workshop on that\n"
-       "same running image.\n"))
+       "same running image.\n\n"
+       "## Licenses\n\n"
+       "This project, including the copied `src/ui` kit, is MIT. See `LICENSE`.\n"
+       "The workshop UI under `evalight/` bundles third-party code. Notices for\n"
+       "that bundle are in `evalight/public/licenses.html`. shadow-cljs and\n"
+       "replicant in this folder's config are installed later by `bun install`;\n"
+       "they are not copied into the ZIP.\n"))
 
 (defn stale-evalight-readme?
   "True for a lamp README that still tells you to clone Evalight."
@@ -303,6 +328,7 @@
       "package.json" (package-json name)
       "shadow-cljs.edn" (shadow-cljs-edn)
       ".gitignore" (gitignore)
+      "LICENSE" (license)
       "README.md" (readme name)
       "public/index.html" (public-html name)
       "public/style.css" (public-css)

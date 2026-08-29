@@ -1,0 +1,47 @@
+{
+  "allowed": [
+    "MIT",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "0BSD",
+    "BlueOak-1.0.0",
+    "CC0-1.0",
+    "Unlicense",
+    "MIT-0",
+    "EPL-1.0",
+    "EPL-2.0",
+    "Zlib"
+  ],
+  "overrides": {
+    "npm:jszip": {
+      "elect": "MIT",
+      "note": "package.json is (MIT OR GPL-3.0-or-later). Evalight elects MIT."
+    },
+    "npm:squint-cljs": {
+      "spdx": "EPL-1.0",
+      "file": "EPL-1.0.txt",
+      "note": "package.json has no license field. The README says EPL; the project ships epl-v10.html (EPL-1.0)."
+    },
+    "maven:no.cjohansen/replicant": {
+      "spdx": "MIT",
+      "file": "replicant-MIT.txt",
+      "note": "The published POM names the license EPL but the URL is MIT. The GitHub LICENSE at v2026.07.1 is MIT. The jar has no LICENSE file."
+    },
+    "maven:org.clojure/clojurescript": {
+      "spdx": "EPL-1.0",
+      "file": "EPL-1.0.txt",
+      "note": "cljs.core and other ClojureScript runtime namespaces compiled into the browser JS. The jar has no LICENSE file; the POM is EPL-1.0."
+    },
+    "maven:org.clojure/google-closure-library": {
+      "spdx": "Apache-2.0",
+      "file": "Apache-2.0.txt"
+    },
+    "maven:org.babashka/sci.impl.types": {
+      "spdx": "EPL-1.0",
+      "file": "EPL-1.0.txt",
+      "note": "POM is EPL-1.0. The jar has no LICENSE file."
+    }
+  }
+}
