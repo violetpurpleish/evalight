@@ -157,8 +157,8 @@ async function writeLamp(dir) {
     `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <title>lamp</title>\n  <link rel="stylesheet" href="/css/ui.css">\n  <link rel="stylesheet" href="/style.css">\n</head>\n<body>\n  <div id="app"></div>\n  <script src="/js/main.js"></script>\n</body>\n</html>\n`);
   const files = await packEvalight(REPO, { compileIfMissing: true, requireJs: true });
   assert.ok(
-    (files["evalight/public/js/main.js"] || "").includes("evalight-editor-v5"),
-    "packed workshop UI must include evalight-editor-v5",
+    (files["evalight/public/js/main.js"] || "").includes("COMPILED=!0"),
+    "packed workshop UI must be a release build",
   );
   assert.ok(files["evalight/compiled.mjs"], "packed Evalight must include compiled.mjs");
   for (const [path, text] of Object.entries(files)) {
@@ -233,10 +233,6 @@ try {
       15000,
       "editor never loaded app.core",
     );
-    const build = await page.evaluate(() => window.EVALIGHT_BUILD);
-    assert.equal(build, "evalight-editor-v5");
-    const stamp = await page.$eval(".brand .build-stamp", (el) => el.textContent.trim());
-    assert.equal(stamp, "evalight-editor-v5");
     const runtime = await until(
       async () => {
         const st = await fetch(`http://127.0.0.1:${PORT}/api/runtime`).then((r) => r.json());
@@ -264,7 +260,6 @@ try {
     const banner = await page.$eval(".preview-banner", (el) => el.innerText).catch(() => null);
     const dump = {
       h1: await preview.$eval("h1", (el) => el.textContent),
-      build,
       banner,
       count: await preview.$eval(".count", (el) => el.textContent).catch(() => null),
       runtime,

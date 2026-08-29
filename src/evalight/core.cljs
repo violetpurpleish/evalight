@@ -1,6 +1,5 @@
 (ns evalight.core
   (:require [evalight.actions :as actions]
-            [evalight.build :as build]
             [evalight.state :as state]
             [evalight.ui :as ui]
             [replicant.dom :as r]))
@@ -14,9 +13,6 @@
      (r/render el (ui/view st)))))
 
 (defn ^:export init []
-  (set! (.-EVALIGHT_BUILD js/window) build/id)
-  (set! (.. js/document -documentElement -dataset -evalightBuild) build/id)
-  (js/console.info "Evalight" build/id)
   (let [el (.getElementById js/document "root")]
     (reset! !root el)
     (r/set-dispatch! actions/handle)

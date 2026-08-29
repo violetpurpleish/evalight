@@ -25,7 +25,7 @@ bun run dev
 
 Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts shadow-cljs in watch mode and serves the UI from `public/`. Wait until `:app` compiles before using the editor.
 
-The compiled workshop JS is gitignored. `git pull` does not replace `public/js`, and a normal refresh can keep old `/js/cljs-runtime` files. If the ClojureScript caret stays in the top-left while CSS still edits, you are on that old compile. The header should show `evalight-editor-v5`. If it does not, wipe the compile, restart, and hard-refresh (Ctrl-Shift-R / Cmd-Shift-R).
+The compiled workshop JS is gitignored. `git pull` does not replace `public/js`, and a normal refresh can keep old `/js/cljs-runtime` files. If the ClojureScript caret stays in the top-left while CSS still edits, wipe the compile, restart, and hard-refresh (Ctrl-Shift-R / Cmd-Shift-R).
 
 ```sh
 rm -rf public/js .shadow-cljs

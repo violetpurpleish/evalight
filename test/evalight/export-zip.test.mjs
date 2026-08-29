@@ -20,7 +20,7 @@ import {
   handlePackRequest,
   packEvalight,
 } from "../../scripts/evalight-pack.mjs";
-import { EVALIGHT_BUILD, servePublicPath } from "../../scripts/static-ui.mjs";
+import { servePublicPath } from "../../scripts/static-ui.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const UI_ROOT = join(ROOT, "public");
@@ -66,7 +66,7 @@ async function startServer() {
     async fetch(req) {
       const url = new URL(req.url);
       if (url.pathname === "/api/meta") {
-        return Response.json({ mode: "browser", build: EVALIGHT_BUILD });
+        return Response.json({ mode: "browser" });
       }
       if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
         return handlePackRequest(ROOT);
@@ -199,15 +199,11 @@ try {
   );
   assert.ok(files["evalight/static.mjs"]?.includes("servePublicPath"));
   assert.ok(files["evalight/fs-http.mjs"]?.includes("SKIP_ROOT"));
-  assert.ok(files["evalight/build-id.mjs"]?.includes("evalight-editor-v5"));
   assert.ok(
-    files["evalight/public/index.html"]?.includes("/js/main.js?v=evalight-editor-v5"),
-    "stamped index.html missing from zip",
+    files["evalight/public/index.html"]?.includes("/js/main.js"),
+    "index.html missing from zip",
   );
-  assert.ok(
-    files["evalight/public/js/main.js"]?.includes("evalight-editor-v5"),
-    "packed workshop UI must include evalight-editor-v5",
-  );
+  assert.equal(files["evalight/build-id.mjs"], undefined);
   assert.ok(
     files["evalight/public/js/main.js"].includes("COMPILED=!0"),
     "zip packed a watch build, not the workshop release",

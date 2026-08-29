@@ -13,7 +13,7 @@
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyEmbedServer, handlePackRequest } from "./evalight-pack.mjs";
-import { EVALIGHT_BUILD, servePublicPath } from "./static-ui.mjs";
+import { servePublicPath } from "./static-ui.mjs";
 import {
   compiledMeta,
   handleRuntimeRequest,
@@ -53,7 +53,6 @@ Bun.serve({
     if (url.pathname === "/api/meta") {
       return json({
         mode: "local",
-        build: EVALIGHT_BUILD,
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
         ...compiledMeta(),
@@ -73,7 +72,7 @@ Bun.serve({
   },
 });
 
-console.log(`Evalight local mode  ${EVALIGHT_BUILD}`);
+console.log(`Evalight local mode`);
 console.log(`  UI:  http://127.0.0.1:${PORT}`);
 console.log(`  FS:  ${FS_ROOT}`);
 

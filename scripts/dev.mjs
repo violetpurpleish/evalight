@@ -11,7 +11,7 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyEmbedServer, ensureWorkshopUi, handlePackRequest } from "./evalight-pack.mjs";
-import { EVALIGHT_BUILD, servePublicPath } from "./static-ui.mjs";
+import { servePublicPath } from "./static-ui.mjs";
 
 const ROOT = join(fileURLToPath(new URL("..", import.meta.url)));
 const UI_ROOT = join(ROOT, "public");
@@ -34,7 +34,7 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === "/api/meta") {
-      return Response.json({ mode: "browser", build: EVALIGHT_BUILD });
+      return Response.json({ mode: "browser" });
     }
     if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
       return handlePackRequest(ROOT);
@@ -45,7 +45,7 @@ Bun.serve({
   },
 });
 
-console.log(`Evalight  http://127.0.0.1:${PORT}  ${EVALIGHT_BUILD}`);
+console.log(`Evalight  http://127.0.0.1:${PORT}`);
 
 setTimeout(() => {
   ensureWorkshopUi(ROOT).catch((err) => {

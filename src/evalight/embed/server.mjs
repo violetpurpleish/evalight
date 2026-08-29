@@ -13,7 +13,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { EVALIGHT_BUILD } from "./build-id.mjs";
 import {
   compiledMeta,
   handleRuntimeRequest,
@@ -70,7 +69,6 @@ Bun.serve({
     if (url.pathname === "/api/meta") {
       return json({
         mode: "local",
-        build: EVALIGHT_BUILD,
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
         ...compiledMeta(),
@@ -94,7 +92,7 @@ Bun.serve({
   },
 });
 
-console.log(`Evalight  http://127.0.0.1:${PORT}  ${EVALIGHT_BUILD}`);
+console.log(`Evalight  http://127.0.0.1:${PORT}`);
 console.log(`  project  ${FS_ROOT}`);
 
 function shutdown() {

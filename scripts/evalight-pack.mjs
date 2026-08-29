@@ -9,10 +9,9 @@
  * public/evalight-embed/manifest.json, which copyEmbedServer writes from here.
  */
 import { createHash } from "node:crypto";
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join, relative } from "node:path";
-import { cljsBuildId, embedBuildIdSource, stampHtml } from "./evalight-build.mjs";
 
 export const EMBED_FILES = [
   "server.mjs",
@@ -21,11 +20,10 @@ export const EMBED_FILES = [
   "bencode.mjs",
   "fs-http.mjs",
   "static.mjs",
-  "build-id.mjs",
 ];
 
 export const PACK_STATIC = [
-  { from: "public/index.html", zip: "evalight/public/index.html", url: "/index.html", stamp: true },
+  { from: "public/index.html", zip: "evalight/public/index.html", url: "/index.html" },
   { from: "public/preview.html", zip: "evalight/public/preview.html", url: "/preview.html" },
   { from: "public/favicon.svg", zip: "evalight/public/favicon.svg", url: "/favicon.svg" },
   { from: "public/css/ui.css", zip: "evalight/public/css/ui.css", url: "/css/ui.css" },
@@ -126,14 +124,7 @@ export async function ensureWorkshopUi(root, { force = false } = {}) {
   return fp;
 }
 
-export async function syncEmbedBuildId(root) {
-  const id = cljsBuildId(root);
-  await writeFile(join(root, "src/evalight/embed/build-id.mjs"), embedBuildIdSource(id));
-  return id;
-}
-
 export async function copyEmbedServer(root) {
-  const id = await syncEmbedBuildId(root);
   await mkdir(join(root, "public/evalight-embed"), { recursive: true });
   for (const name of EMBED_FILES) {
     const src = await readText(root, `src/evalight/embed/${name}`);
@@ -143,22 +134,18 @@ export async function copyEmbedServer(root) {
     join(root, "public/evalight-embed/manifest.json"),
     `${JSON.stringify(fallbackManifest(), null, 2)}\n`,
   );
-  return id;
 }
 
 export async function packEvalight(root, { requireJs = true, compileIfMissing = false } = {}) {
   if (compileIfMissing) {
     await ensureWorkshopUi(root);
   }
-  const id = await syncEmbedBuildId(root);
   const files = {};
   for (const name of EMBED_FILES) {
     files[`evalight/${name}`] = await readText(root, `src/evalight/embed/${name}`);
   }
   for (const item of PACK_STATIC) {
-    let text = await readText(root, item.from);
-    if (item.stamp) text = stampHtml(text, id);
-    files[item.zip] = text;
+    files[item.zip] = await readText(root, item.from);
   }
   for (const item of PACK_RELEASE) {
     const file = Bun.file(join(root, item.from));

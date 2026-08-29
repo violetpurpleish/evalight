@@ -1,6 +1,5 @@
 (ns evalight.ui
   (:require [evalight.actions :as actions]
-            [evalight.build :as build]
             [evalight.editor :as editor]
             [evalight.icons :as icons]
             [evalight.kit :as kit]
@@ -111,9 +110,7 @@
       [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop."])
     [:p.muted
      [:a.help-licenses {:href "/licenses.html" :target "_blank" :rel "noopener noreferrer"}
-      "Open Source Licenses"]]
-    [:p.build-stamp {:title "Compiled UI id. If a cljs caret bug remains, this is not the build that fixed it."}
-     build/id]]])
+      "Open Source Licenses"]]])
 
 (defn- tree-file-paths [nodes]
   (mapcat (fn [n]
@@ -327,8 +324,7 @@
      [:p.tagline
       (if (= :local (:mode state))
         "Local files"
-        "Browser workshop")]
-     [:p.build-stamp {:title "Compiled UI id"} build/id]]]
+        "Browser workshop")]]]
    [:div.project
     (if (= :local (:mode state))
       [:span.project-name (:project state)]
