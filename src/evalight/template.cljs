@@ -61,7 +61,7 @@
        "```\n\n"
        "Open http://127.0.0.1:48721. Evalight starts its own `shadow-cljs watch :app`.\n"
        "Do not also run `bun run dev` in this folder; they would both write `public/js`.\n\n"
-       "To join a watch you already started (experimental):\n\n"
+       "To join a watch you already started:\n\n"
        "```sh\n"
        "bun run evalight --attach\n"
        "```\n\n"

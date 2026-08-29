@@ -99,7 +99,7 @@ The hosted playground still interprets source with SCI inside a sandboxed `previ
 
 Do not also run `bun run dev` in the same project. Two watches of `:app` fight over `public/js`.
 
-To join a watch you already started (experimental):
+To join a watch you already started:
 
 ```sh
 bun run evalight --attach

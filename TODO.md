@@ -47,7 +47,7 @@ Do not "unify" these unless the constraint changes.
 
 ### Tests that are still thin
 
-- [ ] **Attach is opt-in.** `bun run evalight --attach` joins a watch you started. It verifies shadow `nrepl-select` for `:app`, does not kill that process, and turns Evalight Live off. Implicit `.nrepl-port` sniffing is gone. Unit tests lock the flag parser. There is still no Chrome test that starts `bun run dev` first, then `--attach`.
+- [x] **Attach is opt-in.** `bun run evalight --attach` joins a watch you started. It verifies shadow `nrepl-select` for `:app`, does not kill that process, and turns Evalight Live off. Implicit `.nrepl-port` sniffing is gone. Unit tests lock the flag parser. `attach-chrome.test.mjs` starts `shadow-cljs watch :app`, then Evalight with only `--attach`, and asserts Live is off, Preview is that app, and SIGTERM leaves the compiler running.
 - [x] **Export ZIP from the playground UI.** Pack tests the Node packer. `export-zip.test.mjs` clicks Export ZIP on a hosted playground (SCI / OPFS), catches the JSZip blob, and asserts the unzipped tree: lamp `src/app/core.cljs`, `package.json` with `bun evalight/server.mjs`, and the same pack keys `pack.test.mjs` already locks.
 
 ### Known product caveats (not bugs)
@@ -70,4 +70,3 @@ Do not "unify" these unless the constraint changes.
 These are product, not cleanup.
 
 1. Help copy for compiler-env vs REPL-only defs, if people hit it.
-2. A Chrome test for `--attach` (start `watch :app`, then Evalight with the flag) if attach leaves experimental.
