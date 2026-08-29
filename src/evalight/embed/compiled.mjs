@@ -1,9 +1,12 @@
 /**
  * Compiled-app runtime for exported Evalight.
  *
- * The preview iframe is shadow-cljs :app (the same program bun run dev
- * builds). Eval, hover, and completions go through nREPL into that heap.
- * SCI is not used here.
+ * Default: Evalight owns shadow-cljs watch :app (overlay config, own
+ * ports, Live reload). `bun run evalight --attach` joins a watch the
+ * developer already started. Do not sniff .nrepl-port unless --attach.
+ *
+ * The preview iframe is that compiled app. Eval, hover, and completions
+ * go through nREPL into that heap. SCI is not used here.
  */
 import { spawn } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
@@ -91,6 +94,84 @@ export async function isUserProject(root) {
 function parseDevHttp(shadowText) {
   const m = shadowText.match(/:dev-http\s*\{(\d+)\s+"public"/);
   return m ? Number(m[1]) : null;
+}
+
+/**
+ * bun run evalight [--attach] [--preview-url=http://127.0.0.1:3456/] [--nrepl-port=7888]
+ * bun run local [--attach] [project-dir]
+ */
+export function parseEvalightArgs(argv) {
+  const out = { attach: false, previewUrl: null, nreplPort: null, positional: [] };
+  const args = argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--") continue;
+    if (a === "--attach") {
+      out.attach = true;
+      continue;
+    }
+    if (a === "--preview-url" || a.startsWith("--preview-url=")) {
+      out.previewUrl = a.includes("=") ? a.slice(a.indexOf("=") + 1) : args[++i];
+      continue;
+    }
+    if (a === "--nrepl-port" || a.startsWith("--nrepl-port=")) {
+      const v = a.includes("=") ? a.slice(a.indexOf("=") + 1) : args[++i];
+      out.nreplPort = Number(v);
+      continue;
+    }
+    if (a.startsWith("-")) {
+      throw new Error(`Unknown flag ${a}. Try --attach, --preview-url=, --nrepl-port=.`);
+    }
+    out.positional.push(a);
+  }
+  if (out.nreplPort != null && !(Number.isFinite(out.nreplPort) && out.nreplPort > 0)) {
+    throw new Error("--nrepl-port must be a port number.");
+  }
+  if (!out.attach && (out.previewUrl || out.nreplPort)) {
+    throw new Error("--preview-url and --nrepl-port only apply with --attach.");
+  }
+  return out;
+}
+
+/**
+ * Default is owned watch. .nrepl-port is consulted only when attach is true.
+ */
+export function resolveAttachTarget({
+  attach,
+  nreplFromFlag,
+  nreplFromFile,
+  previewFromFlag,
+  previewFromDevHttp,
+}) {
+  if (!attach) return { mode: "owned" };
+  const nreplPort = nreplFromFlag || nreplFromFile || null;
+  if (!nreplPort) {
+    throw new Error(
+      "--attach needs a running shadow-cljs nREPL. Pass --nrepl-port= or start `shadow-cljs watch app` so .nrepl-port exists.",
+    );
+  }
+  const previewUrl = previewFromFlag
+    || (previewFromDevHttp ? `http://127.0.0.1:${previewFromDevHttp}/` : null);
+  if (!previewUrl) {
+    throw new Error(
+      "--attach could not tell where the compiled app is served. Pass --preview-url=http://127.0.0.1:3456/",
+    );
+  }
+  return { mode: "attach", nreplPort, previewUrl };
+}
+
+export function attachLabel({ buildId, previewUrl }) {
+  let host = previewUrl || "";
+  try {
+    const u = new URL(previewUrl);
+    const name = u.hostname === "127.0.0.1" ? "localhost" : u.hostname;
+    host = u.port ? `${name}:${u.port}` : u.host;
+  } catch {
+    /* keep raw */
+  }
+  const build = String(buildId || ":app");
+  const tagged = build.startsWith(":") ? build : `:${build}`;
+  return `Attached · ${tagged} · ${host}`;
 }
 
 /**
@@ -532,7 +613,12 @@ function parseMainNs(edn) {
   return m ? m[1] : "app.core";
 }
 
-export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}) {
+export async function startCompiledRuntime(projectRoot, {
+  buildId = "app",
+  attach = false,
+  previewUrl: previewFromFlag = null,
+  nreplPort: nreplFromFlag = null,
+} = {}) {
   const enabled = await isUserProject(projectRoot);
   if (!enabled) {
     started = { enabled: false, error: null };
@@ -541,24 +627,53 @@ export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}
   const edn = await readText(join(projectRoot, "evalight.edn"));
   const mainNs = parseMainNs(edn);
   const shadowText = await readText(join(projectRoot, "shadow-cljs.edn"));
-  const configuredHttp = parseDevHttp(shadowText);
 
-  const existingPort = await readNreplPortFile(projectRoot);
-  if (existingPort && (await pingNrepl(existingPort))) {
-    const url = `http://127.0.0.1:${configuredHttp || APP_PORT}/`;
-    started = {
-      enabled: true,
-      attached: true,
-      nreplPort: existingPort,
-      previewUrl: url,
-      buildId: `:${buildId}`,
-      mainNs,
-      child: null,
-      error: null,
-    };
-    console.log(`  runtime  compiled (attached nREPL ${existingPort})`);
-    console.log(`  preview  ${url}`);
-    return started;
+  if (attach) {
+    try {
+      const nreplFromFile = await readNreplPortFile(projectRoot);
+      const target = resolveAttachTarget({
+        attach: true,
+        nreplFromFlag,
+        nreplFromFile,
+        previewFromFlag,
+        previewFromDevHttp: parseDevHttp(shadowText),
+      });
+      if (!(await pingNrepl(target.nreplPort))) {
+        throw new Error(
+          `--attach: nothing is listening on nREPL ${target.nreplPort}. Start shadow-cljs watch ${buildId} first.`,
+        );
+      }
+      await ensureCljs(target.nreplPort, `:${buildId}`);
+      started = {
+        enabled: true,
+        attached: true,
+        nreplPort: target.nreplPort,
+        previewUrl: target.previewUrl,
+        buildId: `:${buildId}`,
+        mainNs,
+        child: null,
+        error: null,
+        attachLabel: attachLabel({ buildId: `:${buildId}`, previewUrl: target.previewUrl }),
+      };
+      console.log(`  runtime  compiled ${started.attachLabel}`);
+      console.log(`  preview  ${started.previewUrl}`);
+      console.log(`  nREPL    ${started.nreplPort} (will not be stopped)`);
+      return started;
+    } catch (e) {
+      started = {
+        enabled: true,
+        attached: true,
+        error: e.message || String(e),
+        previewUrl: previewFromFlag || null,
+        nreplPort: nreplFromFlag || null,
+        buildId: `:${buildId}`,
+        mainNs,
+        child: null,
+        attachLabel: null,
+      };
+      console.warn(`  runtime  ${started.error}`);
+      return started;
+    }
   }
 
   try {
@@ -736,7 +851,9 @@ export function compiledMeta() {
   }
   return {
     runtime: "compiled",
-    "preview-url": started.previewUrl || previewUrl(),
+    "preview-url": started.previewUrl || (started.attached ? null : previewUrl()),
     "runtime-error": started.error || null,
+    attached: Boolean(started.attached),
+    "attach-label": started.attachLabel || null,
   };
 }

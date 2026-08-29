@@ -246,6 +246,7 @@ try {
       "compiled runtime never connected",
     );
     assert.equal(runtime.runtime, "compiled");
+    assert.equal(runtime.attached, false, "default evalight must own the watch, not sniff .nrepl-port");
     const sciPreview = page.frames().find((f) => (f.url() || "").includes("preview.html"));
     assert.equal(sciPreview, undefined, "exported Evalight must not load the SCI preview.html");
     const preview = await until(

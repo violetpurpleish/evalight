@@ -93,7 +93,8 @@
                  nil)))))
 
 (defn- schedule-live-reload! []
-  (when (:live? (:preview @state/app))
+  (when (and (:live? (:preview @state/app))
+             (not (:attached @state/app)))
     (when-let [t @!live-timer]
       (js/clearTimeout t))
     (reset! !live-timer
@@ -434,7 +435,9 @@
   (swap! state/app update :help? not))
 
 (defn toggle-live! []
-  (swap! state/app update-in [:preview :live?] not))
+  (if (:attached @state/app)
+    (flash! "shadow-cljs autoload reloads the attached app. Evalight Live stays off.")
+    (swap! state/app update-in [:preview :live?] not)))
 
 (defn set-mobile-tab! [tab]
   (swap! state/app assoc :mobile-tab tab))
@@ -649,12 +652,18 @@
       nil)))
 
 (defn- boot-local [meta]
-  (let [compiled? (= "compiled" (str (:runtime meta)))]
-    (swap! state/app assoc
-           :mode :local
-           :runtime (if compiled? :compiled :sci)
-           :preview-url (or (:preview-url meta) (:previewUrl meta))
-           :project (or (:name meta) "local")))
+  (let [compiled? (= "compiled" (str (:runtime meta)))
+        attached? (boolean (:attached meta))]
+    (swap! state/app
+           (fn [s]
+             (cond-> (-> s
+                          (assoc :mode :local
+                                 :runtime (if compiled? :compiled :sci)
+                                 :preview-url (or (:preview-url meta) (:previewUrl meta))
+                                 :project (or (:name meta) "local")
+                                 :attached attached?
+                                 :attach-label (:attach-label meta)))
+               attached? (assoc-in [:preview :live?] false))))))
   (reset! !fs (http-fs/open))
   (-> (refresh-tree!)
       (.then (fn [_] (preferred-file (now-fs))))

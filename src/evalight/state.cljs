@@ -17,6 +17,8 @@
          :preview {:status :idle
                    :error nil
                    :live? true}
+         :attached false
+         :attach-label nil
          :dialog nil
          :help? false
          :parinfer :smart

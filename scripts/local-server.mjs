@@ -7,6 +7,7 @@
  *
  *   bun run local
  *   bun run local /path/to/project
+ *   bun run local --attach /path/to/project
  */
 
 import { join, resolve } from "node:path";
@@ -16,6 +17,7 @@ import { EVALIGHT_BUILD, servePublicPath } from "./static-ui.mjs";
 import {
   compiledMeta,
   handleRuntimeRequest,
+  parseEvalightArgs,
   startCompiledRuntime,
   stopCompiledRuntime,
 } from "../src/evalight/embed/compiled.mjs";
@@ -23,13 +25,25 @@ import { createFsApi, json } from "../src/evalight/embed/fs-http.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const UI_ROOT = join(ROOT, "public");
-const FS_ROOT = resolve(process.argv[2] || process.cwd());
+const flags = (() => {
+  try {
+    return parseEvalightArgs(process.argv);
+  } catch (e) {
+    console.error(e.message || e);
+    process.exit(1);
+  }
+})();
+const FS_ROOT = resolve(flags.positional[0] || process.cwd());
 const PORT = Number(process.env.PORT || 48721);
 const fsApi = createFsApi(FS_ROOT);
 
 await copyEmbedServer(ROOT);
 console.log(`Starting compiled runtime…`);
-await startCompiledRuntime(FS_ROOT);
+await startCompiledRuntime(FS_ROOT, {
+  attach: flags.attach,
+  previewUrl: flags.previewUrl,
+  nreplPort: flags.nreplPort,
+});
 
 Bun.serve({
   port: PORT,

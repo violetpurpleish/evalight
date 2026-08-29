@@ -59,14 +59,20 @@
        "bun install\n"
        "bun run evalight\n"
        "```\n\n"
-       "Open http://127.0.0.1:48721.\n\n"
+       "Open http://127.0.0.1:48721. Evalight starts its own `shadow-cljs watch :app`.\n"
+       "Do not also run `bun run dev` in this folder; they would both write `public/js`.\n\n"
+       "To join a watch you already started (experimental):\n\n"
+       "```sh\n"
+       "bun run evalight --attach\n"
+       "```\n\n"
+       "That uses the running nREPL and does not stop it on exit. If Preview cannot\n"
+       "tell the app URL, pass `--preview-url=http://127.0.0.1:3456/`.\n\n"
        "## Compiled site without the workshop\n\n"
        "```sh\n"
        "bun run dev\n"
        "```\n\n"
-       "Open http://localhost:3456 if you already started watch yourself.\n"
-       "Do not run this at the same time as `bun run evalight`; they would\n"
-       "both try to compile `:app`.\n"))
+       "Open http://localhost:3456. Use `--attach` if you want the workshop on that\n"
+       "same running image.\n"))
 
 (defn stale-evalight-readme?
   "True for a lamp README that still tells you to clone Evalight."

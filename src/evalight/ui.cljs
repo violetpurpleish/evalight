@@ -105,7 +105,9 @@
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
     [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
     (if (= :local (:mode state))
-      [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground. Live reloads that preview after you save; off keeps the current page."]
+      (if (:attached state)
+        [:p.muted "Attached to a shadow-cljs watch you already started (`bun run evalight --attach`). Preview is that app. Evalight will not start or stop the compiler, and Live stays off so it does not fight shadow autoload."]
+        [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground. Live reloads that preview after you save; off keeps the current page. `bun run evalight --attach` is experimental: it joins an already-running watch instead of starting one."])
       [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop."])
     [:p.build-stamp {:title "Compiled UI id. If a cljs caret bug remains, this is not the build that fixed it."}
      build/id]]])
@@ -251,8 +253,9 @@
                      :keydown [:repl-expr-keydown]}}]]])
 
 (defn preview-pane [state]
-  (let [{:keys [preview layout runtime preview-url]} state
+  (let [{:keys [preview layout runtime preview-url attached attach-label]} state
         compiled? (= :compiled runtime)
+        attached? (boolean attached)
         w (or (:preview-width layout) 360)
         src (if compiled? (or preview-url "about:blank") "/preview.html")]
     [:section.preview
@@ -264,17 +267,26 @@
         :title "Hide preview"
         :aria-label "Hide preview"}
        (icons/panel-right)]
-      [:span (if compiled? "Preview · compiled" "Preview")]
+      [:span (cond
+               attached? (or attach-label "Attached")
+               compiled? "Preview · compiled"
+               :else "Preview")]
       (when (= :loading (:status preview))
         [:span.muted "loading"])
       (when (:error preview)
         [:span.preview-error {:title (:error preview)} "error"])
       [:label.live
-       {:title (if compiled?
+       {:class (when attached? "is-disabled")
+        :title (cond
+                 attached?
+                 "shadow-cljs autoload reloads this app. Evalight Live stays off while attached."
+                 compiled?
                  "Reload Preview after you save. Off keeps this page until you reload it."
+                 :else
                  "Reload the SCI preview as you type.")}
        [:input {:type "checkbox"
                 :checked (boolean (:live? preview))
+                :disabled attached?
                 :on {:change [:toggle-live]}}]
        "Live"]]
      [:div.preview-frame

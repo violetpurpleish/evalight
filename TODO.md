@@ -32,6 +32,7 @@ Ports when Evalight starts its own watch (export / local):
 - [x] **Evalight checkout is SCI.** `isUserProject` is false for this repo (`:workshop` in `shadow-cljs.edn`). Covered by a unit test.
 - [x] **Compiled editor keys.** Embed Chrome test hovers `bump`, Ctrl-Enters the **`(bump)` call** (not the `defn`), and checks completions. Ctrl-Enter on `(defn bump …)` only redefines the var; the lamp count does not change. Previously the test only called `/api/runtime/*`.
 - [x] **Save then compiled preview.** After the count assertions, Live goes back on. The test replaces `Hello` in `app.greet` with `LIVE-SAVE` and waits for that string in the preview lede. That is the Nightlight loop (save, shadow rebuild, iframe reload). Do not assert the lamp count across a Live reload. The atom resets.
+- [x] **No implicit attach.** `bun run evalight` always starts its own overlay watch. `--attach` is the only way to join an existing nREPL. A leftover `.nrepl-port` does not change the default.
 - [x] **`with-evalight-script` stays in two languages.** Browser zip rewrite cannot import the Node helper. Both copies are locked by the same fixture cases (cljs test + pack.test).
 
 ## Still duplicated on purpose
@@ -46,7 +47,7 @@ Do not "unify" these unless the constraint changes.
 
 ### Tests that are still thin
 
-- [ ] **Attach to an existing watch.** If `bun run dev` is already running in the project, `bun run evalight` should attach to that nREPL instead of starting a second watch. Untested. Isolated overlay watch is what the embed test covers.
+- [ ] **Attach is opt-in.** `bun run evalight --attach` joins a watch you started. It verifies shadow `nrepl-select` for `:app`, does not kill that process, and turns Evalight Live off. Implicit `.nrepl-port` sniffing is gone. Unit tests lock the flag parser. There is still no Chrome test that starts `bun run dev` first, then `--attach`.
 - [ ] **Export ZIP from the playground UI.** Pack tests the Node packer. The JSZip path in `export.cljs` (`fetch-evalight-pack` + merge) is not driven in Chrome.
 
 ### Known product caveats (not bugs)
@@ -68,6 +69,6 @@ Do not "unify" these unless the constraint changes.
 
 These are product, not cleanup.
 
-1. Decide whether attaching to an already-running `bun run dev` is worth the port/nREPL matching work.
-2. Chrome-drive Export ZIP from the playground if we care about the JSZip path.
-3. Help copy for compiler-env vs REPL-only defs, if people hit it.
+1. Chrome-drive Export ZIP from the playground if we care about the JSZip path.
+2. Help copy for compiler-env vs REPL-only defs, if people hit it.
+3. A Chrome test for `--attach` (start `watch :app`, then Evalight with the flag) if attach leaves experimental.

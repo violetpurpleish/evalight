@@ -7,6 +7,8 @@
  * so the tool does not list itself.
  *
  *   bun evalight/server.mjs
+ *   bun evalight/server.mjs --attach
+ *   bun evalight/server.mjs --attach --preview-url=http://127.0.0.1:3456/
  */
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -15,6 +17,7 @@ import { EVALIGHT_BUILD } from "./build-id.mjs";
 import {
   compiledMeta,
   handleRuntimeRequest,
+  parseEvalightArgs,
   startCompiledRuntime,
   stopCompiledRuntime,
 } from "./compiled.mjs";
@@ -43,8 +46,21 @@ async function packSelf() {
   return files;
 }
 
+const flags = (() => {
+  try {
+    return parseEvalightArgs(process.argv);
+  } catch (e) {
+    console.error(e.message || e);
+    process.exit(1);
+  }
+})();
+
 console.log(`Starting compiled runtime…`);
-await startCompiledRuntime(FS_ROOT);
+await startCompiledRuntime(FS_ROOT, {
+  attach: flags.attach,
+  previewUrl: flags.previewUrl,
+  nreplPort: flags.nreplPort,
+});
 
 Bun.serve({
   port: PORT,
