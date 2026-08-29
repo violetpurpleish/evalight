@@ -121,7 +121,7 @@ const child = spawn("bun", ["evalight/server.mjs"], {
 child.stderr.pipe(process.stderr);
 child.stdout.pipe(process.stdout);
 try {
-  await waitForOutput(child, /Evalight/, 20000);
+  await waitForOutput(child, /Evalight  http/, 120000);
   const userDataDir = await mkdtemp(join(tmpdir(), "evalight-embed-chrome-"));
   const browser = await puppeteer.launch({
     executablePath: chromePath(),

@@ -95,9 +95,11 @@ evalight.preview
 
 The hosted playground still interprets source with SCI inside a sandboxed `preview.html`. There is no compiler in the browser.
 
-`bun run evalight` starts the workshop and the project's real shadow-cljs watch. Preview is that compiled page. Ctrl-Enter, completions, and hover go through nREPL into the same JS heap. It will not fall back to SCI. You need Bun, a JDK, and `bun install` once.
+`bun run evalight` starts the workshop and a dedicated `shadow-cljs watch :app` (its own nREPL and HTTP ports, so it does not collide with another shadow server on this machine). Preview is that compiled page. Ctrl-Enter, completions, and hover go through nREPL into the same JS heap. It will not fall back to SCI. You need Bun, a JDK, and `bun install` once.
 
-Do not run `bun run evalight` and `bun run dev` in the same project at once. Both would watch `:app`.
+If `bun run dev` is already compiling this project, Evalight attaches to that nREPL instead of starting a second watch.
+
+Do not run `bun run evalight` and `bun run dev` in the same project at once unless you mean to attach. Two watches of `:app` fight over `public/js`.
 
 Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
 

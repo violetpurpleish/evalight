@@ -14,9 +14,24 @@ export function connectNrepl(port, host = "127.0.0.1") {
   let seq = 0;
   let buf = Buffer.alloc(0);
   const pending = new Map();
+  let closed = null;
 
   const socket = net.connect({ port, host });
   socket.setNoDelay(true);
+
+  let settleReady;
+  const ready = new Promise((resolve, reject) => {
+    settleReady = { resolve, reject };
+  });
+  socket.once("connect", () => settleReady.resolve());
+  socket.on("error", (e) => {
+    closed = e;
+    settleReady.reject(e);
+    for (const [, wait] of pending) {
+      wait.reject?.(e);
+    }
+    pending.clear();
+  });
 
   socket.on("data", (chunk) => {
     buf = Buffer.concat([buf, chunk]);
@@ -35,7 +50,20 @@ export function connectNrepl(port, host = "127.0.0.1") {
     }
   });
 
+  function failPending(err) {
+    for (const [, wait] of pending) {
+      wait.reject?.(err);
+    }
+    pending.clear();
+  }
+
+  socket.on("close", () => {
+    if (!closed) closed = new Error("nREPL connection closed");
+    failPending(closed);
+  });
+
   function request(msg, ms = 20000) {
+    if (closed) return Promise.reject(closed);
     const id = String(++seq);
     const payload = { ...msg, id };
     return new Promise((resolve, reject) => {
@@ -48,6 +76,10 @@ export function connectNrepl(port, host = "127.0.0.1") {
         resolve: (msgs) => {
           clearTimeout(t);
           resolve(msgs);
+        },
+        reject: (err) => {
+          clearTimeout(t);
+          reject(err);
         },
       });
       socket.write(encode(payload));
@@ -84,14 +116,18 @@ export function connectNrepl(port, host = "127.0.0.1") {
   return {
     socket,
     async clone() {
+      await ready;
       const msgs = await request({ op: "clone" });
       const last = msgs[msgs.length - 1] || {};
       const session = last["new-session"];
       if (!session) throw new Error("nREPL clone did not return a session");
       return session;
     },
-    async eval(session, code, ms = 20000) {
-      const msgs = await request({ op: "eval", session, code }, ms);
+    async eval(session, code, ms = 20000, nsName) {
+      await ready;
+      const payload = { op: "eval", session, code };
+      if (nsName) payload.ns = nsName;
+      const msgs = await request(payload, ms);
       return foldEval(msgs);
     },
     close() {

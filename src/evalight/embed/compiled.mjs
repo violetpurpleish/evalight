@@ -6,7 +6,8 @@
  * SCI is not used here.
  */
 import { spawn } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { connectNrepl, pingNrepl } from "./nrepl.mjs";
 
@@ -82,6 +83,73 @@ function parseDevHttp(shadowText) {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * shadow-cljs --config-merge only merges into the *build* map, not
+ * :nrepl / :http / :dev-http. We rewrite those keys ourselves.
+ */
+export function overlayShadowEdn(text, { nreplPort, shadowHttp, appPort }) {
+  let out = text || "{}";
+  for (const key of ["nrepl", "http", "dev-http"]) {
+    out = stripTopKey(out, key);
+  }
+  const last = out.lastIndexOf("}");
+  if (last === -1) {
+    throw new Error("shadow-cljs.edn is not a map");
+  }
+  const inject =
+    `\n :nrepl {:port ${nreplPort}}\n` +
+    ` :http {:host "127.0.0.1" :port ${shadowHttp}}\n` +
+    ` :dev-http {${appPort} "public"}\n`;
+  return out.slice(0, last) + inject + out.slice(last);
+}
+
+export function stripTopKey(edn, key) {
+  const needle = `:${key}`;
+  let search = 0;
+  while (search < edn.length) {
+    const idx = edn.indexOf(needle, search);
+    if (idx < 0) return edn;
+    const before = idx === 0 ? "\n" : edn[idx - 1];
+    if (before && /[A-Za-z0-9*!?_\-+.:/]/.test(before)) {
+      search = idx + needle.length;
+      continue;
+    }
+    const lineStart = edn.lastIndexOf("\n", idx);
+    const linePrefix = edn.slice(lineStart + 1, idx);
+    if (linePrefix.includes(";")) {
+      search = idx + needle.length;
+      continue;
+    }
+    let i = idx + needle.length;
+    while (i < edn.length && /\s/.test(edn[i])) i++;
+    if (edn[i] === "{") {
+      let depth = 0;
+      for (let j = i; j < edn.length; j++) {
+        const ch = edn[j];
+        if (ch === '"') {
+          j++;
+          while (j < edn.length && edn[j] !== '"') {
+            if (edn[j] === "\\") j++;
+            j++;
+          }
+          continue;
+        }
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+          depth--;
+          if (depth === 0) {
+            return edn.slice(0, idx) + edn.slice(j + 1);
+          }
+        }
+      }
+      return edn;
+    }
+    while (i < edn.length && !/[\s}]/.test(edn[i])) i++;
+    return edn.slice(0, idx) + edn.slice(i);
+  }
+  return edn;
+}
+
 async function readNreplPortFile(root) {
   const text = (await readText(join(root, ".nrepl-port"))).trim();
   const n = Number(text);
@@ -123,23 +191,6 @@ async function ensureDeps(root) {
   }
 }
 
-function waitForOutput(child, pattern, ms) {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("shadow-cljs watch did not finish compiling")), ms);
-    const onData = (buf) => {
-      const s = String(buf);
-      if (pattern.test(s)) {
-        clearTimeout(t);
-        child.stdout?.off("data", onData);
-        child.stderr?.off("data", onData);
-        resolve();
-      }
-    };
-    child.stdout?.on("data", onData);
-    child.stderr?.on("data", onData);
-  });
-}
-
 async function waitUntil(fn, ms, label) {
   const t0 = Date.now();
   let last;
@@ -151,25 +202,47 @@ async function waitUntil(fn, ms, label) {
   throw new Error(label);
 }
 
-function mergeConfig(nreplPort, shadowHttp, appPort) {
-  return `{:nrepl {:port ${nreplPort}} :http {:port ${shadowHttp}} :dev-http {${appPort} "public"}}`;
+const WATCH_SKIP = new Set([
+  "shadow-cljs.edn",
+  ".shadow-cljs",
+  ".nrepl-port",
+  ".git",
+  "evalight",
+  "evalight-ui",
+]);
+
+async function makeWatchRoot(projectRoot, overlay) {
+  const dir = await mkdtemp(join(tmpdir(), "evalight-watch-"));
+  const names = await readdir(projectRoot);
+  for (const name of names) {
+    if (WATCH_SKIP.has(name)) continue;
+    await symlink(join(projectRoot, name), join(dir, name));
+  }
+  await writeFile(join(dir, "shadow-cljs.edn"), overlay, "utf8");
+  return dir;
 }
 
 let client = null;
 let session = null;
 let cljs = false;
+let lastNrepl = null;
 let child = null;
+let watchRoot = null;
 let started = null;
 
 async function ensureCljs(nreplPort, buildId) {
-  if (client && session && cljs) return;
+  if (client && session && cljs && lastNrepl === nreplPort) return;
   if (client) {
     try {
       client.close();
     } catch {
       /* ignore */
     }
+    client = null;
+    session = null;
+    cljs = false;
   }
+  lastNrepl = nreplPort;
   client = connectNrepl(nreplPort);
   session = await client.clone();
   const sel = await client.eval(
@@ -177,23 +250,18 @@ async function ensureCljs(nreplPort, buildId) {
     `(do (require '[shadow.cljs.devtools.api :as shadow]) (shadow/nrepl-select ${buildId}))`,
     20000,
   );
-  const text = `${sel.value || ""} ${sel.stdout || ""} ${sel.stderr || ""}`;
   if (/no-worker|No application|nrepl-select/i.test(sel.stderr || "") && !sel.ok) {
     throw new Error(sel.stderr || sel.ex || "shadow/nrepl-select failed");
   }
   // nrepl-select often returns [:selected :app] even before a runtime attaches.
   cljs = true;
-  return text;
 }
 
 async function cljsEval(code, nsName, ms = 20000) {
   if (!client || !session || !cljs) {
     throw new Error("Compiled REPL is not connected.");
   }
-  const wrapped = nsName
-    ? `(do (in-ns '${nsName}) ${code})`
-    : code;
-  return client.eval(session, wrapped, ms);
+  return client.eval(session, code, ms, nsName || undefined);
 }
 
 function noRuntime(result) {
@@ -218,6 +286,26 @@ export async function runtimeStatus() {
       connected: false,
       error: started?.error || null,
       previewUrl: null,
+    };
+  }
+  if (started.error && !(started.nreplPort && (await pingNrepl(started.nreplPort)))) {
+    return {
+      runtime: "compiled",
+      ready: false,
+      connected: false,
+      error: started.error,
+      previewUrl: started.previewUrl,
+      attached: started.attached,
+    };
+  }
+  if (started.nreplPort && !(await pingNrepl(started.nreplPort))) {
+    return {
+      runtime: "compiled",
+      ready: true,
+      connected: false,
+      previewUrl: started.previewUrl,
+      error: "Waiting for nREPL…",
+      attached: started.attached,
     };
   }
   try {
@@ -449,22 +537,48 @@ export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}
     return started;
   }
 
-  const nreplPort = NREPL_PORT;
+  const nreplPortWanted = NREPL_PORT;
   const appPort = APP_PORT;
   const shadowHttp = SHADOW_HTTP;
-  const merge = mergeConfig(nreplPort, shadowHttp, appPort);
+  const overlay = overlayShadowEdn(shadowText, {
+    nreplPort: nreplPortWanted,
+    shadowHttp,
+    appPort,
+  });
 
-  child = spawn(
-    "bunx",
-    ["shadow-cljs", "--config-merge", merge, "watch", buildId],
-    {
-      cwd: projectRoot,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
-  child.stdout.on("data", (b) => process.stdout.write(b));
-  child.stderr.on("data", (b) => process.stderr.write(b));
+  try {
+    watchRoot = await makeWatchRoot(projectRoot, overlay);
+  } catch (e) {
+    started = {
+      enabled: true,
+      attached: false,
+      error: e.message || String(e),
+      previewUrl: `http://127.0.0.1:${appPort}/`,
+      nreplPort: null,
+      buildId: `:${buildId}`,
+      mainNs,
+    };
+    console.warn(`  runtime  ${started.error}`);
+    return started;
+  }
+
+  const bin = join(projectRoot, "node_modules", ".bin", "shadow-cljs");
+  let log = "";
+  let spawnErr = null;
+  child = spawn(bin, ["--force-spawn", "watch", buildId], {
+    cwd: watchRoot,
+    env: process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const onData = (b) => {
+    log += String(b);
+    process.stdout.write(b);
+  };
+  child.stdout.on("data", onData);
+  child.stderr.on("data", onData);
+  child.on("error", (e) => {
+    spawnErr = e;
+  });
   child.on("exit", (code) => {
     if (started?.child === child) {
       started.error = `shadow-cljs watch exited (${code})`;
@@ -474,9 +588,25 @@ export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}
     }
   });
 
+  let nreplPort = nreplPortWanted;
   try {
-    await waitForOutput(child, /Build completed|[:].*Build completed/, 120000);
-    await waitUntil(() => pingNrepl(nreplPort), 20000, "nREPL did not start");
+    await waitUntil(
+      () => {
+        if (spawnErr) throw spawnErr;
+        if (child.exitCode != null && !/Build completed/.test(log)) {
+          throw new Error(`shadow-cljs watch exited (${child.exitCode})\n${log.slice(-4000)}`);
+        }
+        return /Build completed/.test(log);
+      },
+      120000,
+      "shadow-cljs watch did not finish compiling",
+    );
+    nreplPort = await waitUntil(
+      () => readNreplPortFile(watchRoot),
+      20000,
+      "nREPL did not start",
+    );
+    await waitUntil(() => pingNrepl(nreplPort), 10000, "nREPL did not accept connections");
     await waitUntil(async () => {
       try {
         const res = await fetch(`http://127.0.0.1:${appPort}/`);
@@ -526,20 +656,26 @@ export function stopCompiledRuntime() {
     client = null;
     session = null;
     cljs = false;
+    lastNrepl = null;
   }
   if (child) {
     child.kill("SIGTERM");
     child = null;
   }
+  if (watchRoot) {
+    const dir = watchRoot;
+    watchRoot = null;
+    rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 export function compiledMeta() {
-  if (started && !started.enabled) {
+  if (!started || !started.enabled) {
     return { runtime: "sci" };
   }
   return {
     runtime: "compiled",
-    "preview-url": started?.previewUrl || previewUrl(),
-    "runtime-error": started?.error || null,
+    "preview-url": started.previewUrl || previewUrl(),
+    "runtime-error": started.error || null,
   };
 }

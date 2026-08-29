@@ -36,6 +36,8 @@ const SKIP = new Set([
 const SKIP_ROOT = new Set(["evalight", "evalight-ui"]);
 
 await copyEmbedServer(ROOT);
+console.log(`Starting compiled runtime…`);
+await startCompiledRuntime(FS_ROOT);
 
 function safe(rel) {
   const full = resolve(FS_ROOT, rel || ".");
@@ -160,10 +162,6 @@ Bun.serve({
 console.log(`Evalight local mode  ${EVALIGHT_BUILD}`);
 console.log(`  UI:  http://127.0.0.1:${PORT}`);
 console.log(`  FS:  ${FS_ROOT}`);
-
-startCompiledRuntime(FS_ROOT).catch((err) => {
-  console.warn("compiled runtime:", err.message || err);
-});
 
 function shutdown() {
   stopCompiledRuntime();

@@ -158,6 +158,9 @@ async function packSelf() {
   return files;
 }
 
+console.log(`Starting compiled runtime…`);
+await startCompiledRuntime(FS_ROOT);
+
 Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
@@ -202,10 +205,6 @@ Bun.serve({
 
 console.log(`Evalight  http://127.0.0.1:${PORT}  ${BUILD}`);
 console.log(`  project  ${FS_ROOT}`);
-
-startCompiledRuntime(FS_ROOT).catch((err) => {
-  console.warn("compiled runtime:", err.message || err);
-});
 
 function shutdown() {
   stopCompiledRuntime();
