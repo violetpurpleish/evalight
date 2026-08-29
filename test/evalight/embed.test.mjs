@@ -131,6 +131,7 @@ try {
   });
   try {
     const page = await browser.newPage();
+    await page.setViewport({ width: 1440, height: 900 });
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (msg) => {
@@ -257,14 +258,22 @@ try {
       "REPL Enter (bump) did not mutate the compiled app",
     );
     assert.equal(afterRepl, "3");
-    const bumpDef = await page.evaluate(() => {
-      for (const node of document.querySelectorAll(".cm-line")) {
-        if (!/\(defn\s+bump/.test(node.textContent)) continue;
-        const r = node.getBoundingClientRect();
-        return { x: r.x + 48, y: r.y + r.height / 2 };
-      }
-      return null;
-    });
+    let bumpDef = null;
+    for (let top = 0; top <= 4000 && !bumpDef; top += 160) {
+      await page.evaluate((y) => {
+        const scroller = document.querySelector(".cm-scroller");
+        if (scroller) scroller.scrollTop = y;
+      }, top);
+      bumpDef = await page.evaluate(() => {
+        for (const node of document.querySelectorAll(".cm-line")) {
+          if (!/\(defn\s+bump/.test(node.textContent || "")) continue;
+          const r = node.getBoundingClientRect();
+          if (r.height < 2 || r.bottom < 0 || r.top > window.innerHeight) continue;
+          return { x: r.x + 48, y: r.y + r.height / 2 };
+        }
+        return null;
+      });
+    }
     assert.ok(bumpDef, "defn bump not visible");
     await page.mouse.click(bumpDef.x, bumpDef.y);
     await page.keyboard.down("Control");
