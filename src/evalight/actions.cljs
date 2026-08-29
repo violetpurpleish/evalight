@@ -663,7 +663,7 @@
                                  :project (or (:name meta) "local")
                                  :attached attached?
                                  :attach-label (:attach-label meta)))
-               attached? (assoc-in [:preview :live?] false))))))
+               attached? (assoc-in [:preview :live?] false)))))
   (reset! !fs (http-fs/open))
   (-> (refresh-tree!)
       (.then (fn [_] (preferred-file (now-fs))))
