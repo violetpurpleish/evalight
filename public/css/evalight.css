@@ -74,12 +74,45 @@ code, pre { font-family: var(--mono); }
   background: rgba(20, 17, 13, 0.92);
   backdrop-filter: blur(12px);
   min-width: 0;
+  position: relative;
+  z-index: 20;
 }
 
 .brand { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
 .brand svg { width: 1.7rem; height: 1.7rem; color: var(--gold); }
 .wordmark { font-family: var(--serif); font-size: 1.15rem; letter-spacing: 0.01em; }
 .tagline { margin: 0; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+
+.beta-pop { flex: none; }
+.beta-badge {
+  border: 0;
+  border-radius: 4px;
+  background: #c3382a;
+  color: #fff8f5;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  padding: 0.22rem 0.42rem 0.2rem;
+}
+.beta-badge:hover { background: #d44334; }
+.beta-badge[aria-expanded="true"] { background: #a82f24; }
+.beta-pop .ui-popover-panel {
+  min-width: 16rem;
+  max-width: 20rem;
+}
+.beta-copy p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+.beta-copy p + p { margin-top: 0.6rem; }
+.beta-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+}
 
 .project { flex: 0 1 auto; min-width: 0; max-width: 16rem; }
 .project-picker { display: block; min-width: 0; }

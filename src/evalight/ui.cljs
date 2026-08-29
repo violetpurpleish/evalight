@@ -7,7 +7,8 @@
             [evalight.state :as state]
             [ui.button :as btn]
             [ui.dialog :as ui-dialog]
-            [ui.input :as ui-input]))
+            [ui.input :as ui-input]
+            [ui.popover :as popover]))
 
 (defn- dirty? [state path]
   (contains? (:dirty state) path))
@@ -304,6 +305,23 @@
       [:p "Open a file from the tree, or create one."]
       [:button.primary {:on {:click [:new-file-dialog]}} "New file"]])])
 
+(defn- beta-badge [state]
+  (let [open? (boolean (:beta? state))]
+    [:div.beta-pop
+     (popover/popover {:open? open?}
+       [:button.beta-badge
+        {:type "button"
+         :aria-expanded open?
+         :aria-haspopup "dialog"
+         :title "Why this is beta"
+         :on {:click [:toggle-beta]}}
+        "BETA"]
+       [:div.beta-copy
+        [:p "Evalight is fully working. It is a very new project, though, so it is not yet stable. Changes can be breaking."]
+        (if (= :local (:mode state))
+          [:p "This copy of Evalight lives with your files, so later changes on the website do not touch it."]
+          [:p "Export your project. The zip freezes this version of Evalight with your files, so you can keep editing after the website changes."])])]))
+
 (defn header [state]
   [:header.top
    [:div.brand
@@ -313,7 +331,8 @@
      [:p.tagline
       (if (= :local (:mode state))
         "Local files"
-        "Browser workshop")]]]
+        "Browser workshop")]]
+    (beta-badge state)]
    [:div.project
     (if (= :local (:mode state))
       [:span.project-name (:project state)]
@@ -405,6 +424,8 @@
     [:div.shell {:class (str "tab-" (name (:mobile-tab state)))}
      [:div.workspace
       (header state)
+      (when (:beta? state)
+        [:div.beta-dismiss {:on {:click [:close-beta]}}])
       [:div.stage
        {:class [(when-not files-open? "is-files-closed")
                 (when-not preview-open? "is-preview-closed")

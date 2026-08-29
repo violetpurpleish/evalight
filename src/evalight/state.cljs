@@ -21,6 +21,7 @@
          :attach-label nil
          :dialog nil
          :help? false
+         :beta? false
          :parinfer :smart
          :mobile-tab :editor
          :notice nil
