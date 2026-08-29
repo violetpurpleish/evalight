@@ -49,25 +49,24 @@
        "or open the files in any other editor.\n\n"
        "Controls under `src/ui` are ordinary ClojureScript. They are not an\n"
        "installed package. Edit a button, delete a popover, or copy another\n"
-       "control from Evalight's **Add UI** dialog. The same files run in the\n"
-       "browser preview (SCI) and in a local shadow-cljs build.\n\n"
+       "control from Evalight's **Add UI** dialog.\n\n"
        "## Keep using Evalight\n\n"
-       "You need [Bun](https://bun.sh). You do not need `bun install` for this.\n\n"
-       "```sh\n"
-       "bun run evalight\n"
-       "```\n\n"
-       "Open http://127.0.0.1:48721. Same workshop, these files.\n\n"
-       "## Compiled site\n\n"
-       "Install a JDK if you want shadow-cljs to compile the app itself:\n\n"
+       "You need [Bun](https://bun.sh), a JDK, and `bun install` once so\n"
+       "shadow-cljs can compile this project. `bun run evalight` starts the\n"
+       "workshop *and* that compile. Preview is the compiled app. Ctrl-Enter\n"
+       "talks to that heap, not SCI.\n\n"
        "```sh\n"
        "bun install\n"
+       "bun run evalight\n"
+       "```\n\n"
+       "Open http://127.0.0.1:48721.\n\n"
+       "## Compiled site without the workshop\n\n"
+       "```sh\n"
        "bun run dev\n"
        "```\n\n"
-       "Open http://localhost:3456. That is the compiled page Preview showed.\n\n"
-       "In the workshop, Evalight interprets this source with SCI so you can\n"
-       "evaluate forms against the live preview. `bun run dev` compiles the\n"
-       "same source with shadow-cljs. The namespaces (`replicant.dom`,\n"
-       "`app.core`, …) are the same in both modes.\n"))
+       "Open http://localhost:3456 if you already started watch yourself.\n"
+       "Do not run this at the same time as `bun run evalight`; they would\n"
+       "both try to compile `:app`.\n"))
 
 (defn stale-evalight-readme?
   "True for a lamp README that still tells you to clone Evalight."
@@ -77,7 +76,9 @@
          (or (str/includes? t "From a checkout of Evalight")
              (str/includes? t "from an Evalight checkout")
              (str/includes? t "Keep editing in Evalight")
-             (str/includes? t "bun run local /path")))))
+             (str/includes? t "bun run local /path")
+             (str/includes? t "interprets this source with SCI")
+             (str/includes? t "You do not need `bun install` for this")))))
 
 (defn public-html [project-name]
   (str "<!DOCTYPE html>\n"
@@ -168,9 +169,23 @@
        "  [name]\n"
        "  (str \"Hello, \" name \".\"))\n"))
 
+(defn stats-cljs []
+  (str "(ns app.stats)\n\n"
+       "(defonce !tally (atom 0))\n\n"
+       "(defn tally\n"
+       "  \"How many times record! has been called in this image.\"\n"
+       "  []\n"
+       "  @!tally)\n\n"
+       "(defn record!\n"
+       "  \"Bump the stats tally. Independent of the lamp count.\"\n"
+       "  []\n"
+       "  (swap! !tally inc)\n"
+       "  @!tally)\n"))
+
 (defn core-cljs [project-name]
   (str "(ns app.core\n"
        "  (:require [app.greet :as greet]\n"
+       "            [app.stats :as stats]\n"
        "            [replicant.dom :as r]\n"
        "            [ui.button :as btn]\n"
        "            [ui.core :as ui]\n"
@@ -185,6 +200,7 @@
        "         :rename? false\n"
        "         :notes [\"Edit src/app/core.cljs — the preview follows.\"\n"
        "                 \"Evaluate (bump) in the REPL to touch the live app.\"\n"
+       "                 \"Evaluate (stats/record!) — that lives in app.stats.\"\n"
        "                 \"The controls live in src/ui. Change them, or delete a file you don't want.\"]}))\n\n"
        "(declare bump toggle-about open-rename close-rename save-title retitle)\n\n"
        "(defn view [{:keys [title count notes about? rename?]}]\n"
@@ -266,6 +282,7 @@
        "  (render)\n"
        "  s)\n\n"
        "(defn init []\n"
+       "  (stats/tally)\n"
        "  (render))\n\n"
        "(init)\n"))
 
@@ -283,4 +300,5 @@
       "public/index.html" (public-html name)
       "public/style.css" (public-css)
       "src/app/greet.cljs" (greet-cljs)
+      "src/app/stats.cljs" (stats-cljs)
       "src/app/core.cljs" (core-cljs name)})))

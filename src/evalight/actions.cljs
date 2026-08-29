@@ -104,7 +104,7 @@
                    (.catch (fn [e]
                              (swap! state/app assoc-in [:preview :status] :error)
                              (swap! state/app assoc-in [:preview :error] (.-message e))))))
-             450))))
+             (if (preview/compiled-runtime?) 900 450)))))
 
 (defn save-current!
   ([] (save-current! {:reload? true}))
@@ -646,7 +646,12 @@
       nil)))
 
 (defn- boot-local [meta]
-  (swap! state/app assoc :mode :local :project (or (:name meta) "local"))
+  (let [compiled? (= "compiled" (str (:runtime meta)))]
+    (swap! state/app assoc
+           :mode :local
+           :runtime (if compiled? :compiled :sci)
+           :preview-url (or (:preview-url meta) (:previewUrl meta))
+           :project (or (:name meta) "local")))
   (reset! !fs (http-fs/open))
   (-> (refresh-tree!)
       (.then (fn [_] (preferred-file (now-fs))))
@@ -661,7 +666,7 @@
 
 (defn- boot-browser []
   (if (opfs/available?)
-    (do (swap! state/app assoc :mode :browser)
+    (do (swap! state/app assoc :mode :browser :runtime :sci :preview-url nil)
         (-> (seed-browser!)
             (.then (fn [_]
                      (swap! state/app assoc :fs-status :ready)

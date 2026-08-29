@@ -99,9 +99,12 @@ export async function ensureWorkshopUi(root, { force = false } = {}) {
 }
 
 export async function copyEmbedServer(root) {
-  const src = await readText(root, "src/evalight/embed/server.mjs");
+  const names = ["server.mjs", "compiled.mjs", "nrepl.mjs", "bencode.mjs"];
   await mkdir(join(root, "public/evalight-embed"), { recursive: true });
-  await Bun.write(join(root, "public/evalight-embed/server.mjs"), src);
+  for (const name of names) {
+    const src = await readText(root, `src/evalight/embed/${name}`);
+    await Bun.write(join(root, "public/evalight-embed", name), src);
+  }
 }
 
 export async function packEvalight(root, { requireJs = true, compileIfMissing = false } = {}) {
@@ -109,7 +112,9 @@ export async function packEvalight(root, { requireJs = true, compileIfMissing = 
     await ensureWorkshopUi(root);
   }
   const files = {};
-  files["evalight/server.mjs"] = await readText(root, "src/evalight/embed/server.mjs");
+  for (const name of ["server.mjs", "compiled.mjs", "nrepl.mjs", "bencode.mjs"]) {
+    files[`evalight/${name}`] = await readText(root, `src/evalight/embed/${name}`);
+  }
   for (const [from, to] of STATIC) {
     files[to] = await readText(root, from);
   }

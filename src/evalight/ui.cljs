@@ -105,8 +105,8 @@
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
     [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
     (if (= :local (:mode state))
-      [:p.muted "These files are on disk. `bun run dev` compiles the site at localhost:3456 if you want another editor."]
-      [:p.muted "Projects live in this browser. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to keep using this workshop. `bun run dev` compiles the site at localhost:3456."])
+      [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground."]
+      [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop."])
     [:p.build-stamp {:title "Compiled UI id. If a cljs caret bug remains, this is not the build that fixed it."}
      build/id]]])
 
@@ -250,8 +250,11 @@
                 :on {:input [:repl-expr-input]
                      :keydown [:repl-expr-keydown]}}]]])
 
-(defn preview-pane [{:keys [preview layout]}]
-  (let [w (or (:preview-width layout) 360)]
+(defn preview-pane [state]
+  (let [{:keys [preview layout runtime preview-url]} state
+        compiled? (= :compiled runtime)
+        w (or (:preview-width layout) 360)
+        src (if compiled? (or preview-url "about:blank") "/preview.html")]
     [:section.preview
      {:style {:width (str w "px")
               :flex-basis (str w "px")}}
@@ -261,7 +264,7 @@
         :title "Hide preview"
         :aria-label "Hide preview"}
        (icons/panel-right)]
-      [:span "Preview"]
+      [:span (if compiled? "Preview · compiled" "Preview")]
       (when (= :loading (:status preview))
         [:span.muted "loading"])
       (when (:error preview)
@@ -271,16 +274,16 @@
                 :checked (boolean (:live? preview))
                 :on {:change [:toggle-live]}}]
        "Live"]]
-   [:div.preview-frame
-    (when-let [err (:error preview)]
-      [:div.preview-banner
-       [:p "The lamp did not start."]
-       [:pre err]])
-    [:iframe {:src "/preview.html"
-              :sandbox "allow-scripts"
-              :title "Live application preview"
-              :replicant/key "preview-frame"
-              :replicant/on-mount preview-mount}]]]))
+     [:div.preview-frame
+      (when-let [err (:error preview)]
+        [:div.preview-banner
+         [:p "The preview did not start."]
+         [:pre err]])
+      [:iframe (cond-> {:src src
+                        :title "Live application preview"
+                        :replicant/key (if compiled? "preview-compiled" "preview-sci")
+                        :replicant/on-mount preview-mount}
+                 (not compiled?) (assoc :sandbox "allow-scripts"))]]]))
 
 (defn editor-pane [state]
   [:section.editor

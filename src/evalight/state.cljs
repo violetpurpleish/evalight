@@ -2,6 +2,8 @@
 
 (defonce app
   (atom {:mode :browser
+         :runtime :sci
+         :preview-url nil
          :fs-status :loading
          :fs-error nil
          :projects []

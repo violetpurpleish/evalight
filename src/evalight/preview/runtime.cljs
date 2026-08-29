@@ -192,6 +192,7 @@
                        :args (mapv str args)})))))))
 
 (defn ^:export init []
+  (set! (.-EVALIGHT_SCI js/window) true)
   (wrap-console)
   (set! (.-onerror js/window)
         (fn [message source lineno colno error]

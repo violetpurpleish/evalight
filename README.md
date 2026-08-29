@@ -25,7 +25,7 @@ bun run dev
 
 Then open [http://127.0.0.1:48721](http://127.0.0.1:48721). `bun run dev` starts shadow-cljs in watch mode and serves the UI from `public/`. Wait until `:app` compiles before using the editor.
 
-The compiled workshop JS is gitignored. `git pull` does not replace `public/js`, and a normal refresh can keep old `/js/cljs-runtime` files. If the ClojureScript caret stays in the top-left while CSS still edits, you are on that old compile. The wordmark should show `evalight-editor-v4`. If it does not, wipe the compile, restart, and hard-refresh (Ctrl-Shift-R / Cmd-Shift-R).
+The compiled workshop JS is gitignored. `git pull` does not replace `public/js`, and a normal refresh can keep old `/js/cljs-runtime` files. If the ClojureScript caret stays in the top-left while CSS still edits, you are on that old compile. The header should show `evalight-editor-v5`. If it does not, wipe the compile, restart, and hard-refresh (Ctrl-Shift-R / Cmd-Shift-R).
 
 ```sh
 rm -rf public/js .shadow-cljs
@@ -66,9 +66,9 @@ Export, unzip, and from the project folder:
 bun run evalight
 ```
 
-Open http://127.0.0.1:48721. Evalight is already in the zip. You need [Bun](https://bun.sh). You do not need `bun install` for the workshop.
+Open http://127.0.0.1:48721. Evalight is already in the zip. You need [Bun](https://bun.sh), a JDK, and `bun install` once. `bun run evalight` compiles the project and attaches the workshop to that running app.
 
-`bun run dev` in that folder is the compiled site at http://localhost:3456, the same page Preview showed, if you want another editor.
+`bun run dev` in that folder is only the compiled site, without the workshop. Do not run it at the same time as `bun run evalight`.
 
 Working on Evalight itself, `bun run local /path/to/a/folder` still points this checkout at a directory on disk.
 
@@ -84,7 +84,20 @@ evalight.fs.protocol
 
 The rest of the application (tree, editor, preview, export) talks only to the protocol: list, read, write, mkdir, rename, delete. Export also asks the server for a release build of this UI and writes it into `evalight/` in the zip so `bun run evalight` works from the unzipped folder.
 
-The preview is a second shadow-cljs build (`:preview`). It hosts an SCI interpreter and a copy of Replicant. The iframe is sandboxed with `allow-scripts` only, so user code cannot reach the IDE. That also means the shadow-cljs watch client has to stay off for this build: it would try to reload `preview.html` from a unique origin, the browser would block the navigation, and the lamp would never appear.
+Two runtimes, one UI.
+
+```
+evalight.preview
+  ├─ SCI iframe          hosted playground (OPFS)
+  └─ compiled app        bun run evalight / bun run local
+                          shadow-cljs watch :app + nREPL into that heap
+```
+
+The hosted playground still interprets source with SCI inside a sandboxed `preview.html`. There is no compiler in the browser.
+
+`bun run evalight` starts the workshop and the project's real shadow-cljs watch. Preview is that compiled page. Ctrl-Enter, completions, and hover go through nREPL into the same JS heap. It will not fall back to SCI. You need Bun, a JDK, and `bun install` once.
+
+Do not run `bun run evalight` and `bun run dev` in the same project at once. Both would watch `:app`.
 
 Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
 

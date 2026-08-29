@@ -14,6 +14,12 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyEmbedServer, handlePackRequest } from "./evalight-pack.mjs";
 import { EVALIGHT_BUILD, servePublicPath } from "./static-ui.mjs";
+import {
+  compiledMeta,
+  handleRuntimeRequest,
+  startCompiledRuntime,
+  stopCompiledRuntime,
+} from "../src/evalight/embed/compiled.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const UI_ROOT = join(ROOT, "public");
@@ -134,8 +140,11 @@ Bun.serve({
         build: EVALIGHT_BUILD,
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
+        ...compiledMeta(),
       });
     }
+    const runtimeRes = await handleRuntimeRequest(req, url);
+    if (runtimeRes) return runtimeRes;
     if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
       return handlePackRequest(ROOT);
     }
@@ -151,3 +160,14 @@ Bun.serve({
 console.log(`Evalight local mode  ${EVALIGHT_BUILD}`);
 console.log(`  UI:  http://127.0.0.1:${PORT}`);
 console.log(`  FS:  ${FS_ROOT}`);
+
+startCompiledRuntime(FS_ROOT).catch((err) => {
+  console.warn("compiled runtime:", err.message || err);
+});
+
+function shutdown() {
+  stopCompiledRuntime();
+  process.exit(0);
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

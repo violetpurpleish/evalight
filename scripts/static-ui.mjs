@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-export const EVALIGHT_BUILD = "evalight-editor-v4";
+export const EVALIGHT_BUILD = "evalight-editor-v5";
 
 export function contentType(p) {
   if (p.endsWith(".js")) return "application/javascript; charset=utf-8";

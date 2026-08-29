@@ -1,5 +1,6 @@
 (ns app.core
   (:require [app.greet :as greet]
+            [app.stats :as stats]
             [replicant.dom :as r]
             [ui.button :as btn]
             [ui.core :as ui]
@@ -15,6 +16,7 @@
          :rename? false
          :notes ["Edit src/app/core.cljs — the preview follows."
                  "Evaluate (bump) in the REPL to touch the live app."
+                 "Evaluate (stats/record!) — that lives in app.stats."
                  "The controls live in src/ui. Change them, or delete a file you don't want."]}))
 
 (declare bump toggle-about open-rename close-rename save-title retitle)
@@ -106,6 +108,7 @@
   s)
 
 (defn init []
+  (stats/tally)
   (render))
 
 (init)

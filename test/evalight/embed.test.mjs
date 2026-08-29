@@ -45,9 +45,22 @@ async function writeLamp(dir) {
   await writeFile(join(dir, "evalight.edn"),
     `{:name "lamp"\n :main app.core\n :src-paths ["src"]\n :preview {:css ["public/css/ui.css" "public/style.css"]}}\n`);
   await writeFile(join(dir, "package.json"),
-    `{"name":"lamp","private":true,"scripts":{"evalight":"bun evalight/server.mjs"}}\n`);
+    `${JSON.stringify({
+      name: "lamp",
+      private: true,
+      scripts: { evalight: "bun evalight/server.mjs", dev: "shadow-cljs watch app" },
+      devDependencies: { "shadow-cljs": "2.28.23" },
+    }, null, 2)}\n`);
+  await writeFile(
+    join(dir, "shadow-cljs.edn"),
+    `{:source-paths ["src"]\n :dependencies [[no.cjohansen/replicant "2026.07.1"]]\n :dev-http {3456 "public"}\n :node-modules {:managed-by :bun}\n :builds\n {:app {:target :browser\n        :output-dir "public/js"\n        :asset-path "/js"\n        :modules {:main {:init-fn app.core/init}}}}}\n`,
+  );
   await writeFile(join(dir, "src/app/greet.cljs"),
     `(ns app.greet)\n(defn greet [name] (str "Hello, " name "."))\n`);
+  await writeFile(
+    join(dir, "src/app/stats.cljs"),
+    `(ns app.stats)\n(defonce !tally (atom 0))\n(defn tally [] @!tally)\n(defn record! [] (swap! !tally inc) @!tally)\n`,
+  );
   await writeFile(
     join(dir, "src/app/core.cljs"),
     await readFile(join(HERE, "fixtures/lamp-core.cljs"), "utf8"),
@@ -55,12 +68,13 @@ async function writeLamp(dir) {
   await writeFile(join(dir, "public/style.css"),
     `.app { padding: 2rem; } h1 { font-family: sans-serif; }\n`);
   await writeFile(join(dir, "public/index.html"),
-    `<!DOCTYPE html><html><body><div id="app"></div></body></html>\n`);
+    `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <title>lamp</title>\n  <link rel="stylesheet" href="/css/ui.css">\n  <link rel="stylesheet" href="/style.css">\n</head>\n<body>\n  <div id="app"></div>\n  <script src="/js/main.js"></script>\n</body>\n</html>\n`);
   const files = await packEvalight(REPO, { compileIfMissing: true, requireJs: true });
   assert.ok(
-    (files["evalight/public/js/main.js"] || "").includes("evalight-editor-v4"),
-    "packed workshop UI must include evalight-editor-v4",
+    (files["evalight/public/js/main.js"] || "").includes("evalight-editor-v5"),
+    "packed workshop UI must include evalight-editor-v5",
   );
+  assert.ok(files["evalight/compiled.mjs"], "packed Evalight must include compiled.mjs");
   for (const [path, text] of Object.entries(files)) {
     const dest = join(dir, path);
     await mkdir(dirname(dest), { recursive: true });
@@ -87,14 +101,27 @@ function waitForOutput(child, pattern, ms = 8000) {
 const lamp = await mkdtemp(join(tmpdir(), "evalight-embed-"));
 await writeLamp(lamp);
 const PORT = 48731;
+const APP_PORT = 48751;
+await new Promise((resolve, reject) => {
+  const inst = spawn("bun", ["install"], { cwd: lamp, stdio: "inherit" });
+  inst.on("exit", (code) => (code === 0 ? resolve() : reject(new Error("bun install failed"))));
+  inst.on("error", reject);
+});
 const child = spawn("bun", ["evalight/server.mjs"], {
   cwd: lamp,
-  env: { ...process.env, PORT: String(PORT) },
+  env: {
+    ...process.env,
+    PORT: String(PORT),
+    EVALIGHT_APP_PORT: String(APP_PORT),
+    EVALIGHT_NREPL_PORT: "7878",
+    EVALIGHT_SHADOW_HTTP: "9641",
+  },
   stdio: ["ignore", "pipe", "pipe"],
 });
 child.stderr.pipe(process.stderr);
+child.stdout.pipe(process.stdout);
 try {
-  await waitForOutput(child, /Evalight/);
+  await waitForOutput(child, /Evalight/, 20000);
   const userDataDir = await mkdtemp(join(tmpdir(), "evalight-embed-chrome-"));
   const browser = await puppeteer.launch({
     executablePath: chromePath(),
@@ -120,25 +147,39 @@ try {
       "editor never loaded app.core",
     );
     const build = await page.evaluate(() => window.EVALIGHT_BUILD);
-    assert.equal(build, "evalight-editor-v4");
+    assert.equal(build, "evalight-editor-v5");
     const stamp = await page.$eval(".brand .build-stamp", (el) => el.textContent.trim());
-    assert.equal(stamp, "evalight-editor-v4");
-    const preview = page.frames().find((f) => (f.url() || "").includes("preview.html"));
-    assert.ok(preview, "preview iframe missing");
-    const h1 = await until(
+    assert.equal(stamp, "evalight-editor-v5");
+    const runtime = await until(
       async () => {
-        const t = await preview.$eval("h1", (el) => el.textContent).catch(() => "");
-        return t.includes("Lamp") ? t : null;
+        const st = await fetch(`http://127.0.0.1:${PORT}/api/runtime`).then((r) => r.json());
+        return st.connected ? st : null;
       },
-      20000,
-      "preview h1 never rendered",
+      120000,
+      "compiled runtime never connected",
     );
+    assert.equal(runtime.runtime, "compiled");
+    const sciPreview = page.frames().find((f) => (f.url() || "").includes("preview.html"));
+    assert.equal(sciPreview, undefined, "exported Evalight must not load the SCI preview.html");
+    const preview = await until(
+      async () => {
+        const f = page.frames().find((fr) => (fr.url() || "").includes(String(APP_PORT)));
+        if (!f) return null;
+        const t = await f.$eval("h1", (el) => el.textContent).catch(() => "");
+        return t.includes("Lamp") ? f : null;
+      },
+      30000,
+      "compiled preview iframe never rendered lamp",
+    );
+    const sciFlag = await preview.evaluate(() => window.EVALIGHT_SCI);
+    assert.equal(sciFlag, undefined, "compiled preview must not set EVALIGHT_SCI");
     const banner = await page.$eval(".preview-banner", (el) => el.innerText).catch(() => null);
     const dump = {
-      h1,
+      h1: await preview.$eval("h1", (el) => el.textContent),
       build,
       banner,
       count: await preview.$eval(".count", (el) => el.textContent).catch(() => null),
+      runtime,
       errors,
     };
     await writeFile("/tmp/evalight-embed-dump.json", JSON.stringify(dump, null, 2));
@@ -159,6 +200,48 @@ try {
       "lamp click did not increment",
     );
     assert.equal(count, "1");
+    const evalBump = await page.evaluate(async () => {
+      const res = await fetch("/api/runtime/eval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "(bump)", ns: "app.core" }),
+      });
+      return res.json();
+    });
+    assert.equal(evalBump.ok, true, JSON.stringify(evalBump));
+    const afterEval = await until(
+      async () => {
+        const t = await preview.$eval(".count", (el) => el.textContent).catch(() => "");
+        return t === "2" ? t : null;
+      },
+      8000,
+      "(bump) via nREPL did not mutate the compiled app",
+    );
+    assert.equal(afterEval, "2");
+    const stats = await page.evaluate(async () => {
+      await fetch("/api/runtime/eval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "(app.stats/record!)", ns: "app.core" }),
+      }).then((r) => r.json());
+      const tally = await fetch("/api/runtime/eval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: "(app.stats/tally)", ns: "app.core" }),
+      }).then((r) => r.json());
+      const intel = await fetch("/api/runtime/intel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ns: "app.core" }),
+      }).then((r) => r.json());
+      return { tally, intel };
+    });
+    assert.match(String(stats.tally.value), /1/, JSON.stringify(stats.tally));
+    const intelNames = (stats.intel.items || []).map((it) => it.name);
+    assert.ok(
+      intelNames.some((n) => n === "stats/record!" || n === "record!"),
+      "live intel should include app.stats/record!: " + intelNames.slice(0, 30).join(", "),
+    );
     const beforeCursor = await page.evaluate(() => {
       const r = document.querySelector(".cm-cursor")?.getBoundingClientRect();
       return r ? { x: r.x, y: r.y } : null;

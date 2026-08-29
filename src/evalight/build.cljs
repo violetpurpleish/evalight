@@ -1,3 +1,3 @@
 (ns evalight.build)
 
-(def id "evalight-editor-v4")
+(def id "evalight-editor-v5")

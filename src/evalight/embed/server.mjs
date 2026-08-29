@@ -11,12 +11,18 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  compiledMeta,
+  handleRuntimeRequest,
+  startCompiledRuntime,
+  stopCompiledRuntime,
+} from "./compiled.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const UI_ROOT = join(HERE, "public");
 const FS_ROOT = resolve(HERE, "..");
 const PORT = Number(process.env.PORT || 48721);
-const BUILD = "evalight-editor-v4";
+const BUILD = "evalight-editor-v5";
 const SKIP = new Set([
   "node_modules",
   ".git",
@@ -163,8 +169,11 @@ Bun.serve({
         build: BUILD,
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
+        ...compiledMeta(),
       });
     }
+    const runtimeRes = await handleRuntimeRequest(req, url);
+    if (runtimeRes) return runtimeRes;
     if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
       try {
         return json({ files: await packSelf() });
@@ -193,3 +202,14 @@ Bun.serve({
 
 console.log(`Evalight  http://127.0.0.1:${PORT}  ${BUILD}`);
 console.log(`  project  ${FS_ROOT}`);
+
+startCompiledRuntime(FS_ROOT).catch((err) => {
+  console.warn("compiled runtime:", err.message || err);
+});
+
+function shutdown() {
+  stopCompiledRuntime();
+  process.exit(0);
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

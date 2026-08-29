@@ -14,7 +14,10 @@
    ["/css/preview.css" "evalight/public/css/preview.css"]
    ["/js/main.js" "evalight/public/js/main.js"]
    ["/js/preview/preview.js" "evalight/public/js/preview/preview.js"]
-   ["/evalight-embed/server.mjs" "evalight/server.mjs"]])
+   ["/evalight-embed/server.mjs" "evalight/server.mjs"]
+   ["/evalight-embed/compiled.mjs" "evalight/compiled.mjs"]
+   ["/evalight-embed/nrepl.mjs" "evalight/nrepl.mjs"]
+   ["/evalight-embed/bencode.mjs" "evalight/bencode.mjs"]])
 
 (defn- download-blob [blob filename]
   (let [url (js/URL.createObjectURL blob)
