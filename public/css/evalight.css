@@ -232,7 +232,7 @@ code, pre { font-family: var(--mono); }
   pointer-events: none;
 }
 
-@media (min-width: 1025px) {
+@media (min-width: 768px) {
   .stage.is-files-closed > .sidebar,
   .stage.is-files-closed > .splitter-files {
     display: none;
@@ -630,7 +630,7 @@ kbd {
   border: 0;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 767px) {
   .splitter,
   .pane-hide,
   .pane-rail {

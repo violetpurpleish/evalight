@@ -749,6 +749,67 @@ try {
     { timeout: 4000 }
   );
 
+  async function workshopChrome(width, height) {
+    await page.setViewport({ width, height });
+    return page.evaluate(() => {
+      const tabs = document.querySelector(".mobile-tabs");
+      const split = document.querySelector(".splitter-files");
+      const hide = document.querySelector(".sidebar .pane-hide");
+      return {
+        tabs: tabs ? getComputedStyle(tabs).display : "missing",
+        split: split ? getComputedStyle(split).display : "missing",
+        hide: hide ? getComputedStyle(hide).display : "missing",
+      };
+    });
+  }
+
+  const at900 = await workshopChrome(900, 800);
+  check(
+    "900px keeps the column workshop",
+    at900.tabs === "none" && at900.split !== "none" && at900.hide !== "none",
+    JSON.stringify(at900)
+  );
+  await page.click(".sidebar [aria-label='Hide files']");
+  await page.waitForFunction(
+    () => {
+      const el = document.querySelector(".sidebar");
+      return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
+    },
+    { timeout: 4000 }
+  );
+  check(
+    "900px can close the files sidebar",
+    await page.evaluate(() => {
+      const rail = document.querySelector(".pane-rail[aria-label='Show files']");
+      const el = document.querySelector(".sidebar");
+      return (
+        Boolean(rail) &&
+        getComputedStyle(rail).display !== "none" &&
+        (!el || el.offsetWidth === 0 || getComputedStyle(el).display === "none")
+      );
+    })
+  );
+  await page.click(".pane-rail[aria-label='Show files']");
+  await page.waitForFunction(
+    () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
+    { timeout: 4000 }
+  );
+
+  const at768 = await workshopChrome(768, 800);
+  check(
+    "768px keeps the column workshop",
+    at768.tabs === "none" && at768.split !== "none",
+    JSON.stringify(at768)
+  );
+  const at767 = await workshopChrome(767, 800);
+  check(
+    "767px uses the tab workshop",
+    at767.tabs === "flex" && at767.split === "none",
+    JSON.stringify(at767)
+  );
+
+  await page.setViewport({ width: 1440, height: 900 });
+
   const currentProject = await page.$eval("#project-select", (el) => el.value);
   check("delete project button is present", Boolean(await page.$("button[aria-label='Delete project']")));
   await page.click("button[aria-label='Delete project']");
