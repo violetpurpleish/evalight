@@ -632,14 +632,20 @@ export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}
       20000,
       "nREPL did not start",
     );
-    await waitUntil(async () => {
-      try {
-        const res = await fetch(`http://127.0.0.1:${appPort}/`);
-        return res.ok;
-      } catch {
-        return false;
-      }
-    }, 30000, `compiled app did not serve on :${appPort}`);
+    try {
+      await waitUntil(async () => {
+        try {
+          const root = await fetch(`http://127.0.0.1:${appPort}/`);
+          if (root.ok) return true;
+          const idx = await fetch(`http://127.0.0.1:${appPort}/index.html`);
+          return idx.ok;
+        } catch {
+          return false;
+        }
+      }, 15000, `compiled app did not serve on :${appPort}`);
+    } catch (e) {
+      console.warn(`  runtime  ${e.message} (Preview may still load)`);
+    }
   } catch (e) {
     started = {
       enabled: true,

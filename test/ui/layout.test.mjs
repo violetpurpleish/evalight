@@ -313,9 +313,27 @@ try {
 
   const iframeEl = await page.$("section.preview iframe");
   const lampFrame = iframeEl ? await iframeEl.contentFrame() : null;
+  const previewSrc = iframeEl
+    ? await page.$eval("section.preview iframe", (el) => el.getAttribute("src") || "")
+    : "";
+  const previewSandbox = iframeEl
+    ? await page.$eval("section.preview iframe", (el) => el.getAttribute("sandbox"))
+    : "";
+  check(
+    "playground preview is the SCI iframe",
+    previewSrc.includes("preview.html"),
+    previewSrc,
+  );
+  check(
+    "playground preview is sandboxed",
+    previewSandbox === "allow-scripts",
+    String(previewSandbox),
+  );
   if (!lampFrame) {
     check("preview iframe is reachable for lamp Rename", false, "contentFrame() was null");
   } else {
+    const sciFlag = await lampFrame.evaluate(() => window.EVALIGHT_SCI).catch(() => null);
+    check("playground preview sets EVALIGHT_SCI", sciFlag === true, String(sciFlag));
     await lampFrame.waitForSelector("h1, .ui-btn", { timeout: 20000 });
     const beforeTitle = await lampFrame.$eval("h1", (el) => el.textContent);
     await lampFrame.evaluate(() => {
