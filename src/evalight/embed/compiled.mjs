@@ -110,7 +110,17 @@ export function overlayShadowEdn(text, { nreplPort, shadowHttp, appPort }) {
     `\n :nrepl {:port ${nreplPort}}\n` +
     ` :http {:host "127.0.0.1" :port ${shadowHttp}}\n` +
     ` :dev-http {${appPort} "public"}\n`;
-  return out.slice(0, last) + inject + out.slice(last);
+  return disableAppDevtools(out.slice(0, last) + inject + out.slice(last));
+}
+
+/** Shadow must not reload the iframe on its own. Evalight Live does that. */
+export function disableAppDevtools(edn) {
+  const m = edn.match(/:app\s*\{/);
+  if (!m) return edn;
+  const at = edn.indexOf(m[0]);
+  const after = at + m[0].length;
+  if (/:devtools/.test(edn.slice(at, after + 500))) return edn;
+  return `${edn.slice(0, after)}\n        :devtools {:enabled false}${edn.slice(after)}`;
 }
 
 export function stripTopKey(edn, key) {
@@ -423,6 +433,10 @@ function ednMap(src) {
   return ednRead(s).value;
 }
 
+export function parseEvalightEdn(src) {
+  return ednMap(src);
+}
+
 function ednRead(src, i = 0) {
   const skip = () => {
     while (i < src.length && /\s|,/.test(src[i])) i++;
@@ -595,6 +609,7 @@ export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}
     cwd: watchRoot,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
   });
   const onData = (b) => {
     log += String(b);
@@ -677,6 +692,20 @@ export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}
   return started;
 }
 
+function killWatch(proc) {
+  if (!proc) return;
+  const pid = proc.pid;
+  if (pid && process.platform !== "win32") {
+    try {
+      process.kill(-pid, "SIGTERM");
+      return;
+    } catch {
+      /* not a group leader */
+    }
+  }
+  proc.kill("SIGTERM");
+}
+
 export function stopCompiledRuntime() {
   if (client) {
     try {
@@ -691,7 +720,7 @@ export function stopCompiledRuntime() {
     lastNrepl = null;
   }
   if (child) {
-    child.kill("SIGTERM");
+    killWatch(child);
     child = null;
   }
   if (watchRoot) {

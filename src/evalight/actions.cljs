@@ -99,12 +99,15 @@
     (reset! !live-timer
             (js/setTimeout
              (fn []
-               (-> (preview/load-project (now-fs) {:reset? false})
-                   (.then apply-preview-result)
-                   (.catch (fn [e]
-                             (swap! state/app assoc-in [:preview :status] :error)
-                             (swap! state/app assoc-in [:preview :error] (.-message e))))))
-             (if (preview/compiled-runtime?) 900 450)))))
+               (let [compiled? (preview/compiled-runtime?)]
+                 (when compiled?
+                   (preview/reload-frame!))
+                 (-> (preview/load-project (now-fs) {:reset? false})
+                     (.then apply-preview-result)
+                     (.catch (fn [e]
+                               (swap! state/app assoc-in [:preview :status] :error)
+                               (swap! state/app assoc-in [:preview :error] (.-message e)))))))
+             (if (preview/compiled-runtime?) 1400 450)))))
 
 (defn save-current!
   ([] (save-current! {:reload? true}))

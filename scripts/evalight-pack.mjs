@@ -4,24 +4,37 @@
  *
  * Do not copy public/js from `shadow-cljs watch`. That tree is ~50MB of
  * cljs-runtime. The workshop UI is a release build in evalight-ui/js.
+ *
+ * This file is the only pack inventory. Browser export fallback reads
+ * public/evalight-embed/manifest.json, which copyEmbedServer writes from here.
  */
 import { createHash } from "node:crypto";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join, relative } from "node:path";
+import { cljsBuildId, embedBuildIdSource, stampHtml } from "./evalight-build.mjs";
 
-const STATIC = [
-  ["public/index.html", "evalight/public/index.html"],
-  ["public/preview.html", "evalight/public/preview.html"],
-  ["public/favicon.svg", "evalight/public/favicon.svg"],
-  ["public/css/ui.css", "evalight/public/css/ui.css"],
-  ["public/css/evalight.css", "evalight/public/css/evalight.css"],
-  ["public/css/preview.css", "evalight/public/css/preview.css"],
+export const EMBED_FILES = [
+  "server.mjs",
+  "compiled.mjs",
+  "nrepl.mjs",
+  "bencode.mjs",
+  "fs-http.mjs",
+  "build-id.mjs",
 ];
 
-const RELEASE = [
-  ["evalight-ui/js/main.js", "evalight/public/js/main.js"],
-  ["evalight-ui/js/preview/preview.js", "evalight/public/js/preview/preview.js"],
+export const PACK_STATIC = [
+  { from: "public/index.html", zip: "evalight/public/index.html", url: "/index.html", stamp: true },
+  { from: "public/preview.html", zip: "evalight/public/preview.html", url: "/preview.html" },
+  { from: "public/favicon.svg", zip: "evalight/public/favicon.svg", url: "/favicon.svg" },
+  { from: "public/css/ui.css", zip: "evalight/public/css/ui.css", url: "/css/ui.css" },
+  { from: "public/css/evalight.css", zip: "evalight/public/css/evalight.css", url: "/css/evalight.css" },
+  { from: "public/css/preview.css", zip: "evalight/public/css/preview.css", url: "/css/preview.css" },
+];
+
+export const PACK_RELEASE = [
+  { from: "evalight-ui/js/main.js", zip: "evalight/public/js/main.js", url: "/js/main.js" },
+  { from: "evalight-ui/js/preview/preview.js", zip: "evalight/public/js/preview/preview.js", url: "/js/preview/preview.js" },
 ];
 
 const FINGERPRINT = "evalight-ui/js/.src-fingerprint";
@@ -32,6 +45,19 @@ async function readText(root, rel) {
     throw new Error(`Missing ${rel}`);
   }
   return file.text();
+}
+
+export function fallbackManifest() {
+  return {
+    files: [
+      ...PACK_STATIC.map(({ url, zip }) => ({ url, zip })),
+      ...PACK_RELEASE.map(({ url, zip }) => ({ url, zip })),
+      ...EMBED_FILES.map((name) => ({
+        url: `/evalight-embed/${name}`,
+        zip: `evalight/${name}`,
+      })),
+    ],
+  };
 }
 
 function compileWorkshop(root) {
@@ -98,39 +124,54 @@ export async function ensureWorkshopUi(root, { force = false } = {}) {
   return fp;
 }
 
+export async function syncEmbedBuildId(root) {
+  const id = cljsBuildId(root);
+  await writeFile(join(root, "src/evalight/embed/build-id.mjs"), embedBuildIdSource(id));
+  return id;
+}
+
 export async function copyEmbedServer(root) {
-  const names = ["server.mjs", "compiled.mjs", "nrepl.mjs", "bencode.mjs"];
+  const id = await syncEmbedBuildId(root);
   await mkdir(join(root, "public/evalight-embed"), { recursive: true });
-  for (const name of names) {
+  for (const name of EMBED_FILES) {
     const src = await readText(root, `src/evalight/embed/${name}`);
     await Bun.write(join(root, "public/evalight-embed", name), src);
   }
+  await Bun.write(
+    join(root, "public/evalight-embed/manifest.json"),
+    `${JSON.stringify(fallbackManifest(), null, 2)}\n`,
+  );
+  return id;
 }
 
 export async function packEvalight(root, { requireJs = true, compileIfMissing = false } = {}) {
   if (compileIfMissing) {
     await ensureWorkshopUi(root);
   }
+  const id = await syncEmbedBuildId(root);
   const files = {};
-  for (const name of ["server.mjs", "compiled.mjs", "nrepl.mjs", "bencode.mjs"]) {
+  for (const name of EMBED_FILES) {
     files[`evalight/${name}`] = await readText(root, `src/evalight/embed/${name}`);
   }
-  for (const [from, to] of STATIC) {
-    files[to] = await readText(root, from);
+  for (const item of PACK_STATIC) {
+    let text = await readText(root, item.from);
+    if (item.stamp) text = stampHtml(text, id);
+    files[item.zip] = text;
   }
-  for (const [from, to] of RELEASE) {
-    const file = Bun.file(join(root, from));
+  for (const item of PACK_RELEASE) {
+    const file = Bun.file(join(root, item.from));
     if (await file.exists()) {
-      files[to] = await file.text();
+      files[item.zip] = await file.text();
     } else if (requireJs) {
       throw new Error(
-        `Evalight UI is not built (${from}). Run bun run embed, then export again.`,
+        `Evalight UI is not built (${item.from}). Run bun run embed, then export again.`,
       );
     }
   }
   return files;
 }
 
+/** Keep in sync with evalight.export/with-evalight-script (browser zip rewrite). */
 export function withEvalightScript(packageJsonText) {
   try {
     const data = JSON.parse(packageJsonText || "{}");

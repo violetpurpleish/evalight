@@ -8,122 +8,23 @@
  *
  *   bun evalight/server.mjs
  */
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { EVALIGHT_BUILD } from "./build-id.mjs";
 import {
   compiledMeta,
   handleRuntimeRequest,
   startCompiledRuntime,
   stopCompiledRuntime,
 } from "./compiled.mjs";
+import { createFsApi, error, json } from "./fs-http.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const UI_ROOT = join(HERE, "public");
 const FS_ROOT = resolve(HERE, "..");
 const PORT = Number(process.env.PORT || 48721);
-const BUILD = "evalight-editor-v5";
-const SKIP = new Set([
-  "node_modules",
-  ".git",
-  ".shadow-cljs",
-  ".cpcache",
-  "out",
-  ".DS_Store",
-]);
-const SKIP_ROOT = new Set(["evalight", "evalight-ui"]);
-
-function safe(rel) {
-  const full = resolve(FS_ROOT, rel || ".");
-  const relToRoot = relative(FS_ROOT, full);
-  if (relToRoot.startsWith("..") || relToRoot.startsWith(`..${sep}`)) {
-    throw new Error("Path escapes the project root.");
-  }
-  return full;
-}
-
-async function listDir(rel) {
-  const dir = safe(rel);
-  const names = await readdir(dir);
-  const entries = [];
-  for (const name of names) {
-    if (SKIP.has(name)) continue;
-    if (!rel && SKIP_ROOT.has(name)) continue;
-    const childRel = rel ? `${rel}/${name}` : name;
-    const s = await stat(join(dir, name));
-    entries.push({
-      name,
-      path: childRel.replaceAll("\\", "/"),
-      type: s.isDirectory() ? "dir" : "file",
-    });
-  }
-  return entries.sort((a, b) => {
-    if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-}
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function error(status, message) {
-  return json({ error: message }, status);
-}
-
-async function readBody(req) {
-  const text = await req.text();
-  return text ? JSON.parse(text) : {};
-}
-
-async function handleFs(req, url) {
-  const path = url.searchParams.get("path") || "";
-  try {
-    if (url.pathname.endsWith("/list") && req.method === "GET") {
-      return json({ entries: await listDir(path) });
-    }
-    if (url.pathname.endsWith("/read") && req.method === "GET") {
-      const content = await readFile(safe(path), "utf8");
-      return json({ path, content });
-    }
-    if (url.pathname.endsWith("/exists") && req.method === "GET") {
-      try {
-        await stat(safe(path));
-        return json({ exists: true });
-      } catch {
-        return json({ exists: false });
-      }
-    }
-    if (url.pathname.endsWith("/write") && req.method === "PUT") {
-      const body = await readBody(req);
-      const target = safe(body.path);
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(target, body.content ?? "", "utf8");
-      return json({ path: body.path });
-    }
-    if (url.pathname.endsWith("/mkdir") && req.method === "POST") {
-      const body = await readBody(req);
-      await mkdir(safe(body.path), { recursive: true });
-      return json({ path: body.path });
-    }
-    if (url.pathname.endsWith("/rename") && req.method === "POST") {
-      const body = await readBody(req);
-      await mkdir(dirname(safe(body.to)), { recursive: true });
-      await rename(safe(body.from), safe(body.to));
-      return json({ to: body.to });
-    }
-    if (url.pathname.endsWith("/delete") && req.method === "DELETE") {
-      await rm(safe(path), { recursive: true, force: true });
-      return json({ path });
-    }
-    return error(404, "Unknown filesystem endpoint");
-  } catch (e) {
-    return error(400, e.message || String(e));
-  }
-}
+const fsApi = createFsApi(FS_ROOT);
 
 function contentType(p) {
   if (p.endsWith(".js")) return "application/javascript; charset=utf-8";
@@ -140,6 +41,13 @@ function staticHeaders(rel) {
     headers["Cache-Control"] = "no-store";
   }
   return headers;
+}
+
+function stampHtml(html) {
+  return html
+    .replace(/content="evalight-editor-v[^"]*"/, `content="${EVALIGHT_BUILD}"`)
+    .replace(/window\.__EVALIGHT_HTML__ = "[^"]*"/, `window.__EVALIGHT_HTML__ = "${EVALIGHT_BUILD}"`)
+    .replace(/src="\/js\/main\.js[^"]*"/, `src="/js/main.js?v=${EVALIGHT_BUILD}"`);
 }
 
 async function packSelf() {
@@ -169,7 +77,7 @@ Bun.serve({
     if (url.pathname === "/api/meta") {
       return json({
         mode: "local",
-        build: BUILD,
+        build: EVALIGHT_BUILD,
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
         ...compiledMeta(),
@@ -185,17 +93,13 @@ Bun.serve({
       }
     }
     if (url.pathname.startsWith("/api/fs/")) {
-      return handleFs(req, url);
+      return fsApi.handle(req, url);
     }
     const rel = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     const file = Bun.file(join(UI_ROOT, rel));
     if (await file.exists()) {
       if (rel === "index.html") {
-        const html = (await file.text()).replace(
-          /src="\/js\/main\.js[^"]*"/,
-          `src="/js/main.js?v=${BUILD}"`,
-        );
-        return new Response(html, { headers: staticHeaders(rel) });
+        return new Response(stampHtml(await file.text()), { headers: staticHeaders(rel) });
       }
       return new Response(file, { headers: staticHeaders(rel) });
     }
@@ -203,7 +107,7 @@ Bun.serve({
   },
 });
 
-console.log(`Evalight  http://127.0.0.1:${PORT}  ${BUILD}`);
+console.log(`Evalight  http://127.0.0.1:${PORT}  ${EVALIGHT_BUILD}`);
 console.log(`  project  ${FS_ROOT}`);
 
 function shutdown() {

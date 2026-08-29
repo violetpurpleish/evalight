@@ -5,20 +5,6 @@
             [evalight.promise :as p]
             [evalight.template :as template]))
 
-(def ^:private static-pack
-  [["/index.html" "evalight/public/index.html"]
-   ["/preview.html" "evalight/public/preview.html"]
-   ["/favicon.svg" "evalight/public/favicon.svg"]
-   ["/css/ui.css" "evalight/public/css/ui.css"]
-   ["/css/evalight.css" "evalight/public/css/evalight.css"]
-   ["/css/preview.css" "evalight/public/css/preview.css"]
-   ["/js/main.js" "evalight/public/js/main.js"]
-   ["/js/preview/preview.js" "evalight/public/js/preview/preview.js"]
-   ["/evalight-embed/server.mjs" "evalight/server.mjs"]
-   ["/evalight-embed/compiled.mjs" "evalight/compiled.mjs"]
-   ["/evalight-embed/nrepl.mjs" "evalight/nrepl.mjs"]
-   ["/evalight-embed/bencode.mjs" "evalight/bencode.mjs"]])
-
 (defn- download-blob [blob filename]
   (let [url (js/URL.createObjectURL blob)
         a (js/document.createElement "a")]
@@ -30,7 +16,8 @@
     (js/URL.revokeObjectURL url)))
 
 (defn with-evalight-script
-  "Ensure package.json has `\"evalight\": \"bun evalight/server.mjs\"`."
+  "Ensure package.json has `\"evalight\": \"bun evalight/server.mjs\"`.
+  Keep in sync with scripts/evalight-pack.mjs withEvalightScript."
   [text]
   (try
     (let [pkg (js/JSON.parse (or text "{}"))]
@@ -48,16 +35,24 @@
                  (throw (js/Error. (str "Missing " url " (needed to put Evalight in the zip)."))))))))
 
 (defn- pack-from-static []
-  (p/reduce-p
-   (fn [acc [url path]]
-     (.then (fetch-ok-text url)
-            (fn [text]
-              (when (and (= path "evalight/public/js/main.js")
-                         (str/includes? text "cljs-runtime"))
-                (throw (js/Error. "This Evalight is a watch build. Run bun run embed from the Evalight folder, then export again.")))
-              (assoc acc path text))))
-   {}
-   static-pack))
+  (-> (fetch-ok-text "/evalight-embed/manifest.json")
+      (.then (fn [text]
+               (let [data (js/JSON.parse text)
+                     items (js->clj (.-files data))]
+                 (when-not (seq items)
+                   (throw (js/Error. "evalight-embed/manifest.json has no files.")))
+                 (p/reduce-p
+                  (fn [acc item]
+                    (let [url (get item "url")
+                          zip (get item "zip")]
+                      (.then (fetch-ok-text url)
+                             (fn [body]
+                               (when (and (= zip "evalight/public/js/main.js")
+                                          (str/includes? body "cljs-runtime"))
+                                 (throw (js/Error. "This Evalight is a watch build. Run bun run embed from the Evalight folder, then export again.")))
+                               (assoc acc zip body)))))
+                  {}
+                  items))))))
 
 (defn- pack-error [res]
   (-> (.text res)

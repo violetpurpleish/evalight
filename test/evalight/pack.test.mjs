@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { packEvalight, withEvalightScript } from "../../scripts/evalight-pack.mjs";
+import { packEvalight, fallbackManifest, withEvalightScript } from "../../scripts/evalight-pack.mjs";
 
 const root = join(import.meta.dir, "../..");
 
 const files = await packEvalight(root, { requireJs: false });
-assert.ok(files["evalight/server.mjs"].includes("bun evalight/server.mjs"));
-assert.ok(files["evalight/server.mjs"].includes("SKIP_ROOT"));
+assert.ok(files["evalight/server.mjs"].includes("createFsApi"));
+assert.ok(files["evalight/fs-http.mjs"].includes("SKIP_ROOT"));
+assert.ok(files["evalight/build-id.mjs"].includes("evalight-editor-v5"));
 assert.ok(files["evalight/public/index.html"].includes("/js/main.js?v=evalight-editor-v5"));
-assert.ok(files["evalight/server.mjs"].includes("Cache-Control"));
 assert.ok(files["evalight/compiled.mjs"].includes("nrepl-select"));
 assert.ok(files["evalight/nrepl.mjs"].includes("bencode"));
 assert.ok(files["evalight/public/preview.html"].includes("preview"));
@@ -22,6 +22,11 @@ assert.equal(
   Object.keys(files).some((k) => k.includes("cljs-runtime")),
   false,
 );
+
+const zips = new Set(fallbackManifest().files.map((f) => f.zip));
+for (const zip of Object.keys(files)) {
+  assert.ok(zips.has(zip), `packed ${zip} missing from fallbackManifest`);
+}
 
 const out = withEvalightScript(`{"name":"lamp","scripts":{"dev":"shadow-cljs watch app"}}`);
 const pkg = JSON.parse(out);

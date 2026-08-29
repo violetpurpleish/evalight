@@ -105,7 +105,7 @@
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
     [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
     (if (= :local (:mode state))
-      [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground."]
+      [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground. Live reloads that preview after you save; off keeps the current page."]
       [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop."])
     [:p.build-stamp {:title "Compiled UI id. If a cljs caret bug remains, this is not the build that fixed it."}
      build/id]]])
@@ -270,6 +270,9 @@
       (when (:error preview)
         [:span.preview-error {:title (:error preview)} "error"])
       [:label.live
+       {:title (if compiled?
+                 "Reload Preview after you save. Off keeps this page until you reload it."
+                 "Reload the SCI preview as you type.")}
        [:input {:type "checkbox"
                 :checked (boolean (:live? preview))
                 :on {:change [:toggle-live]}}]

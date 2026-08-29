@@ -1,6 +1,8 @@
 import { join } from "node:path";
+import { EVALIGHT_BUILD } from "../src/evalight/embed/build-id.mjs";
+import { stampHtml } from "./evalight-build.mjs";
 
-export const EVALIGHT_BUILD = "evalight-editor-v5";
+export { EVALIGHT_BUILD };
 
 export function contentType(p) {
   if (p.endsWith(".js")) return "application/javascript; charset=utf-8";
@@ -25,10 +27,7 @@ export async function servePublicPath(uiRoot, pathname) {
   const file = Bun.file(join(uiRoot, rel));
   if (!(await file.exists())) return null;
   if (rel === "index.html") {
-    const html = (await file.text()).replace(
-      /src="\/js\/main\.js[^"]*"/,
-      `src="/js/main.js?v=${EVALIGHT_BUILD}"`,
-    );
+    const html = stampHtml(await file.text(), EVALIGHT_BUILD);
     return new Response(html, { headers: staticHeaders(rel) });
   }
   return new Response(file, { headers: staticHeaders(rel) });

@@ -242,6 +242,68 @@ try {
       intelNames.some((n) => n === "stats/record!" || n === "record!"),
       "live intel should include app.stats/record!: " + intelNames.slice(0, 30).join(", "),
     );
+    await page.click("textarea[name=expr]");
+    await page.keyboard.type("(bump)");
+    await page.keyboard.press("Enter");
+    const afterRepl = await until(
+      async () => {
+        const t = await preview.$eval(".count", (el) => el.textContent).catch(() => "");
+        return t === "3" ? t : null;
+      },
+      8000,
+      "REPL Enter (bump) did not mutate the compiled app",
+    );
+    assert.equal(afterRepl, "3");
+    const bumpDef = await page.evaluate(() => {
+      for (const node of document.querySelectorAll(".cm-line")) {
+        if (!/\(defn\s+bump/.test(node.textContent)) continue;
+        const r = node.getBoundingClientRect();
+        return { x: r.x + 48, y: r.y + r.height / 2 };
+      }
+      return null;
+    });
+    assert.ok(bumpDef, "defn bump not visible");
+    await page.mouse.click(bumpDef.x, bumpDef.y);
+    await page.keyboard.down("Control");
+    await page.keyboard.press("Enter");
+    await page.keyboard.up("Control");
+    const afterCtrl = await until(
+      async () => {
+        const t = await preview.$eval(".count", (el) => el.textContent).catch(() => "");
+        return t === "4" ? t : null;
+      },
+      8000,
+      "Ctrl-Enter (bump) did not mutate the compiled app",
+    );
+    assert.equal(afterCtrl, "4");
+    await page.mouse.move(bumpDef.x, bumpDef.y);
+    const hover = await until(
+      async () => {
+        const tip = await page.$eval(".cm-evalight-doc", (el) => el.textContent).catch(() => "");
+        return /bump/i.test(tip) ? tip : null;
+      },
+      4000,
+      "hover docs did not appear over bump",
+    );
+    assert.match(hover, /lamp counter|Increment/i);
+    await page.click(".cm-content");
+    await page.keyboard.down("Control");
+    await page.keyboard.press("End");
+    await page.keyboard.up("Control");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("bum");
+    const labels = await until(
+      async () => {
+        const tips = await page.$$eval(".cm-tooltip-autocomplete li", (els) =>
+          els.map((e) => e.textContent),
+        ).catch(() => []);
+        return tips.some((t) => /bump/i.test(t)) ? tips : null;
+      },
+      8000,
+      "compiled completions did not include bump",
+    );
+    assert.ok(labels.some((t) => /bump/i.test(t)));
+    await page.keyboard.press("Escape");
     const beforeCursor = await page.evaluate(() => {
       const r = document.querySelector(".cm-cursor")?.getBoundingClientRect();
       return r ? { x: r.x, y: r.y } : null;
