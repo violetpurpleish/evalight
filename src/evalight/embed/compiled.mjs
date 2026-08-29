@@ -15,38 +15,48 @@ const APP_PORT = Number(process.env.EVALIGHT_APP_PORT || 48741);
 const NREPL_PORT = Number(process.env.EVALIGHT_NREPL_PORT || 7879);
 const SHADOW_HTTP = Number(process.env.EVALIGHT_SHADOW_HTTP || 9640);
 
-const INTEL_FORM = `(let [n (ns-name *ns*)
-         interned (try (ns-interns n) (catch :default _ {}))
-         referred (try (ns-refers n) (catch :default _ {}))
-         aliases (try (ns-aliases n) (catch :default _ {}))
-         nss (try (all-ns) (catch :default _ []))
-         pack (fn [s v kind]
-                (let [m (or (meta v) {})]
-                  {:name (str s)
-                   :kind kind
-                   :ns (str (or (:ns m) n))
-                   :arglists (when-let [a (:arglists m)] (pr-str a))
-                   :doc (:doc m)
-                   :macro (boolean (:macro m))}))]
-     {:ns (str n)
-      :items
-      (vec
-       (concat
-        (map (fn [[s v]] (pack s v "var")) interned)
-        (keep (fn [[s v]]
-                (when-not (contains? interned s)
-                  (pack s v "core")))
-              referred)
-        (mapcat
-         (fn [[a t]]
-           (let [target (try (ns-interns t) (catch :default _ {}))
-                 nsn (str (try (ns-name t) (catch :default _ a)))]
-             (cons {:name (str a) :kind "alias" :ns nsn}
-                   (map (fn [[s v]]
-                          (assoc (pack s v "var") :name (str a "/" s)))
-                        target))))
-         aliases)
-        (map (fn [x] {:name (str (ns-name x)) :kind "ns"}) nss)))})`;
+/**
+ * CLJS ns-interns is a compile-time macro. Completions come from the
+ * same shadow :app compiler env that produced the running JS heap.
+ */
+function intelForm(nsName, buildId) {
+  const ns = /^[A-Za-z0-9*.!?_+\-\/]+$/.test(nsName || "") ? nsName : "cljs.user";
+  return `(do
+  (require '[shadow.cljs.devtools.api :as api])
+  (set! *print-length* nil)
+  (set! *print-level* nil)
+  (let [build ${buildId}
+        ns-sym '${ns}
+        env (api/compiler-env build)
+        ns-map (get-in env [:cljs.analyzer/namespaces ns-sym])
+        defs (or (:defs ns-map) {})
+        reqs (or (:requires ns-map) {})
+        uses (or (:uses ns-map) {})
+        pack (fn [s m]
+               {:name (str (name s))
+                :kind "var"
+                :ns (str (or (:ns m) ns-sym))
+                :arglists (when-let [a (:arglists m)] (pr-str a))
+                :doc (:doc m)
+                :macro (boolean (:macro m))})]
+    {:ns (str ns-sym)
+     :items
+     (vec
+      (concat
+       [{:name (str ns-sym) :kind "ns"}]
+       (map (fn [[s m]] (pack s m)) defs)
+       (map (fn [[s t]] {:name (str s) :kind "core" :ns (str t)}) uses)
+       (mapcat
+        (fn [[a t]]
+          (if (= (str a) (str t))
+            [{:name (str t) :kind "ns"}]
+            (let [target (or (get-in env [:cljs.analyzer/namespaces t :defs]) {})]
+              (cons {:name (str a) :kind "alias" :ns (str t)}
+                    (map (fn [[s m]]
+                           (assoc (pack s m) :name (str a "/" (name s))))
+                         target)))))
+        reqs)))}))`;
+}
 
 export function previewUrl() {
   return `http://127.0.0.1:${APP_PORT}/`;
@@ -156,6 +166,16 @@ async function readNreplPortFile(root) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+async function discoverNrepl(watchDir, projectRoot, wanted) {
+  for (const root of [watchDir, projectRoot]) {
+    if (!root) continue;
+    const p = await readNreplPortFile(root);
+    if (p && (await pingNrepl(p))) return p;
+  }
+  if (wanted && (await pingNrepl(wanted))) return wanted;
+  return null;
+}
+
 function run(cmd, args, opts) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, { ...opts, stdio: ["ignore", "pipe", "pipe"] });
@@ -224,6 +244,7 @@ async function makeWatchRoot(projectRoot, overlay) {
 
 let client = null;
 let session = null;
+let cljSession = null;
 let cljs = false;
 let lastNrepl = null;
 let child = null;
@@ -231,7 +252,7 @@ let watchRoot = null;
 let started = null;
 
 async function ensureCljs(nreplPort, buildId) {
-  if (client && session && cljs && lastNrepl === nreplPort) return;
+  if (client && session && cljSession && cljs && lastNrepl === nreplPort) return;
   if (client) {
     try {
       client.close();
@@ -240,10 +261,12 @@ async function ensureCljs(nreplPort, buildId) {
     }
     client = null;
     session = null;
+    cljSession = null;
     cljs = false;
   }
   lastNrepl = nreplPort;
   client = connectNrepl(nreplPort);
+  cljSession = await client.clone();
   session = await client.clone();
   const sel = await client.eval(
     session,
@@ -367,12 +390,15 @@ export async function runtimeIntel(nsName) {
   if (!st.connected) {
     return { ok: false, items: [], ns: nsName || started?.mainNs, error: st.error };
   }
-  const result = await cljsEval(
-    `(do (set! *print-length* nil) (set! *print-level* nil) ${INTEL_FORM})`,
-    nsName || started.mainNs,
+  if (!cljSession) {
+    return { ok: false, items: [], ns: nsName || started?.mainNs, error: "Clojure nREPL session missing" };
+  }
+  const result = await client.eval(
+    cljSession,
+    intelForm(nsName || started.mainNs, started.buildId),
     20000,
   );
-  if (!result.ok || noRuntime(result)) {
+  if (!result.ok) {
     return {
       ok: false,
       items: [],
@@ -602,11 +628,10 @@ export async function startCompiledRuntime(projectRoot, { buildId = "app" } = {}
       "shadow-cljs watch did not finish compiling",
     );
     nreplPort = await waitUntil(
-      () => readNreplPortFile(watchRoot),
+      () => discoverNrepl(watchRoot, projectRoot, nreplPortWanted),
       20000,
       "nREPL did not start",
     );
-    await waitUntil(() => pingNrepl(nreplPort), 10000, "nREPL did not accept connections");
     await waitUntil(async () => {
       try {
         const res = await fetch(`http://127.0.0.1:${appPort}/`);
@@ -655,6 +680,7 @@ export function stopCompiledRuntime() {
     }
     client = null;
     session = null;
+    cljSession = null;
     cljs = false;
     lastNrepl = null;
   }
