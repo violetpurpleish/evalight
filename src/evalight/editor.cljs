@@ -61,8 +61,12 @@
             ".cm-selectionBackground, &.cm-focused .cm-selectionBackground"
             {:background "rgba(228, 179, 76, 0.22) !important"}
             ".cm-cursor" {:border-left-color "#e4b34c"}
-            ".cm-matchingBracket" {:outline "1px solid #e4b34c"
+            ".cm-matchingBracket" {:color "#e4b34c"
+                                     :outline "none"
                                      :background "transparent"}
+            ".cm-nonmatchingBracket" {:color "#ff8a78"
+                                      :outline "none"
+                                      :background "transparent"}
             ".cm-scroller" {:overflow "auto"}
             "&.cm-focused" {:outline "none"}})))
 
