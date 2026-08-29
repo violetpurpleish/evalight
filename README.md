@@ -105,7 +105,7 @@ To join a watch you already started:
 bun run evalight --attach
 ```
 
-That uses the running shadow nREPL and does not stop it. Evalight Live stays off so it does not fight shadow autoload. If the app URL cannot be read from `:dev-http`, pass `--preview-url=http://127.0.0.1:3456/`. A leftover `.nrepl-port` file is ignored unless you pass `--attach`.
+That uses the running shadow nREPL and does not stop it. Evalight Live stays off so it does not fight shadow autoload. If the app URL cannot be read from `:dev-http`, pass `--preview-url=http://127.0.0.1:3456/`. If there is no `.nrepl-port` file, attach reads `:nrepl {:port ...}` from `shadow-cljs.edn`. A leftover `.nrepl-port` file is ignored unless you pass `--attach`.
 
 Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
 
