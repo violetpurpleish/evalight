@@ -147,8 +147,17 @@ async function bunInstall(dir) {
 
 async function httpOk(url) {
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers: { Accept: "text/html" } });
     return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function httpReachable(url) {
+  try {
+    await fetch(url);
+    return true;
   } catch {
     return false;
   }
@@ -252,7 +261,7 @@ try {
   assert.equal(await live.evaluate((el) => el.checked), false, "Live must start off while attached");
 
   assert.equal(
-    await httpOk(`http://127.0.0.1:${OWNED_APP_PORT}/`),
+    await httpReachable(`http://127.0.0.1:${OWNED_APP_PORT}/`),
     false,
     "attach must not start the owned overlay watch on :48741",
   );
