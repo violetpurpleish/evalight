@@ -96,6 +96,11 @@ function parseDevHttp(shadowText) {
   return m ? Number(m[1]) : null;
 }
 
+export function parseNreplPort(shadowText) {
+  const m = (shadowText || "").match(/:nrepl\s*\{[^}]*:port\s+(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
 /**
  * bun run evalight [--attach] [--preview-url=http://127.0.0.1:3456/] [--nrepl-port=7888]
  * bun run local [--attach] [project-dir]
@@ -140,14 +145,15 @@ export function resolveAttachTarget({
   attach,
   nreplFromFlag,
   nreplFromFile,
+  nreplFromEdn,
   previewFromFlag,
   previewFromDevHttp,
 }) {
   if (!attach) return { mode: "owned" };
-  const nreplPort = nreplFromFlag || nreplFromFile || null;
+  const nreplPort = nreplFromFlag || nreplFromFile || nreplFromEdn || null;
   if (!nreplPort) {
     throw new Error(
-      "--attach needs a running shadow-cljs nREPL. Pass --nrepl-port= or start `shadow-cljs watch app` so .nrepl-port exists.",
+      "--attach needs a running shadow-cljs nREPL. Pass --nrepl-port=, set :nrepl {:port ...} in shadow-cljs.edn, or start watch so .nrepl-port exists.",
     );
   }
   const previewUrl = previewFromFlag
@@ -635,6 +641,7 @@ export async function startCompiledRuntime(projectRoot, {
         attach: true,
         nreplFromFlag,
         nreplFromFile,
+        nreplFromEdn: parseNreplPort(shadowText),
         previewFromFlag,
         previewFromDevHttp: parseDevHttp(shadowText),
       });

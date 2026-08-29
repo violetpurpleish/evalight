@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   attachLabel,
   parseEvalightArgs,
+  parseNreplPort,
   resolveAttachTarget,
 } from "../../src/evalight/embed/compiled.mjs";
 
@@ -75,6 +76,15 @@ const flagged = resolveAttachTarget({
 assert.equal(flagged.nreplPort, 7879);
 assert.equal(flagged.previewUrl, "http://127.0.0.1:9000/");
 
+assert.equal(
+  resolveAttachTarget({
+    attach: true,
+    nreplFromEdn: 7880,
+    previewFromDevHttp: 3456,
+  }).nreplPort,
+  7880,
+);
+
 assert.throws(
   () => resolveAttachTarget({ attach: true }),
   /--nrepl-port/,
@@ -83,6 +93,12 @@ assert.throws(
   () => resolveAttachTarget({ attach: true, nreplFromFlag: 7888 }),
   /--preview-url/,
 );
+
+assert.equal(
+  parseNreplPort(`{:nrepl {:port 7880}\n :dev-http {3456 "public"}}`),
+  7880,
+);
+assert.equal(parseNreplPort(`{:dev-http {3456 "public"}}`), null);
 
 assert.equal(
   attachLabel({ buildId: ":app", previewUrl: "http://127.0.0.1:3456/" }),
