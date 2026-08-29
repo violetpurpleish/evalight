@@ -110,7 +110,7 @@
       [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop."])
     [:p.muted
      [:a.help-licenses {:href "/licenses.html" :target "_blank" :rel "noopener noreferrer"}
-      "Open Source Licenses"]]])
+      "Open Source Licenses"]]]])
 
 (defn- tree-file-paths [nodes]
   (mapcat (fn [n]
