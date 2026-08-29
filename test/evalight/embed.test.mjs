@@ -37,47 +37,81 @@ async function until(fn, ms, label) {
   throw new Error(label + " last=" + JSON.stringify(last));
 }
 
-async function cmPoint(page, { includes, clickText }) {
-  await page.$eval(".editor .cm-content", (el) => {
-    el.scrollIntoView({ block: "nearest", inline: "nearest" });
+async function cmPoint(page, { includes, clickText, avoid = [], atParen = false }) {
+  await page.evaluate(() => {
+    const already = /app\/core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? "");
+    if (already) return;
+    const row = [...document.querySelectorAll(".tree-row")].find((el) => {
+      if (el.querySelector(".tree-name")?.textContent !== "core.cljs") return false;
+      const dir = el
+        .closest(".tree-children")
+        ?.previousElementSibling
+        ?.querySelector(".tree-name")
+        ?.textContent;
+      return dir === "app";
+    });
+    row?.querySelector(".tree-item")?.click();
   });
-  return until(async () => {
-    const found = await page.evaluate(({ includes, clickText }) => {
-      const root = document.querySelector(".editor") || document;
-      const lines = [...root.querySelectorAll(".cm-line")];
-      const line = lines.find((el) => (el.textContent || "").includes(includes));
-      if (!line) {
-        return {
-          ok: false,
-          sample: lines.slice(0, 24).map((el) => el.textContent),
-          doc: document.querySelector(".cm-content")?.innerText?.slice(0, 500) || "",
-        };
-      }
-      line.scrollIntoView({ block: "center", inline: "nearest" });
-      if (clickText) {
-        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
-        let node;
-        while ((node = walker.nextNode())) {
-          const i = node.textContent.indexOf(clickText);
-          if (i < 0) continue;
-          const range = document.createRange();
-          range.setStart(node, i);
-          range.setEnd(node, Math.min(i + clickText.length, node.textContent.length));
-          const r = range.getBoundingClientRect();
-          if (r.width < 2 || r.height < 2) continue;
-          return { ok: true, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  await page.waitForFunction(
+    () => /app\/core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 8000 },
+  );
+  let found = null;
+  for (let top = 0; top <= 5000 && !found; top += 140) {
+    await page.evaluate((y) => {
+      const s = document.querySelector(".editor .cm-scroller")
+        || document.querySelector(".cm-scroller");
+      if (s) s.scrollTop = y;
+    }, top);
+    await sleep(40);
+    found = await page.evaluate(({ includes, clickText, avoid, atParen }) => {
+      const root = document.querySelector(".cm-content");
+      if (!root) return null;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node;
+      const needle = clickText || includes;
+      while ((node = walker.nextNode())) {
+        const i = node.textContent.indexOf(needle);
+        if (i < 0) continue;
+        const line = node.parentElement?.closest(".cm-line");
+        const lineText = line?.textContent || "";
+        if (!lineText.includes(includes)) continue;
+        if (avoid.some((s) => lineText.includes(s))) continue;
+        line.scrollIntoView({ block: "center" });
+        const range = document.createRange();
+        range.setStart(node, i);
+        range.setEnd(node, Math.min(i + needle.length, node.textContent.length));
+        const r = range.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        let x = atParen ? r.x - 5 : r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        const overEl = document.elementFromPoint(x, y)?.closest(".cm-editor");
+        if (!overEl && atParen) {
+          x = r.x + 1;
         }
+        const over = document.elementFromPoint(x, y)?.closest(".cm-editor") != null;
+        if (!over) continue;
+        return { x, y, line: lineText };
       }
-      const r = line.getBoundingClientRect();
-      if (r.width < 2 || r.height < 2) return null;
+      return null;
+    }, { includes, clickText: clickText || includes, avoid, atParen: Boolean(atParen) });
+  }
+  if (!found) {
+    const dump = await page.evaluate(() => {
+      const s = document.querySelector(".editor .cm-scroller")
+        || document.querySelector(".cm-scroller");
+      if (s) s.scrollTop = 0;
       return {
-        ok: true,
-        x: r.x + Math.min(56, Math.max(12, r.width / 3)),
-        y: r.y + r.height / 2,
+        path: document.querySelector(".file-path")?.textContent,
+        bumpLines: [...document.querySelectorAll(".cm-line")]
+          .map((el) => el.textContent)
+          .filter((t) => /bump/i.test(t)),
+        doc: document.querySelector(".cm-content")?.innerText || "",
       };
-    }, { includes, clickText: clickText || null });
-    return found?.ok ? found : null;
-  }, 8000, `cm line ${includes}`);
+    });
+    throw new Error(`cm line ${JSON.stringify(includes)} not found ${JSON.stringify(dump)}`);
+  }
+  return found;
 }
 
 async function writeLamp(dir) {
@@ -301,6 +335,10 @@ try {
       "REPL Enter (bump) did not mutate the compiled app",
     );
     assert.equal(afterRepl, "3");
+    const live = await page.$(".live input[type=checkbox]");
+    if (live && await live.evaluate((el) => el.checked)) {
+      await live.click();
+    }
     const bumpDef = await cmPoint(page, { includes: "(defn bump", clickText: "bump" });
     await page.mouse.move(bumpDef.x, bumpDef.y);
     const hover = await until(
@@ -315,7 +353,12 @@ try {
     await page.keyboard.press("Escape");
 
     // Ctrl-Enter must eval the (bump) *call*. The defn only redefines it.
-    const bumpCall = await cmPoint(page, { includes: "(fn [_e] (bump))", clickText: "(bump)" });
+    const bumpCall = await cmPoint(page, {
+      includes: "(bump)",
+      clickText: "bump",
+      avoid: ["Evaluate", "defn"],
+      atParen: true,
+    });
     await page.mouse.click(bumpCall.x, bumpCall.y);
     await page.keyboard.down("Control");
     await page.keyboard.press("Enter");
@@ -327,7 +370,14 @@ try {
       },
       8000,
       "Ctrl-Enter (bump) did not mutate the compiled app",
-    );
+    ).catch(async (e) => {
+      const extra = await page.evaluate(() => ({
+        count: document.querySelector("iframe")?.contentDocument?.querySelector(".count")?.textContent,
+        repl: [...document.querySelectorAll(".repl-line")].slice(-6).map((el) => el.innerText),
+      })).catch(() => null);
+      e.message += " " + JSON.stringify(extra);
+      throw e;
+    });
     assert.equal(afterCtrl, "4");
     await page.click(".cm-content");
     await page.keyboard.down("Control");
@@ -347,13 +397,31 @@ try {
     );
     assert.ok(labels.some((t) => /bump/i.test(t)));
     await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await page.keyboard.down("Control");
+    await page.keyboard.press("z");
+    await page.keyboard.up("Control");
+    await page.evaluate(() => {
+      const s = document.querySelector(".editor .cm-scroller")
+        || document.querySelector(".cm-scroller");
+      if (s) s.scrollTop = 0;
+    });
+    await sleep(80);
     const beforeCursor = await page.evaluate(() => {
       const r = document.querySelector(".cm-cursor")?.getBoundingClientRect();
       return r ? { x: r.x, y: r.y } : null;
     });
     const clickAt = await page.evaluate(() => {
-      const lines = [...document.querySelectorAll(".cm-line")];
-      const line = lines[Math.min(6, lines.length - 1)] || lines[0];
+      const scroller = document.querySelector(".editor .cm-scroller")
+        || document.querySelector(".cm-scroller");
+      const box = scroller?.getBoundingClientRect();
+      const lines = [...document.querySelectorAll(".editor .cm-line, .cm-line")];
+      const line = lines.find((el) => {
+        const r = el.getBoundingClientRect();
+        if (!box) return r.height > 4;
+        return r.height > 4 && r.top >= box.top + 8 && r.bottom < box.bottom - 8;
+      }) || lines[0];
+      line?.scrollIntoView({ block: "center" });
       const r = line.getBoundingClientRect();
       return { x: r.x + Math.min(90, r.width / 2), y: r.y + r.height / 2 };
     });
