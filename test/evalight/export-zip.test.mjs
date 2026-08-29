@@ -53,13 +53,14 @@ async function until(fn, ms, label) {
   throw new Error(label + " last=" + JSON.stringify(last));
 }
 
-async function startServer() {
+async function startServer({ packApi }) {
   const mainJs = join(UI_ROOT, "js/main.js");
   if (!existsSync(mainJs)) {
     throw new Error("public/js/main.js is missing. Run bun run dev or bun run release first.");
   }
   await copyEmbedServer(ROOT);
   await packEvalight(ROOT, { compileIfMissing: true, requireJs: true });
+  const workshopRoot = join(ROOT, "evalight-ui");
   const server = Bun.serve({
     port: PORT,
     hostname: "127.0.0.1",
@@ -69,7 +70,14 @@ async function startServer() {
         return Response.json({ mode: "browser" });
       }
       if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
+        if (!packApi) return new Response("Not found", { status: 404 });
         return handlePackRequest(ROOT);
+      }
+      // Vercel has no pack API. Overlay the workshop release at /js so a
+      // leftover shadow watch in public/js cannot poison the static fallback.
+      if (!packApi && url.pathname.startsWith("/js/")) {
+        const workshop = await servePublicPath(workshopRoot, url.pathname);
+        if (workshop) return workshop;
       }
       const served = await servePublicPath(UI_ROOT, url.pathname);
       if (served) return served;
@@ -86,100 +94,7 @@ function bytesFromBase64(b64) {
   return Buffer.from(b64, "base64");
 }
 
-const { url, stop } = await startServer();
-const userDataDir = await mkdtemp(join(tmpdir(), "evalight-export-zip-"));
-const browser = await puppeteer.launch({
-  executablePath: chromePath(),
-  headless: "new",
-  userDataDir,
-  args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
-});
-
-try {
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1440, height: 900 });
-  await page.evaluateOnNewDocument(() => {
-    window.__evalightBlobs = [];
-    const orig = URL.createObjectURL.bind(URL);
-    URL.createObjectURL = function (blob) {
-      if (blob && typeof blob.size === "number" && blob.size > 0) {
-        window.__evalightBlobs.push(blob);
-      }
-      return orig(blob);
-    };
-  });
-  await page.goto(url, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".tree-row", { timeout: 20000 });
-  await page.waitForSelector("#project-select", { timeout: 10000 });
-  await page.waitForFunction(
-    () => {
-      const path = document.querySelector(".file-path")?.textContent ?? "";
-      const project = document.querySelector("#project-select")?.value ?? "";
-      return project === "lamp" && /core\.cljs/.test(path);
-    },
-    { timeout: 20000 },
-  );
-  await page.waitForFunction(
-    () => [...document.querySelectorAll("nav.actions button")]
-      .some((b) => /Export ZIP/.test(b.textContent)),
-    { timeout: 8000 },
-  );
-
-  const clicked = await page.evaluate(() => {
-    const btn = [...document.querySelectorAll("nav.actions button")]
-      .find((b) => /Export ZIP/.test(b.textContent));
-    if (!btn) return false;
-    btn.click();
-    return true;
-  });
-  assert.equal(clicked, true, "Export ZIP was not in the toolbar");
-
-  const packing = await until(
-    async () => {
-      const t = await page.evaluate(() => document.querySelector(".toast")?.textContent ?? "");
-      return /Packing|Exported lamp\.zip|could not be packed|Missing /.test(t) ? t : null;
-    },
-    15000,
-    "no packing toast",
-  );
-  if (/could not be packed|Missing /.test(packing)) {
-    throw new Error("export failed in the UI: " + packing);
-  }
-
-  const b64 = await until(
-    async () => page.evaluate(async () => {
-      const blobs = window.__evalightBlobs || [];
-      if (!blobs.length) return null;
-      const blob = blobs[blobs.length - 1];
-      const buf = await blob.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      const step = 0x4000;
-      let binary = "";
-      for (let i = 0; i < bytes.length; i += step) {
-        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
-      }
-      return btoa(binary);
-    }),
-    120000,
-    "no zip blob from URL.createObjectURL",
-  );
-
-  await until(
-    async () => {
-      const t = await page.evaluate(() => document.querySelector(".toast")?.textContent ?? "");
-      return /Exported lamp\.zip/.test(t) ? t : null;
-    },
-    15000,
-    "no Exported lamp.zip toast",
-  );
-
-  const zip = await JSZip.loadAsync(bytesFromBase64(b64));
-  const names = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
-  const files = {};
-  for (const name of names) {
-    files[name] = await zip.file(name).async("string");
-  }
-
+function assertZip(files, names) {
   assert.ok(
     files["src/app/core.cljs"]?.includes("(defn bump"),
     "zip is missing lamp src/app/core.cljs",
@@ -213,6 +128,10 @@ try {
     false,
     "zip packed public/js (watch) instead of evalight-ui/js",
   );
+  assert.ok(
+    files["evalight/public/js/main.js"].includes("cljs-runtime"),
+    "release :simple still mentions cljs-runtime; watch detection must not use that string",
+  );
   assert.equal(
     names.some((k) => k.includes("cljs-runtime")),
     false,
@@ -240,9 +159,117 @@ try {
   for (const zipPath of zips) {
     assert.ok(files[zipPath] != null, `download missing ${zipPath}`);
   }
+}
 
-  console.log("export-zip.test.mjs ok", { files: names.length, bytes: bytesFromBase64(b64).length });
+const userDataDir = await mkdtemp(join(tmpdir(), "evalight-export-zip-"));
+const browser = await puppeteer.launch({
+  executablePath: chromePath(),
+  headless: "new",
+  userDataDir,
+  args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
+});
+
+try {
+  // packApi true: local bun run dev (Node packs evalight-ui).
+  // packApi false: Vercel static host (/api/evalight-pack is 404).
+  for (const packApi of [true, false]) {
+    const { url, stop } = await startServer({ packApi });
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1440, height: 900 });
+      await page.evaluateOnNewDocument(() => {
+        window.__evalightBlobs = [];
+        const orig = URL.createObjectURL.bind(URL);
+        URL.createObjectURL = function (blob) {
+          if (blob && typeof blob.size === "number" && blob.size > 0) {
+            window.__evalightBlobs.push(blob);
+          }
+          return orig(blob);
+        };
+      });
+      await page.goto(url, { waitUntil: "domcontentloaded" });
+      await page.waitForSelector(".tree-row", { timeout: 20000 });
+      await page.waitForSelector("#project-select", { timeout: 10000 });
+      await page.waitForFunction(
+        () => {
+          const path = document.querySelector(".file-path")?.textContent ?? "";
+          const project = document.querySelector("#project-select")?.value ?? "";
+          return project === "lamp" && /core\.cljs/.test(path);
+        },
+        { timeout: 20000 },
+      );
+      await page.waitForFunction(
+        () => [...document.querySelectorAll("nav.actions button")]
+          .some((b) => /Export ZIP/.test(b.textContent)),
+        { timeout: 8000 },
+      );
+
+      const clicked = await page.evaluate(() => {
+        const btn = [...document.querySelectorAll("nav.actions button")]
+          .find((b) => /Export ZIP/.test(b.textContent));
+        if (!btn) return false;
+        btn.click();
+        return true;
+      });
+      assert.equal(clicked, true, "Export ZIP was not in the toolbar");
+
+      const packing = await until(
+        async () => {
+          const t = await page.evaluate(() => document.querySelector(".toast")?.textContent ?? "");
+          return /Packing|Exported lamp\.zip|could not be packed|Missing |watch build/.test(t) ? t : null;
+        },
+        15000,
+        "no packing toast",
+      );
+      if (/could not be packed|Missing |watch build/.test(packing)) {
+        throw new Error("export failed in the UI (packApi=" + packApi + "): " + packing);
+      }
+
+      const b64 = await until(
+        async () => page.evaluate(async () => {
+          const blobs = window.__evalightBlobs || [];
+          if (!blobs.length) return null;
+          const blob = blobs[blobs.length - 1];
+          const buf = await blob.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+          const step = 0x4000;
+          let binary = "";
+          for (let i = 0; i < bytes.length; i += step) {
+            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + step));
+          }
+          return btoa(binary);
+        }),
+        120000,
+        "no zip blob from URL.createObjectURL",
+      );
+
+      await until(
+        async () => {
+          const t = await page.evaluate(() => document.querySelector(".toast")?.textContent ?? "");
+          return /Exported lamp\.zip/.test(t) ? t : null;
+        },
+        15000,
+        "no Exported lamp.zip toast",
+      );
+
+      const zip = await JSZip.loadAsync(bytesFromBase64(b64));
+      const names = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
+      const files = {};
+      for (const name of names) {
+        files[name] = await zip.file(name).async("string");
+      }
+
+      assertZip(files, names);
+      await page.close();
+      console.log("export-zip.test.mjs ok", {
+        packApi,
+        files: names.length,
+        bytes: bytesFromBase64(b64).length,
+      });
+    } finally {
+      await stop();
+    }
+  }
 } finally {
   await browser.close().catch(() => {});
-  await stop();
 }

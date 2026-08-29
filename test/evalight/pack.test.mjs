@@ -41,4 +41,15 @@ assert.equal(pkg.scripts.dev, "shadow-cljs watch app");
 
 assert.equal(withEvalightScript("{not json"), "{not json");
 
+const hostedMain = join(root, "public/js/main.js");
+if (await Bun.file(hostedMain).exists()) {
+  const body = await Bun.file(hostedMain).text();
+  if (body.includes("COMPILED=!0") && !body.includes("SHADOW_ENV.evalLoad")) {
+    assert.ok(
+      body.includes("cljs-runtime"),
+      "hosted release still mentions cljs-runtime; browser export must not treat that as watch",
+    );
+  }
+}
+
 console.log("pack.test.mjs ok");
