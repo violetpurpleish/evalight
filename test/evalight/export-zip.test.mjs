@@ -208,10 +208,14 @@ try {
     files["evalight/public/js/main.js"]?.includes("evalight-editor-v5"),
     "packed workshop UI must include evalight-editor-v5",
   );
-  assert.equal(
-    files["evalight/public/js/main.js"].includes("cljs-runtime"),
-    false,
+  assert.ok(
+    files["evalight/public/js/main.js"].includes("COMPILED=!0"),
     "zip packed a watch build, not the workshop release",
+  );
+  assert.equal(
+    files["evalight/public/js/main.js"].includes("SHADOW_ENV.evalLoad"),
+    false,
+    "zip packed public/js (watch) instead of evalight-ui/js",
   );
   assert.equal(
     names.some((k) => k.includes("cljs-runtime")),
