@@ -19,36 +19,13 @@ import {
   stopCompiledRuntime,
 } from "./compiled.mjs";
 import { createFsApi, error, json } from "./fs-http.mjs";
+import { servePublicPath } from "./static.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const UI_ROOT = join(HERE, "public");
 const FS_ROOT = resolve(HERE, "..");
 const PORT = Number(process.env.PORT || 48721);
 const fsApi = createFsApi(FS_ROOT);
-
-function contentType(p) {
-  if (p.endsWith(".js")) return "application/javascript; charset=utf-8";
-  if (p.endsWith(".css")) return "text/css; charset=utf-8";
-  if (p.endsWith(".html")) return "text/html; charset=utf-8";
-  if (p.endsWith(".svg")) return "image/svg+xml";
-  if (p.endsWith(".json")) return "application/json";
-  return "application/octet-stream";
-}
-
-function staticHeaders(rel) {
-  const headers = { "Content-Type": contentType(rel) };
-  if (rel === "index.html" || /\.(html|js|css|map)$/.test(rel)) {
-    headers["Cache-Control"] = "no-store";
-  }
-  return headers;
-}
-
-function stampHtml(html) {
-  return html
-    .replace(/content="evalight-editor-v[^"]*"/, `content="${EVALIGHT_BUILD}"`)
-    .replace(/window\.__EVALIGHT_HTML__ = "[^"]*"/, `window.__EVALIGHT_HTML__ = "${EVALIGHT_BUILD}"`)
-    .replace(/src="\/js\/main\.js[^"]*"/, `src="/js/main.js?v=${EVALIGHT_BUILD}"`);
-}
 
 async function packSelf() {
   const files = {};
@@ -95,14 +72,8 @@ Bun.serve({
     if (url.pathname.startsWith("/api/fs/")) {
       return fsApi.handle(req, url);
     }
-    const rel = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
-    const file = Bun.file(join(UI_ROOT, rel));
-    if (await file.exists()) {
-      if (rel === "index.html") {
-        return new Response(stampHtml(await file.text()), { headers: staticHeaders(rel) });
-      }
-      return new Response(file, { headers: staticHeaders(rel) });
-    }
+    const served = await servePublicPath(UI_ROOT, url.pathname);
+    if (served) return served;
     return new Response("Not found", { status: 404 });
   },
 });

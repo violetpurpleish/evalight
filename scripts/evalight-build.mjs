@@ -8,12 +8,7 @@ export function cljsBuildId(root) {
   return m[1];
 }
 
-export function stampHtml(html, id) {
-  return html
-    .replace(/content="evalight-editor-v[^"]*"/, `content="${id}"`)
-    .replace(/window\.__EVALIGHT_HTML__ = "[^"]*"/, `window.__EVALIGHT_HTML__ = "${id}"`)
-    .replace(/src="\/js\/main\.js[^"]*"/, `src="/js/main.js?v=${id}"`);
-}
+export { stampHtml } from "../src/evalight/embed/static.mjs";
 
 export function embedBuildIdSource(id) {
   return `/** Synced from src/evalight/build.cljs by copyEmbedServer / packEvalight. */\nexport const EVALIGHT_BUILD = ${JSON.stringify(id)};\n`;

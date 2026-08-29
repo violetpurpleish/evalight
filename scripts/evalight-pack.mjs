@@ -20,6 +20,7 @@ export const EMBED_FILES = [
   "nrepl.mjs",
   "bencode.mjs",
   "fs-http.mjs",
+  "static.mjs",
   "build-id.mjs",
 ];
 

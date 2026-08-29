@@ -1,34 +1,60 @@
 # Evalight follow-ups
 
-Findings from the v1 review after the SCI / compiled split. Check items off when they are done, not when they are “probably fine.”
+Findings from the v1 review after the SCI / compiled split. Check items off when they are done, not when they are "probably fine."
 
-## Done in this pass
+## Map of the two runtimes
+
+Keep this straight. A lot of the debt came from treating them as one thing.
+
+- **Hosted playground** (`bun run dev`, this repo). SCI in a sandboxed iframe (`preview.html`). Files live in OPFS. Completions, hover, Ctrl-Enter, and Preview all talk to SCI. Do not rip SCI out.
+- **Exported project** (`bun run evalight` after unzip). The iframe is the compiled app (`shadow-cljs watch :app`). Ctrl-Enter, completions, and hover talk to that JS heap over nREPL. No SCI fallback. Intel is shadow's **compiler env**, not a live `ns-interns` scrape. A `def` that exists only in the REPL will not show until save + rebuild.
+
+The Evalight checkout itself is **not** a user project (`:workshop` in `shadow-cljs.edn`). `bun run evalight` here would be wrong; `bun run local` is the path for a real directory.
+
+Ports when Evalight starts its own watch (export / local):
+
+- `EVALIGHT_APP_PORT` default 48741
+- `EVALIGHT_NREPL_PORT` default 7879
+- `EVALIGHT_SHADOW_HTTP` default 9640
+
+`--config-merge` only merges into the **build** map. Overlay config + isolated watch (`--force-spawn`, dedicated ports) is required so we do not steal this repo's playground nREPL.
+
+## Done
 
 - [x] **One pack file list.** Zip contents used to live in both `src/evalight/export.cljs` (`static-pack`) and `scripts/evalight-pack.mjs`. The Node packer is the source of truth. It writes `public/evalight-embed/manifest.json`. Browser export fallback fetches that manifest instead of a second hardcoded list.
 - [x] **One filesystem HTTP handler.** `evalight/server.mjs` and `scripts/local-server.mjs` both used a copied `/api/fs` implementation. That lives in `src/evalight/embed/fs-http.mjs`.
+- [x] **One static file helper.** HTML stamping, content types, and `servePublicPath` lived in `scripts/static-ui.mjs` and again in `src/evalight/embed/server.mjs`. They now live in `src/evalight/embed/static.mjs`. Pack copies that file into the zip. `scripts/static-ui.mjs` re-exports it for `dev` / `local`.
 - [x] **One build stamp.** `src/evalight/build.cljs` is the id. `src/evalight/embed/build-id.mjs` is generated from it on pack/copy. HTML is stamped at serve and pack time. A test fails if cljs and the mjs copy disagree.
 - [x] **Lamp fixture lock.** The embed test lamp must match `template/core-cljs`. A cljs test compares the fixture file to the template.
-- [x] **Compiled Live.** Saving always writes to disk, so shadow watch still compiles. The overlay sets `:devtools {:autoload false}` so shadow does not reload the iframe itself (the websocket stays, or nREPL has nothing to eval into). Live on reloads the preview iframe after save. Live off keeps the current page. Help and the checkbox title say that.
+- [x] **Compiled Live.** Saving always writes to disk, so shadow watch still compiles. The overlay sets `:devtools {:autoload false}` so shadow does not reload the iframe itself. `:enabled false` dropped the shadow JS client, so nREPL eval succeeded on a heap that was **not** the preview iframe. Autoload false keeps the websocket; Evalight Live reloads the iframe after save (`schedule-live-reload!`, 1400ms when compiled). Live off keeps the current page. Help and the checkbox title say that.
 - [x] **Watch process group.** `stopCompiledRuntime` kills the shadow-cljs process group (Unix), not only the node wrapper, so Java does not leak after SIGTERM.
 - [x] **Intel EDN reader tests.** The tiny reader used for compiler-env intel has unit cases (maps, keywords, vectors, strings, nil).
 - [x] **Evalight checkout is SCI.** `isUserProject` is false for this repo (`:workshop` in `shadow-cljs.edn`). Covered by a unit test.
-- [x] **Compiled editor keys.** Embed Chrome test presses Ctrl-Enter, opens hover on `bump`, and checks completions. Previously it only called `/api/runtime/*`.
+- [x] **Compiled editor keys.** Embed Chrome test hovers `bump`, Ctrl-Enters the **`(bump)` call** (not the `defn`), and checks completions. Ctrl-Enter on `(defn bump …)` only redefines the var; the lamp count does not change. Previously the test only called `/api/runtime/*`.
 - [x] **`with-evalight-script` stays in two languages.** Browser zip rewrite cannot import the Node helper. Both copies are locked by the same fixture cases (cljs test + pack.test).
+
+## Still duplicated on purpose
+
+Do not "unify" these unless the constraint changes.
+
+- **`with-evalight-script` (cljs) and `withEvalightScript` (Node).** Browser export cannot import the packer. Tests lock both.
+- **`evalight/server.mjs` vs `scripts/local-server.mjs` / `scripts/dev.mjs` fetch loops.** Same routes, different roots (embed folder vs repo `public/`). The handlers they share are already modules. A shared "tiny HTTP app" would hide more than it would save.
+- **`packSelf` in the embed server.** Nested export from an already-exported project is not a product. Export is hidden in local mode. Leave `packSelf` as a cheap same-folder walk.
 
 ## Still open
 
 ### Tests that are still thin
 
-- [ ] **Save then compiled preview.** Edit a `.cljs` file with Live on and assert the iframe updates (shadow rebuild + iframe reload). Ctrl-Enter already mutates the current heap; this would catch “save did not refresh Preview.”
-- [ ] **Attach to an existing watch.** If `bun run dev` is already running in the project, `bun run evalight` should attach to that nREPL instead of starting a second watch. Untested.
+- [ ] **Save then compiled preview.** Edit a `.cljs` file with Live on and assert the iframe updates (shadow rebuild + iframe reload). Ctrl-Enter already mutates the current heap; this would catch "save did not refresh Preview." Typing into the editor with Live on will save (~320ms) and reload the compiled iframe (~1400ms), which **resets** in-memory state such as the lamp count. Any test that both edits the buffer and asserts a count must finish the count assertion before the reload, or turn Live off.
+- [ ] **Attach to an existing watch.** If `bun run dev` is already running in the project, `bun run evalight` should attach to that nREPL instead of starting a second watch. Untested. Isolated overlay watch is what the embed test covers.
 - [ ] **Export ZIP from the playground UI.** Pack tests the Node packer. The JSZip path in `export.cljs` (`fetch-evalight-pack` + merge) is not driven in Chrome.
 
 ### Known product caveats (not bugs)
 
-- [ ] **Completions vs REPL-only defs.** Ctrl-Enter evals in the JS heap. Hover/completions in an export come from shadow’s `:app` compiler env. A `def` that exists only in the REPL will not show until the file is saved and rebuilt. Do not add a second interpreter to “fix” this. Document in Help if people trip on it.
+- [ ] **Completions vs REPL-only defs.** Ctrl-Enter evals in the JS heap. Hover/completions in an export come from shadow's `:app` compiler env. A `def` that exists only in the REPL will not show until the file is saved and rebuilt. Do not add a second interpreter to "fix" this. Document in Help if people trip on it.
 - [ ] **`stripTopKey` is a brace matcher.** Fine for the lamp `shadow-cljs.edn`. A real config with `:http` in a string or a nested comment can break the overlay. If that shows up, parse EDN properly instead of growing the regex.
 - [ ] **Watch overlay uses directory symlinks.** Correct on macOS/Linux. Windows export users may need a copy-based overlay.
-- [ ] **`isUserProject` is a heuristic.** `:main` in `evalight.edn`, or `:app` and not `:workshop`. Opening this Evalight checkout with `bun run evalight` would be wrong; `bun run local` is the path. The unit test covers the checkout. Odd third-party `shadow-cljs.edn` files may still be classified wrong.
+- [ ] **`isUserProject` is a heuristic.** `:main` in `evalight.edn`, or `:app` and not `:workshop`. Odd third-party `shadow-cljs.edn` files may still be classified wrong.
 
 ### Do not do
 
@@ -36,3 +62,13 @@ Findings from the v1 review after the SCI / compiled split. Check items off when
 - Ripping SCI out of the hosted playground.
 - A generic IDE, LSP, or second interpreter.
 - Unifying `with-evalight-script` into one file that both the browser and Node import.
+- Turning `:devtools {:enabled false}` back on to "disable reload." That drops the shadow client and nREPL evals into the wrong heap.
+
+## Next steps (once this base holds)
+
+These are product, not cleanup. Do not start them as a way to avoid the items above.
+
+1. Save + Live compiled preview test (the last hole in the export loop).
+2. Decide whether attaching to an already-running `bun run dev` is worth the port/nREPL matching work.
+3. Chrome-drive Export ZIP from the playground if we care about the JSZip path.
+4. Help copy for compiler-env vs REPL-only defs, if people hit it.

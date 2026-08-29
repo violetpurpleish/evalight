@@ -7,6 +7,8 @@ const root = join(import.meta.dir, "../..");
 const files = await packEvalight(root, { requireJs: false });
 assert.ok(files["evalight/server.mjs"].includes("createFsApi"));
 assert.ok(files["evalight/fs-http.mjs"].includes("SKIP_ROOT"));
+assert.ok(files["evalight/static.mjs"].includes("servePublicPath"));
+assert.ok(files["evalight/server.mjs"].includes("servePublicPath"));
 assert.ok(files["evalight/build-id.mjs"].includes("evalight-editor-v5"));
 assert.ok(files["evalight/public/index.html"].includes("/js/main.js?v=evalight-editor-v5"));
 assert.ok(files["evalight/compiled.mjs"].includes("nrepl-select"));

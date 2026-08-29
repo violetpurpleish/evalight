@@ -275,7 +275,46 @@ try {
       });
     }
     assert.ok(bumpDef, "defn bump not visible");
-    await page.mouse.click(bumpDef.x, bumpDef.y);
+    await page.mouse.move(bumpDef.x, bumpDef.y);
+    const hover = await until(
+      async () => {
+        const tip = await page.$eval(".cm-evalight-doc", (el) => el.textContent).catch(() => "");
+        return /bump/i.test(tip) ? tip : null;
+      },
+      4000,
+      "hover docs did not appear over bump",
+    );
+    assert.match(hover, /lamp counter|Increment/i);
+    await page.keyboard.press("Escape");
+
+    // Ctrl-Enter must eval the (bump) *call*. The defn only redefines it.
+    let bumpCall = null;
+    for (let top = 0; top <= 4000 && !bumpCall; top += 160) {
+      await page.evaluate((y) => {
+        const scroller = document.querySelector(".cm-scroller");
+        if (scroller) scroller.scrollTop = y;
+      }, top);
+      bumpCall = await page.evaluate(() => {
+        for (const line of document.querySelectorAll(".cm-line")) {
+          if (!(line.textContent || "").includes("(fn [_e] (bump))")) continue;
+          const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+          let node;
+          while ((node = walker.nextNode())) {
+            const i = node.textContent.indexOf("(bump)");
+            if (i < 0) continue;
+            const range = document.createRange();
+            range.setStart(node, i);
+            range.setEnd(node, Math.min(i + 6, node.textContent.length));
+            const r = range.getBoundingClientRect();
+            if (r.height < 2 || r.bottom < 0 || r.top > window.innerHeight) continue;
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+          }
+        }
+        return null;
+      });
+    }
+    assert.ok(bumpCall, "(bump) call not visible");
+    await page.mouse.click(bumpCall.x, bumpCall.y);
     await page.keyboard.down("Control");
     await page.keyboard.press("Enter");
     await page.keyboard.up("Control");
@@ -288,16 +327,6 @@ try {
       "Ctrl-Enter (bump) did not mutate the compiled app",
     );
     assert.equal(afterCtrl, "4");
-    await page.mouse.move(bumpDef.x, bumpDef.y);
-    const hover = await until(
-      async () => {
-        const tip = await page.$eval(".cm-evalight-doc", (el) => el.textContent).catch(() => "");
-        return /bump/i.test(tip) ? tip : null;
-      },
-      4000,
-      "hover docs did not appear over bump",
-    );
-    assert.match(hover, /lamp counter|Increment/i);
     await page.click(".cm-content");
     await page.keyboard.down("Control");
     await page.keyboard.press("End");
