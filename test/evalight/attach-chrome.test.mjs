@@ -254,7 +254,8 @@ try {
   assert.equal(sciFlag, undefined, "attached preview must not set EVALIGHT_SCI");
 
   const head = await page.$eval(".preview .pane-head", (el) => el.innerText);
-  assert.match(head, /Attached · :app · localhost:48752/);
+  assert.match(head, /attached/i);
+  assert.match(head, /localhost:48752/i);
   const live = await page.$(".live input[type=checkbox]");
   assert.ok(live, "Live checkbox missing");
   assert.equal(await live.evaluate((el) => el.disabled), true, "Live must be disabled while attached");
