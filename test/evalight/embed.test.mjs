@@ -58,8 +58,8 @@ async function writeLamp(dir) {
     `<!DOCTYPE html><html><body><div id="app"></div></body></html>\n`);
   const files = await packEvalight(REPO, { compileIfMissing: true, requireJs: true });
   assert.ok(
-    (files["evalight/public/js/main.js"] || "").includes("evalight-fs-v3"),
-    "packed workshop UI must include evalight-fs-v3 (export rebuilt after the http FS fix)",
+    (files["evalight/public/js/main.js"] || "").includes("evalight-editor-v4"),
+    "packed workshop UI must include evalight-editor-v4",
   );
   for (const [path, text] of Object.entries(files)) {
     const dest = join(dir, path);
@@ -120,7 +120,9 @@ try {
       "editor never loaded app.core",
     );
     const build = await page.evaluate(() => window.EVALIGHT_BUILD);
-    assert.equal(build, "evalight-fs-v3");
+    assert.equal(build, "evalight-editor-v4");
+    const stamp = await page.$eval(".brand .build-stamp", (el) => el.textContent.trim());
+    assert.equal(stamp, "evalight-editor-v4");
     const preview = page.frames().find((f) => (f.url() || "").includes("preview.html"));
     assert.ok(preview, "preview iframe missing");
     const h1 = await until(

@@ -11,21 +11,13 @@ import { spawn } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyEmbedServer, ensureWorkshopUi, handlePackRequest } from "./evalight-pack.mjs";
+import { EVALIGHT_BUILD, servePublicPath } from "./static-ui.mjs";
 
 const ROOT = join(fileURLToPath(new URL("..", import.meta.url)));
 const UI_ROOT = join(ROOT, "public");
 const PORT = Number(process.env.PORT || 48721);
 
 await copyEmbedServer(ROOT);
-
-function contentType(p) {
-  if (p.endsWith(".js")) return "application/javascript; charset=utf-8";
-  if (p.endsWith(".css")) return "text/css; charset=utf-8";
-  if (p.endsWith(".html")) return "text/html; charset=utf-8";
-  if (p.endsWith(".svg")) return "image/svg+xml";
-  if (p.endsWith(".json") || p.endsWith(".map")) return "application/json";
-  return "application/octet-stream";
-}
 
 const shadow = spawn("bunx", ["shadow-cljs", "watch", "app", "preview"], {
   stdio: "inherit",
@@ -42,21 +34,18 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === "/api/meta") {
-      return Response.json({ mode: "browser" });
+      return Response.json({ mode: "browser", build: EVALIGHT_BUILD });
     }
     if (url.pathname === "/api/evalight-pack" && req.method === "GET") {
       return handlePackRequest(ROOT);
     }
-    const rel = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.slice(1));
-    const file = Bun.file(join(UI_ROOT, rel));
-    if (await file.exists()) {
-      return new Response(file, { headers: { "Content-Type": contentType(rel) } });
-    }
+    const served = await servePublicPath(UI_ROOT, url.pathname);
+    if (served) return served;
     return new Response("Not found", { status: 404 });
   },
 });
 
-console.log(`Evalight  http://127.0.0.1:${PORT}`);
+console.log(`Evalight  http://127.0.0.1:${PORT}  ${EVALIGHT_BUILD}`);
 
 setTimeout(() => {
   ensureWorkshopUi(ROOT).catch((err) => {

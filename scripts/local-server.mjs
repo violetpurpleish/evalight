@@ -13,6 +13,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/p
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { copyEmbedServer, handlePackRequest } from "./evalight-pack.mjs";
+import { EVALIGHT_BUILD, servePublicPath } from "./static-ui.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const UI_ROOT = join(ROOT, "public");
@@ -122,15 +123,6 @@ async function handleFs(req, url) {
   }
 }
 
-function contentType(p) {
-  if (p.endsWith(".js")) return "application/javascript";
-  if (p.endsWith(".css")) return "text/css";
-  if (p.endsWith(".html")) return "text/html; charset=utf-8";
-  if (p.endsWith(".svg")) return "image/svg+xml";
-  if (p.endsWith(".json")) return "application/json";
-  return "application/octet-stream";
-}
-
 Bun.serve({
   port: PORT,
   hostname: "127.0.0.1",
@@ -139,6 +131,7 @@ Bun.serve({
     if (url.pathname === "/api/meta") {
       return json({
         mode: "local",
+        build: EVALIGHT_BUILD,
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
       });
@@ -149,15 +142,12 @@ Bun.serve({
     if (url.pathname.startsWith("/api/fs/")) {
       return handleFs(req, url);
     }
-    const rel = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
-    const file = Bun.file(join(UI_ROOT, rel));
-    if (await file.exists()) {
-      return new Response(file, { headers: { "Content-Type": contentType(rel) } });
-    }
+    const served = await servePublicPath(UI_ROOT, url.pathname);
+    if (served) return served;
     return new Response("Not found", { status: 404 });
   },
 });
 
-console.log(`Evalight local mode`);
+console.log(`Evalight local mode  ${EVALIGHT_BUILD}`);
 console.log(`  UI:  http://127.0.0.1:${PORT}`);
 console.log(`  FS:  ${FS_ROOT}`);

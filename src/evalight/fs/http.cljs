@@ -1,5 +1,6 @@
 (ns evalight.fs.http
-  (:require [evalight.fs.protocol :as proto]
+  (:require [evalight.build :as build]
+            [evalight.fs.protocol :as proto]
             [goog.object :as gobj]))
 
 (defn- json [res]
@@ -102,7 +103,7 @@
 (defn open
   ([] (open "/api/fs"))
   ([base]
-   (set! (.-EVALIGHT_BUILD js/window) "evalight-fs-v3")
+   (set! (.-EVALIGHT_BUILD js/window) build/id)
    (->HttpFS base)))
 
 (defn server-meta []

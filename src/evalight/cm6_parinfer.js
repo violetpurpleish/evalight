@@ -18,7 +18,9 @@ const defaultConfig = {
     mode: "smart"
 };
 const configField = StateField.define({
-    create: () => null,
+    // Start enabled. A null create() made the first click a
+    // select+setConfig transaction, and Parinfer rewrote the caret.
+    create: () => Object.assign({}, defaultConfig),
     update: (value, tr) => {
         const effect = filterTransactionEffects(setConfigEffect, tr).at(-1);
         return effect ? Object.assign(Object.assign({}, value), effect.value) : value;
@@ -124,15 +126,6 @@ function applyParinferSmartWithDiff(transaction) {
     const effect = maybeErrorEffect(startState, null);
     return Object.assign({ changes: cmChanges, selection: EditorSelection.cursor(newPos), sequential: true }, (effect ? { effects: [effect] } : null));
 }
-function maybeInitialize(tr, initialConfig) {
-    if (!(tr.startState.field(configField, false))) {
-        return [
-            tr,
-            { effects: setConfigEffect.of(Object.assign(Object.assign({}, defaultConfig), initialConfig)) }
-        ];
-    }
-    return tr;
-}
 function effectivelyEnabled(tr) {
     const aSetConfigEffect = filterTransactionEffects(setConfigEffect, tr).at(-1);
     return (enabled(tr.startState) ||
@@ -166,7 +159,7 @@ function needToApplyParinfer(tr) {
     // Parinfer put the text back.
     return tr.docChanged;
 }
-function parinferTransactionFilter(initialConfig) {
+function parinferTransactionFilter() {
     return EditorState.transactionFilter.of(tr => {
         try {
             if (needToApplyParinfer(tr)) {
@@ -180,7 +173,7 @@ function parinferTransactionFilter(initialConfig) {
                     }
                 }
             }
-            return maybeInitialize(tr, initialConfig);
+            return tr;
         } catch (err) {
             console.error("parinfer filter", err);
             return tr;
@@ -261,12 +254,12 @@ function enableParinfer(view) {
  * @param initialConfig (optional) the initial configuration for the Parinfer extension
  * @returns the CodeMirror6 Parinfer extension in the form of an array of extensions
  */
-function parinferExtension(initialConfig) {
+function parinferExtension(_initialConfig) {
     return [
         configField,
         parinferErrorField,
         invertParinferError,
-        parinferTransactionFilter(initialConfig),
+        parinferTransactionFilter(),
         parinferViewUpdateListener()
     ];
 }

@@ -16,6 +16,7 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const UI_ROOT = join(HERE, "public");
 const FS_ROOT = resolve(HERE, "..");
 const PORT = Number(process.env.PORT || 48721);
+const BUILD = "evalight-editor-v4";
 const SKIP = new Set([
   "node_modules",
   ".git",
@@ -119,12 +120,20 @@ async function handleFs(req, url) {
 }
 
 function contentType(p) {
-  if (p.endsWith(".js")) return "application/javascript";
-  if (p.endsWith(".css")) return "text/css";
+  if (p.endsWith(".js")) return "application/javascript; charset=utf-8";
+  if (p.endsWith(".css")) return "text/css; charset=utf-8";
   if (p.endsWith(".html")) return "text/html; charset=utf-8";
   if (p.endsWith(".svg")) return "image/svg+xml";
   if (p.endsWith(".json")) return "application/json";
   return "application/octet-stream";
+}
+
+function staticHeaders(rel) {
+  const headers = { "Content-Type": contentType(rel) };
+  if (rel === "index.html" || /\.(html|js|css|map)$/.test(rel)) {
+    headers["Cache-Control"] = "no-store";
+  }
+  return headers;
 }
 
 async function packSelf() {
@@ -151,6 +160,7 @@ Bun.serve({
     if (url.pathname === "/api/meta") {
       return json({
         mode: "local",
+        build: BUILD,
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
       });
@@ -168,11 +178,18 @@ Bun.serve({
     const rel = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
     const file = Bun.file(join(UI_ROOT, rel));
     if (await file.exists()) {
-      return new Response(file, { headers: { "Content-Type": contentType(rel) } });
+      if (rel === "index.html") {
+        const html = (await file.text()).replace(
+          /src="\/js\/main\.js[^"]*"/,
+          `src="/js/main.js?v=${BUILD}"`,
+        );
+        return new Response(html, { headers: staticHeaders(rel) });
+      }
+      return new Response(file, { headers: staticHeaders(rel) });
     }
     return new Response("Not found", { status: 404 });
   },
 });
 
-console.log(`Evalight  http://127.0.0.1:${PORT}`);
+console.log(`Evalight  http://127.0.0.1:${PORT}  ${BUILD}`);
 console.log(`  project  ${FS_ROOT}`);

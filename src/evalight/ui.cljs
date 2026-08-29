@@ -1,5 +1,6 @@
 (ns evalight.ui
   (:require [evalight.actions :as actions]
+            [evalight.build :as build]
             [evalight.editor :as editor]
             [evalight.icons :as icons]
             [evalight.kit :as kit]
@@ -105,7 +106,9 @@
     [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
     (if (= :local (:mode state))
       [:p.muted "These files are on disk. `bun run dev` compiles the site at localhost:3456 if you want another editor."]
-      [:p.muted "Projects live in this browser. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to keep using this workshop. `bun run dev` compiles the site at localhost:3456."])]])
+      [:p.muted "Projects live in this browser. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to keep using this workshop. `bun run dev` compiles the site at localhost:3456."])
+    [:p.build-stamp {:title "Compiled UI id. If a cljs caret bug remains, this is not the build that fixed it."}
+     build/id]]])
 
 (defn- tree-file-paths [nodes]
   (mapcat (fn [n]
@@ -303,7 +306,8 @@
      [:p.tagline
       (if (= :local (:mode state))
         "Local files"
-        "Browser workshop")]]]
+        "Browser workshop")]
+     [:p.build-stamp {:title "Compiled UI id"} build/id]]]
    [:div.project
     (if (= :local (:mode state))
       [:span.project-name (:project state)]
