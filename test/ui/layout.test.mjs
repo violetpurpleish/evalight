@@ -442,6 +442,72 @@ try {
     );
   }
 
+  const beta = await page.evaluate(() => {
+    const brand = document.querySelector(".brand");
+    const badge = document.querySelector("button.beta-badge");
+    const projectEl = document.querySelector(".project");
+    const wrap = badge?.closest(".beta-pop");
+    if (!brand || !badge || !projectEl || !wrap) return { missing: true };
+    const kids = [...brand.parentElement.children];
+    const brandKids = [...brand.children];
+    const bg = getComputedStyle(badge).backgroundColor;
+    const rgb = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    const r = rgb ? Number(rgb[1]) : 0;
+    const g = rgb ? Number(rgb[2]) : 0;
+    const b = rgb ? Number(rgb[3]) : 0;
+    return {
+      missing: false,
+      text: badge.textContent.trim(),
+      inBrand: brand.contains(badge),
+      afterWordmark: brandKids.indexOf(wrap) === brandKids.length - 1,
+      beforeProject: kids.indexOf(brand) < kids.indexOf(projectEl),
+      red: r > 140 && r > g + 40 && r > b + 40,
+      bg,
+    };
+  });
+  check("beta badge is in the header", !beta.missing);
+  if (!beta.missing) {
+    check("beta badge says BETA", beta.text === "BETA", beta.text);
+    check(
+      "beta badge sits between the wordmark and the project switcher",
+      beta.inBrand && beta.afterWordmark && beta.beforeProject,
+      JSON.stringify(beta)
+    );
+    check("beta badge is red", beta.red, beta.bg);
+  }
+
+  await page.click("button.beta-badge");
+  await page.waitForSelector(".beta-pop .ui-popover-panel", { timeout: 3000 });
+  const betaOpen = await page.evaluate(() => {
+    const panel = document.querySelector(".beta-pop .ui-popover-panel");
+    const text = panel?.textContent || "";
+    return {
+      expanded: document.querySelector("button.beta-badge")?.getAttribute("aria-expanded") === "true",
+      text,
+      mentionsExport: /export/i.test(text),
+      mentionsFreeze: /freez/i.test(text),
+      mentionsBreaking: /break/i.test(text),
+    };
+  });
+  check("beta popover opens on click", betaOpen.expanded, JSON.stringify(betaOpen));
+  check(
+    "beta popover explains export freezes Evalight",
+    betaOpen.mentionsExport && betaOpen.mentionsFreeze && betaOpen.mentionsBreaking,
+    betaOpen.text
+  );
+
+  await page.click(".beta-dismiss");
+  await page.waitForSelector(".beta-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
+  const betaClosed = await page.evaluate(() => ({
+    expanded: document.querySelector("button.beta-badge")?.getAttribute("aria-expanded") === "true",
+    panel: Boolean(document.querySelector(".beta-pop .ui-popover-panel")),
+  }));
+  check(
+    "clicking outside closes the beta popover",
+    !betaClosed.expanded && !betaClosed.panel,
+    JSON.stringify(betaClosed)
+  );
+
   const helpBtn = await page.$("button.icon-btn[title='Help']");
   assert.ok(helpBtn, "help button missing");
   await helpBtn.click();

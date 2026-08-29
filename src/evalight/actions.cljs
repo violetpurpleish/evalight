@@ -434,6 +434,12 @@
 (defn toggle-help! []
   (swap! state/app update :help? not))
 
+(defn close-beta! []
+  (swap! state/app assoc :beta? false))
+
+(defn toggle-beta! []
+  (swap! state/app update :beta? not))
+
 (defn toggle-live! []
   (if (:attached @state/app)
     (flash! "shadow-cljs autoload reloads the attached app. Evalight Live stays off.")
@@ -598,6 +604,8 @@
       :restore-ui (catch-ui (restore-ui-component! (first args)))
       :close-dialog (close-dialog!)
       :toggle-help (toggle-help!)
+      :toggle-beta (toggle-beta!)
+      :close-beta (close-beta!)
       :toggle-live (toggle-live!)
       :toggle-files (toggle-files!)
       :toggle-preview-pane (toggle-preview-pane!)

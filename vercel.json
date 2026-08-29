@@ -1,6 +1,6 @@
 {
   "buildCommand": "bun run release",
   "outputDirectory": "public",
-  "installCommand": "bun install",
+  "installCommand": "bunx bun@1.4.0 install",
   "framework": null
 }
