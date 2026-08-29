@@ -242,7 +242,10 @@ try {
       intelNames.some((n) => n === "stats/record!" || n === "record!"),
       "live intel should include app.stats/record!: " + intelNames.slice(0, 30).join(", "),
     );
-    await page.click("textarea[name=expr]");
+    await page.$eval("textarea[name=expr]", (el) => {
+      el.scrollIntoView({ block: "center" });
+      el.focus();
+    });
     await page.keyboard.type("(bump)");
     await page.keyboard.press("Enter");
     const afterRepl = await until(
