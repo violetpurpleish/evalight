@@ -113,14 +113,14 @@ export function overlayShadowEdn(text, { nreplPort, shadowHttp, appPort }) {
   return disableAppDevtools(out.slice(0, last) + inject + out.slice(last));
 }
 
-/** Shadow must not reload the iframe on its own. Evalight Live does that. */
+/** Keep the nREPL websocket; do not let shadow reload the iframe. Live does that. */
 export function disableAppDevtools(edn) {
   const m = edn.match(/:app\s*\{/);
   if (!m) return edn;
   const at = edn.indexOf(m[0]);
   const after = at + m[0].length;
   if (/:devtools/.test(edn.slice(at, after + 500))) return edn;
-  return `${edn.slice(0, after)}\n        :devtools {:enabled false}${edn.slice(after)}`;
+  return `${edn.slice(0, after)}\n        :devtools {:autoload false}\n        ${edn.slice(after)}`;
 }
 
 export function stripTopKey(edn, key) {

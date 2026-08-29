@@ -8,7 +8,7 @@ Findings from the v1 review after the SCI / compiled split. Check items off when
 - [x] **One filesystem HTTP handler.** `evalight/server.mjs` and `scripts/local-server.mjs` both used a copied `/api/fs` implementation. That lives in `src/evalight/embed/fs-http.mjs`.
 - [x] **One build stamp.** `src/evalight/build.cljs` is the id. `src/evalight/embed/build-id.mjs` is generated from it on pack/copy. HTML is stamped at serve and pack time. A test fails if cljs and the mjs copy disagree.
 - [x] **Lamp fixture lock.** The embed test lamp must match `template/core-cljs`. A cljs test compares the fixture file to the template.
-- [x] **Compiled Live.** Saving always writes to disk, so shadow watch still compiles. The overlay disables shadow’s own iframe reload (`:devtools {:enabled false}`). Live on reloads the preview iframe after save. Live off keeps the current page. Help and the checkbox title say that.
+- [x] **Compiled Live.** Saving always writes to disk, so shadow watch still compiles. The overlay sets `:devtools {:autoload false}` so shadow does not reload the iframe itself (the websocket stays, or nREPL has nothing to eval into). Live on reloads the preview iframe after save. Live off keeps the current page. Help and the checkbox title say that.
 - [x] **Watch process group.** `stopCompiledRuntime` kills the shadow-cljs process group (Unix), not only the node wrapper, so Java does not leak after SIGTERM.
 - [x] **Intel EDN reader tests.** The tiny reader used for compiler-env intel has unit cases (maps, keywords, vectors, strings, nil).
 - [x] **Evalight checkout is SCI.** `isUserProject` is false for this repo (`:workshop` in `shadow-cljs.edn`). Covered by a unit test.

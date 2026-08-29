@@ -19,7 +19,7 @@ assert.equal(out.includes(":nrepl {:port 7888}"), false, "old :nrepl must be str
 assert.ok(out.includes(":nrepl {:port 7878}"));
 assert.ok(out.includes(':http {:host "127.0.0.1" :port 9641}'));
 assert.ok(out.includes(":dev-http {48751 \"public\"}"));
-assert.ok(out.includes(":devtools {:enabled false}"));
+assert.ok(out.includes(":devtools {:autoload false}"));
 assert.ok(out.includes(":source-paths"));
 assert.ok(out.includes(":builds"));
 
