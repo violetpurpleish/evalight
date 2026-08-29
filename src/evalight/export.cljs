@@ -35,11 +35,11 @@
                  (throw (js/Error. (str "Missing " url " (needed to put Evalight in the zip)."))))))))
 
 (defn watch-build-js?
-  "True for a shadow-cljs watch loader. Release :simple still sets
-  CLOSURE_BASE_PATH to /js/cljs-runtime/, so looking for that string
-  rejects the Vercel build (and this checker, once compiled into main.js)."
+  "True when main.js is a shadow-cljs watch loader, not a release module.
+  Release :simple still sets CLOSURE_BASE_PATH to /js/cljs-runtime/, so a
+  substring check for that path rejects the Vercel build."
   [body]
-  (str/includes? body "SHADOW_ENV.evalLoad"))
+  (not (str/includes? body "COMPILED=!0")))
 
 (defn- pack-from-static []
   (-> (fetch-ok-text "/evalight-embed/manifest.json")

@@ -21,6 +21,6 @@
   (is (not (export/watch-build-js?
             "CLOSURE_NO_DEPS=!0,CLOSURE_BASE_PATH=\"/js/cljs-runtime/\",COMPILED=!0")))
   (is (not (export/watch-build-js?
-            "clojure.string.includes_QMARK_(f,\"cljs-runtime\")")))
+            "clojure.string.includes_QMARK_(f,\"cljs-runtime\");COMPILED=!0")))
   (is (export/watch-build-js?
-        "SHADOW_ENV.evalLoad=function(src){};")))
+        "var shadow$provide={};")))

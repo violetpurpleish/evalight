@@ -5,7 +5,7 @@
  * Do not copy public/js from `shadow-cljs watch`. That tree is ~50MB of
  * cljs-runtime. The workshop UI is a release build in evalight-ui/js.
  * Browser export fallback fetches /js/main.js on a static host. Detect a
- * watch loader with SHADOW_ENV.evalLoad, not the substring cljs-runtime:
+ * watch loader by the absence of COMPILED=!0, not the substring cljs-runtime:
  * release :simple still sets CLOSURE_BASE_PATH to /js/cljs-runtime/.
  *
  * This file is the only pack inventory. Browser export fallback reads
