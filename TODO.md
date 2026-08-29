@@ -7,7 +7,7 @@ Findings from the v1 review after the SCI / compiled split. Check items off when
 Keep this straight. A lot of the debt came from treating them as one thing.
 
 - **Hosted playground** (`bun run dev`, this repo). SCI in a sandboxed iframe (`preview.html`). Files live in OPFS. Completions, hover, Ctrl-Enter, and Preview all talk to SCI. Do not rip SCI out.
-- **Exported project** (`bun run evalight` after unzip). The iframe is the compiled app (`shadow-cljs watch :app`). Ctrl-Enter, completions, and hover talk to that JS heap over nREPL. No SCI fallback. Intel is shadow's **compiler env**, not a live `ns-interns` scrape. A `def` that exists only in the REPL will not show until save + rebuild.
+- **Exported project** (`bun run evalight` after unzip). The iframe is the compiled app (`shadow-cljs watch :app`). Ctrl-Enter talks to that JS heap over nREPL. Hover and completions read shadow's `:app` compiler env, the same analyzer state REPL evaluation writes into. A REPL-only `def` shows up there without a save. Values live in the heap; names and docs live in the compiler env. That is normal ClojureScript. No SCI fallback.
 
 The Evalight checkout itself is **not** a user project (`:workshop` in `shadow-cljs.edn`). `bun run evalight` here would be wrong; `bun run local` is the path for a real directory.
 
@@ -34,6 +34,7 @@ Ports when Evalight starts its own watch (export / local):
 - [x] **Save then compiled preview.** After the count assertions, Live goes back on. The test replaces `Hello` in `app.greet` with `LIVE-SAVE` and waits for that string in the preview lede. That is the Nightlight loop (save, shadow rebuild, iframe reload). Do not assert the lamp count across a Live reload. The atom resets.
 - [x] **No implicit attach.** `bun run evalight` always starts its own overlay watch. `--attach` is the only way to join an existing nREPL. A leftover `.nrepl-port` does not change the default.
 - [x] **`with-evalight-script` stays in two languages.** Browser zip rewrite cannot import the Node helper. Both copies are locked by the same fixture cases (cljs test + pack.test).
+- [x] **REPL-only defs land in compiler env.** After `(def scratch …)` on the `:app` CLJS session, `shadow.cljs.devtools.api/compiler-env` has `scratch` under `app.core` `:defs`, including the docstring. That is the map intel reads. There is no split that needs Help copy. Do not add a second interpreter. `repl-intel.test.mjs` locks this.
 
 ## Still duplicated on purpose
 
@@ -52,7 +53,6 @@ Do not "unify" these unless the constraint changes.
 
 ### Known product caveats (not bugs)
 
-- [ ] **Completions vs REPL-only defs.** Ctrl-Enter evals in the JS heap. Hover/completions in an export come from shadow's `:app` compiler env. A `def` that exists only in the REPL will not show until the file is saved and rebuilt. Do not add a second interpreter to "fix" this. Document in Help if people trip on it.
 - [ ] **`stripTopKey` is a brace matcher.** Fine for the lamp `shadow-cljs.edn`. A real config with `:http` in a string or a nested comment can break the overlay. If that shows up, parse EDN properly instead of growing the regex.
 - [ ] **Watch overlay uses directory symlinks.** Correct on macOS/Linux. Windows export users may need a copy-based overlay.
 - [ ] **`isUserProject` is a heuristic.** `:main` in `evalight.edn`, or `:app` and not `:workshop`. Odd third-party `shadow-cljs.edn` files may still be classified wrong.
@@ -67,6 +67,4 @@ Do not "unify" these unless the constraint changes.
 
 ## Next steps (once this base holds)
 
-These are product, not cleanup.
-
-1. Help copy for compiler-env vs REPL-only defs, if people hit it.
+These are product, not cleanup. None queued.

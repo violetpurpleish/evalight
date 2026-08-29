@@ -330,6 +330,27 @@ try {
       intelNames.some((n) => n === "stats/record!" || n === "record!"),
       "live intel should include app.stats/record!: " + intelNames.slice(0, 30).join(", "),
     );
+    const replOnly = await page.evaluate(async () => {
+      const defd = await fetch("/api/runtime/eval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: `(def scratch "REPL-only scratch" 1)`,
+          ns: "app.core",
+        }),
+      }).then((r) => r.json());
+      const intel = await fetch("/api/runtime/intel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ns: "app.core" }),
+      }).then((r) => r.json());
+      return { defd, intel };
+    });
+    assert.equal(replOnly.defd.ok, true, JSON.stringify(replOnly.defd));
+    const scratch = (replOnly.intel.items || []).find((it) => it.name === "scratch");
+    assert.ok(scratch, "HTTP intel missing REPL-only scratch: " +
+      (replOnly.intel.items || []).map((it) => it.name).slice(0, 40).join(", "));
+    assert.match(String(scratch.doc || ""), /REPL-only scratch/);
     await page.$eval("textarea[name=expr]", (el) => {
       el.scrollIntoView({ block: "center" });
       el.focus();

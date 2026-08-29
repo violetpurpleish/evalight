@@ -5,8 +5,9 @@
  * ports, Live reload). `bun run evalight --attach` joins a watch the
  * developer already started. Do not sniff .nrepl-port unless --attach.
  *
- * The preview iframe is that compiled app. Eval, hover, and completions
- * go through nREPL into that heap. SCI is not used here.
+ * The preview iframe is that compiled app. Ctrl-Enter evals through
+ * nREPL into the JS heap. Hover and completions read the same shadow
+ * :app compiler env that analyzed those forms. SCI is not used here.
  */
 import { spawn } from "node:child_process";
 import { mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
@@ -19,10 +20,12 @@ const NREPL_PORT = Number(process.env.EVALIGHT_NREPL_PORT || 7879);
 const SHADOW_HTTP = Number(process.env.EVALIGHT_SHADOW_HTTP || 9640);
 
 /**
- * CLJS ns-interns is a compile-time macro. Completions come from the
- * same shadow :app compiler env that produced the running JS heap.
+ * CLJS ns-interns is a compile-time macro, so intel does not scrape the
+ * JS intern map. It reads shadow's :app compiler env. REPL analysis of
+ * (def ...) writes into that same env, so a REPL-only def shows up
+ * without a save. Runtime values still live in the JS heap.
  */
-function intelForm(nsName, buildId) {
+export function intelForm(nsName, buildId) {
   const ns = /^[A-Za-z0-9*.!?_+\-\/]+$/.test(nsName || "") ? nsName : "cljs.user";
   return `(do
   (require '[shadow.cljs.devtools.api :as api])
