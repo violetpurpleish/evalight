@@ -38,6 +38,22 @@
   (intel/set-live! [{:name "bump" :kind "var" :ns "app.core"}] "app.core")
   (is (re-find #"Increment" (:doc (intel/lookup "bump")))))
 
+(deftest live-intel-unwraps-quoted-arglists
+  (intel/index-sources! [] "app.core")
+  (intel/set-live!
+   [{:name "ui/dom-event" :kind "var" :ns "ui.core"
+     :arglists "(quote ([e]))"
+     :doc "Replicant calls handlers with a map."}
+    {:name "bump" :kind "var" :ns "app.core" :arglists "([])"}
+    {:name "swap!" :kind "var" :ns "cljs.core"
+     :arglists "(quote ([a f] [a f x] [a f x y] [a f x y & zs]))"}]
+   "app.core")
+  (is (= "([e])" (:arglists (intel/lookup "ui/dom-event"))))
+  (is (= "([])" (:arglists (intel/lookup "bump"))))
+  (is (= "([a f] [a f x] [a f x y] [a f x y & zs])"
+         (:arglists (intel/lookup "swap!"))))
+  (is (nil? (re-find #"quote" (or (:arglists (intel/lookup "ui/dom-event")) "")))))
+
 (deftest sci-intel-form-sees-bump
   (let [ctx (sci/init {})]
     (sci/eval-string* ctx "(ns app.core)\n(defn bump \"Increment the lamp counter.\" [] 1)")

@@ -57,11 +57,26 @@
     (swap! !catalog assoc :source items :ns (or main "user"))
     items))
 
+(defn unwrap-arglists
+  "Compiler env prints :arglists as (quote ([e])). SCI prints ([e]).
+  Hover and completions should show ([e])."
+  [a]
+  (when (seq a)
+    (let [s (str/trim (str a))]
+      (if-let [[_ inner] (re-find #"^\(quote\s+(.+)\)$" s)]
+        inner
+        s))))
+
+(defn- clean-item [it]
+  (if-let [a (unwrap-arglists (:arglists it))]
+    (assoc it :arglists a)
+    (dissoc it :arglists)))
+
 (defn set-live!
   ([items] (set-live! items nil))
   ([items ns-name]
    (swap! !catalog assoc
-          :live (vec items)
+          :live (mapv clean-item (or items []))
           :ns (or ns-name (:ns @!catalog)))))
 
 (defn- blend [live source]

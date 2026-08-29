@@ -376,6 +376,34 @@ try {
       "hover docs did not appear over bump",
     );
     assert.match(hover, /lamp counter|Increment/i);
+    assert.equal(
+      /quote/i.test(hover),
+      false,
+      "hover must not print analyzer (quote …) arglists: " + hover,
+    );
+    assert.match(hover, /\(\[\]\)/);
+    await page.keyboard.press("Escape");
+
+    const domEventCall = await cmPoint(page, {
+      includes: "ui/dom-event",
+      clickText: "dom-event",
+    });
+    await page.mouse.move(domEventCall.x, domEventCall.y);
+    const hoverDom = await until(
+      async () => {
+        const tip = await page.$eval(".cm-evalight-doc", (el) => el.textContent).catch(() => "");
+        return /dom-event/i.test(tip) ? tip : null;
+      },
+      4000,
+      "hover docs did not appear over ui/dom-event",
+    );
+    assert.equal(
+      /quote/i.test(hoverDom),
+      false,
+      "ui/dom-event hover must not show (quote ([e])): " + hoverDom,
+    );
+    assert.match(hoverDom, /\(\[e\]\)/);
+    assert.match(hoverDom, /Replicant|real Event/i);
     await page.keyboard.press("Escape");
 
     // Ctrl-Enter must eval the (bump) *call*. The defn only redefines it.

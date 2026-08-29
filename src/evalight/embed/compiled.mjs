@@ -24,6 +24,9 @@ const SHADOW_HTTP = Number(process.env.EVALIGHT_SHADOW_HTTP || 9640);
  * JS intern map. It reads shadow's :app compiler env. REPL analysis of
  * (def ...) writes into that same env, so a REPL-only def shows up
  * without a save. Runtime values still live in the JS heap.
+ *
+ * Analyzer :arglists is (quote ([e])). Unwrap before pr-str or hover
+ * shows "(quote ([e]))" next to the name.
  */
 export function intelForm(nsName, buildId) {
   const ns = /^[A-Za-z0-9*.!?_+\-\/]+$/.test(nsName || "") ? nsName : "cljs.user";
@@ -38,11 +41,17 @@ export function intelForm(nsName, buildId) {
         defs (or (:defs ns-map) {})
         reqs (or (:requires ns-map) {})
         uses (or (:uses ns-map) {})
+        unpack-arglists (fn [a]
+                          (cond
+                            (nil? a) nil
+                            (and (seq? a) (= 'quote (first a))) (second a)
+                            :else a))
         pack (fn [s m]
                {:name (str (name s))
                 :kind "var"
                 :ns (str (or (:ns m) ns-sym))
-                :arglists (when-let [a (:arglists m)] (pr-str a))
+                :arglists (when-let [a (unpack-arglists (:arglists m))]
+                            (pr-str a))
                 :doc (:doc m)
                 :macro (boolean (:macro m))})]
     {:ns (str ns-sym)

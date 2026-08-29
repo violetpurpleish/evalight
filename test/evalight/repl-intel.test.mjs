@@ -209,9 +209,24 @@ try {
   assert.ok(scratch, "intel compiler-env missing REPL-only scratch: " +
     (intel.items || []).map((it) => it.name).slice(0, 40).join(", "));
   assert.match(String(scratch.doc || ""), /REPL-only scratch/);
+  const bump = (intel.items || []).find((it) => it.name === "bump");
+  assert.ok(bump, "file-compiled bump should still be present");
+  assert.equal(
+    bump.arglists,
+    "([])",
+    "compiler-env arglists must drop the analyzer quote: " + JSON.stringify(bump),
+  );
+
+  const domEvent = (intel.items || []).find((it) => it.name === "ui/dom-event");
   assert.ok(
-    (intel.items || []).some((it) => it.name === "bump"),
-    "file-compiled bump should still be present",
+    domEvent,
+    "intel missing ui/dom-event: " +
+      (intel.items || []).map((it) => it.name).slice(0, 40).join(", "),
+  );
+  assert.equal(
+    domEvent.arglists,
+    "([e])",
+    "ui/dom-event hover must show ([e]), not (quote ([e])): " + JSON.stringify(domEvent),
   );
 
   console.log("repl-intel.test.mjs ok");
