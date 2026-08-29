@@ -75,6 +75,31 @@ function within(inner, outer, slop = 0.75) {
   );
 }
 
+function replPromptMetrics(page) {
+  return page.evaluate(() => {
+    const gutter = document.querySelector(".repl-input .gutter");
+    const ta = document.querySelector(".repl-input textarea");
+    if (!gutter || !ta) return { missing: true };
+    const range = document.createRange();
+    range.selectNodeContents(gutter);
+    const gLine = range.getClientRects()[0];
+    const tBox = ta.getBoundingClientRect();
+    const csG = getComputedStyle(gutter);
+    const csT = getComputedStyle(ta);
+    const lineH = parseFloat(csT.lineHeight);
+    return {
+      missing: false,
+      gutterFont: csG.fontSize,
+      textareaFont: csT.fontSize,
+      gutterLineH: csG.lineHeight,
+      textareaLineH: csT.lineHeight,
+      textareaH: tBox.height,
+      lineH,
+      topDelta: gLine ? Math.abs(gLine.top - tBox.top) : 99,
+    };
+  });
+}
+
 const failures = [];
 function check(name, cond, detail) {
   if (!cond) failures.push(detail ? `${name}: ${detail}` : name);
@@ -517,6 +542,25 @@ try {
     { timeout: 20000 }
   );
 
+  const emptyPrompt = await replPromptMetrics(page);
+  check("REPL prompt is in the page", !emptyPrompt.missing, JSON.stringify(emptyPrompt));
+  check(
+    "REPL prompt uses the same type as the field",
+    emptyPrompt.gutterFont === emptyPrompt.textareaFont &&
+      emptyPrompt.gutterLineH === emptyPrompt.textareaLineH,
+    JSON.stringify(emptyPrompt)
+  );
+  check(
+    "REPL prompt sits on the field's first line",
+    emptyPrompt.topDelta <= 2.5,
+    JSON.stringify(emptyPrompt)
+  );
+  check(
+    "empty REPL field is one line tall",
+    emptyPrompt.textareaH <= emptyPrompt.lineH * 1.35 + 2,
+    JSON.stringify(emptyPrompt)
+  );
+
   await page.focus("textarea[name=expr]");
   await page.evaluate(() => {
     const el = document.querySelector("textarea[name=expr]");
@@ -524,6 +568,12 @@ try {
     el.dispatchEvent(new Event("input", { bubbles: true }));
   });
   await page.keyboard.type("(defn squared [n]");
+  const typedPrompt = await replPromptMetrics(page);
+  check(
+    "REPL prompt still sits on the first typed line",
+    typedPrompt.topDelta <= 2.5,
+    JSON.stringify(typedPrompt)
+  );
   await page.keyboard.down("Shift");
   await page.keyboard.press("Enter");
   await page.keyboard.up("Shift");

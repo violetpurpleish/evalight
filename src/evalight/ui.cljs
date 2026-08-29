@@ -20,15 +20,6 @@
 (defn- editor-unmount [_]
   (editor/destroy!))
 
-(defn- resize-repl-field! [el]
-  (when el
-    (let [style (.-style el)]
-      (set! (.-height style) "auto")
-      (set! (.-height style) (str (min (.-scrollHeight el) 160) "px")))))
-
-(defn- repl-expr-mount [{:keys [replicant/node]}]
-  (resize-repl-field! node))
-
 (defn- preview-mount [{:keys [replicant/node]}]
   (preview/attach! node actions/on-preview-event))
 
@@ -248,9 +239,7 @@
                 :spellcheck "false"
                 :aria-label "REPL expression"
                 :replicant/key "repl-expr"
-                :replicant/on-mount repl-expr-mount
-                :on {:input [:repl-expr-input]
-                     :keydown [:repl-expr-keydown]}}]]])
+                :on {:keydown [:repl-expr-keydown]}}]]])
 
 (defn preview-pane [state]
   (let [{:keys [preview layout runtime preview-url attached attach-label]} state

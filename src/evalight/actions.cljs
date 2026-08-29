@@ -539,15 +539,6 @@
       (eval-code! code :repl)
       (p/ok nil))))
 
-(defn- resize-repl-field! [el]
-  (when el
-    (let [style (.-style el)]
-      (set! (.-height style) "auto")
-      (set! (.-height style) (str (min (.-scrollHeight el) 160) "px")))))
-
-(defn repl-expr-input! [event]
-  (resize-repl-field! (.-target event)))
-
 (defn repl-expr-keydown! [event]
   (when (and (= "Enter" (.-key event))
              (not (.-isComposing event))
@@ -626,7 +617,6 @@
                          (set! (.-height (.-style input)) "")
                          (.focus input))
                        (catch-ui (submit-repl! code))))
-      :repl-expr-input (when event (repl-expr-input! event))
       :repl-expr-keydown (when event (repl-expr-keydown! event))
       :clear-repl (clear-repl!)
       :run (catch-ui (run-preview! {:reset? true}))

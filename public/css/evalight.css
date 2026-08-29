@@ -46,7 +46,7 @@ body {
   overscroll-behavior: none;
 }
 
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 code, pre { font-family: var(--mono); }
 
@@ -425,20 +425,23 @@ code, pre { font-family: var(--mono); }
 
 .repl-log { flex: 1; overflow: auto; padding: 0.5rem 0.7rem; }
 .repl-line { display: grid; grid-template-columns: 1.1rem 1fr; gap: 0.4rem; margin: 0.2rem 0; }
-.repl-line pre { margin: 0; white-space: pre-wrap; font-size: 0.8rem; }
+.repl-line pre { margin: 0; white-space: pre-wrap; font-size: 0.8rem; line-height: 1.4; }
 .repl-line.is-in { color: var(--gold); }
 .repl-line.is-err { color: var(--ember); }
-.gutter { color: var(--muted); font-family: var(--mono); }
+.gutter { color: var(--muted); font-family: var(--mono); font-size: 0.8rem; line-height: 1.4; }
 .repl-input {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.1rem 1fr;
   gap: 0.4rem;
-  align-items: flex-start;
+  align-items: start;
   padding: 0.45rem 0.7rem 0.6rem;
   border-top: 1px solid var(--line);
 }
-.repl-input .gutter { padding-top: 0.12rem; line-height: 1.4; }
+.repl-input .gutter { display: block; }
 .repl-input textarea {
-  flex: 1;
+  display: block;
+  appearance: none;
+  -webkit-appearance: none;
   min-width: 0;
   min-height: 1.4em;
   max-height: 10em;
@@ -447,9 +450,10 @@ code, pre { font-family: var(--mono); }
   background: transparent;
   border: 0;
   outline: none;
-  font-family: var(--mono);
-  line-height: 1.4;
+  margin: 0;
   padding: 0;
+  color: inherit;
+  font: 400 0.8rem/1.4 var(--mono);
   field-sizing: content;
 }
 
