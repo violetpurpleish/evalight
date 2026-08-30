@@ -32,6 +32,29 @@
     (when (.-stopPropagation ev)
       (.stopPropagation ev))))
 
+(defn run
+  "Invoke a Replicant :on value. Functions receive the event. Keywords
+  and vectors go through :replicant/dispatch on a wrapped event."
+  [e handler]
+  (when handler
+    (cond
+      (fn? handler) (handler e)
+      :else
+      (when-let [dispatch (when (map? e) (:replicant/dispatch e))]
+        (dispatch e handler)))))
+
+(defn emit
+  "Turn a Replicant handler plus a value into something :on can take.
+  A vector becomes (conj handler value). A function is called with the
+  value, not the DOM event, because the kit already knows the id."
+  [handler value]
+  (cond
+    (nil? handler) nil
+    (fn? handler) (fn [_] (handler value))
+    (vector? handler) (conj handler value)
+    (keyword? handler) [handler value]
+    :else handler))
+
 (defn attrs
   "Merge kit defaults with caller props. `stripped` keys are kit-only
   and never become DOM attributes."

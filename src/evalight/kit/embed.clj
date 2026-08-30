@@ -12,6 +12,8 @@
    "src/ui/dialog.cljs"
    "src/ui/popover.cljs"
    "src/ui/split.cljs"
+   "src/ui/breadcrumbs.cljs"
+   "src/ui/command.cljs"
    "public/css/ui.css"])
 
 (defmacro files

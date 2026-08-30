@@ -5,7 +5,11 @@
             [evalight.kit :as kit]
             [evalight.preview :as preview]
             [evalight.state :as state]
+            [evalight.commands :as commands]
+            [evalight.crumbs :as crumbs]
+            [ui.breadcrumbs :as ui-crumbs]
             [ui.button :as btn]
+            [ui.command :as ui-command]
             [ui.dialog :as ui-dialog]
             [ui.input :as ui-input]
             [ui.popover :as popover]))
@@ -91,7 +95,8 @@
      (shortcut ["Tab"] "Indent this line, or accept a completion when the list is showing")
      (shortcut ["Shift" "Tab"] "Dedent. Parinfer moves the parentheses.")
      (shortcut ["Enter"] "New line in the editor. Evaluate in the REPL.")
-     (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")]
+     (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")
+     (shortcut ["Ctrl" "K"] "Command palette")]
     [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
     [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
@@ -211,12 +216,17 @@
                                               (.focus node))}
                        "Delete project"))])]))))
 
+(defn- pane-head [start end]
+  [:header.pane-head
+   (into [:div.pane-start] (remove nil? start))
+   (into [:div.pane-end] (remove nil? end))])
+
 (defn repl-pane [{:keys [repl]}]
   [:section.repl {:replicant/key "repl-pane"}
-   [:header.pane-head
-    [:span "REPL"]
-    [:span.ns (:ns repl)]
-    [:button.ghost.small {:on {:click [:clear-repl]}} "Clear"]]
+     (pane-head
+      [[:span "REPL"]
+       [:span.ns (:ns repl)]]
+      [[:button.ghost.small {:on {:click [:clear-repl]}} "Clear"]])
    [:div.repl-log
     {:replicant/on-render
      (fn [{:keys [replicant/node]}]
@@ -251,34 +261,34 @@
     [:section.preview
      {:style {:width (str w "px")
               :flex-basis (str w "px")}}
-     [:header.pane-head
-      [:button.icon-btn.pane-hide
-       {:on {:click [:toggle-preview-pane]}
-        :title "Hide preview"
-        :aria-label "Hide preview"}
-       (icons/panel-right)]
-      [:span (cond
-               attached? (or attach-label "Attached")
-               compiled? "Preview · compiled"
-               :else "Preview")]
-      (when (= :loading (:status preview))
-        [:span.muted "loading"])
-      (when (:error preview)
-        [:span.preview-error {:title (:error preview)} "error"])
-      [:label.live
-       {:class (when attached? "is-disabled")
-        :title (cond
-                 attached?
-                 "shadow-cljs autoload reloads this app. Evalight Live stays off while attached."
-                 compiled?
-                 "Reload Preview after you save. Off keeps this page until you reload it."
-                 :else
-                 "Reload the SCI preview as you type.")}
-       [:input {:type "checkbox"
-                :checked (boolean (:live? preview))
-                :disabled attached?
-                :on {:change [:toggle-live]}}]
-       "Live"]]
+     (pane-head
+      [[:button.icon-btn.pane-hide
+        {:on {:click [:toggle-preview-pane]}
+         :title "Hide preview"
+         :aria-label "Hide preview"}
+        (icons/panel-right)]
+       [:span (cond
+                attached? (or attach-label "Attached")
+                compiled? "Preview · compiled"
+                :else "Preview")]
+       (when (= :loading (:status preview))
+         [:span.muted "loading"])
+       (when (:error preview)
+         [:span.preview-error {:title (:error preview)} "error"])]
+      [[:label.live
+        {:class (when attached? "is-disabled")
+         :title (cond
+                  attached?
+                  "shadow-cljs autoload reloads this app. Evalight Live stays off while attached."
+                  compiled?
+                  "Reload Preview after you save. Off keeps this page until you reload it."
+                  :else
+                  "Reload the SCI preview as you type.")}
+        [:input {:type "checkbox"
+                 :checked (boolean (:live? preview))
+                 :disabled attached?
+                 :on {:change [:toggle-live]}}]
+        "Live"]])
      [:div.preview-frame
       (when-let [err (:error preview)]
         [:div.preview-banner
@@ -290,12 +300,26 @@
                         :replicant/on-mount preview-mount}
                  (not compiled?) (assoc :sandbox "allow-scripts"))]]]))
 
+(defn- editor-crumbs [state]
+  (let [path (:active-file state)
+        pick (:pick state)
+        trail (crumbs/from-path path)
+        open-id (when (= :crumb (:via pick)) (:anchor pick))]
+    [:div.file-path
+     (ui-crumbs/breadcrumbs
+      {:items trail
+       :open-id open-id
+       :menu (or (commands/crumb-menu state) [])
+       :on-open [:crumb-open]
+       :on-pick [:crumb-pick]
+       :on-dismiss [:pick-close]})]))
+
 (defn editor-pane [state]
   [:section.editor
-   [:header.pane-head
-    [:span.file-path (or (:active-file state) "No file open")]
-    (when (and (:active-file state) (dirty? state (:active-file state)))
-      [:span.pill "saving"])]
+   (pane-head
+    [(editor-crumbs state)]
+    [(when (and (:active-file state) (dirty? state (:active-file state)))
+       [:span.pill "saving"])])
    (if (:active-file state)
      [:div.editor-host
       {:replicant/key "editor-host"
@@ -355,6 +379,11 @@
     (when (= :browser (:mode state))
       [:button.ghost {:on {:click [:export]}} (icons/download) "Export ZIP"])
     [:button.primary {:on {:click [:run]}} (icons/play) "Run"]
+    [:button.icon-btn
+     {:on {:click [:pick-open {:via :palette}]}
+      :title "Command palette (Ctrl+K)"
+      :aria-label "Command palette"}
+     (icons/command)]
     [:button.icon-btn {:on {:click [:toggle-help]} :title "Help"}
      (icons/help)]]])
 
@@ -363,17 +392,17 @@
     [:aside.sidebar
      {:style {:width (str w "px")
               :flex-basis (str w "px")}}
-     [:header.pane-head
-      [:span "Files"]
-      [:div.tree-tools
-       [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
-       [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]
-       [:button.tiny {:on {:click [:add-ui-dialog]}} "UI"]
-       [:button.icon-btn.pane-hide
-        {:on {:click [:toggle-files]}
-         :title "Hide files"
-         :aria-label "Hide files"}
-        (icons/panel-left)]]]
+     (pane-head
+      [[:span "Files"]]
+      [[:div.tree-tools
+        [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
+        [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]
+        [:button.tiny {:on {:click [:add-ui-dialog]}} "UI"]
+        [:button.icon-btn.pane-hide
+         {:on {:click [:toggle-files]}
+          :title "Hide files"
+          :aria-label "Hide files"}
+         (icons/panel-left)]]])
      (file-tree state)]))
 
 (defn mobile-tabs [{:keys [mobile-tab]}]
@@ -441,6 +470,16 @@
        (when-not preview-open? (pane-rail :preview))]
       (mobile-tabs state)]
      (when (:help? state) (help-panel state))
+     (when (= :palette (:via (:pick state)))
+       (ui-command/command
+        {:open? true
+         :query (or (:query (:pick state)) "")
+         :active (:active (:pick state))
+         :items (commands/items state)
+         :placeholder "Type a command or file…"
+         :on-query [:pick-query]
+         :on-active commands/set-active!
+         :on-close [:pick-close]}))
      (when (:dialog state)
        (dialog state))
      (notice state)]))

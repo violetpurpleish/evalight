@@ -205,10 +205,19 @@ code, pre { font-family: var(--mono); }
   align-items: stretch;
 }
 
-.sidebar, .editor, .repl, .preview {
+.sidebar, .repl, .preview {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+}
+
+.editor {
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   background: var(--panel);
@@ -281,13 +290,27 @@ code, pre { font-family: var(--mono); }
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.45rem 0.7rem;
+  box-sizing: border-box;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  max-height: 2.5rem;
+  padding: 0 0.7rem;
   border-bottom: 1px solid var(--line);
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+  flex: none;
 }
+.pane-start,
+.pane-end {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.pane-start { flex: 1; }
+.pane-end { flex: none; margin-left: auto; }
 .pane-head .pane-hide {
   padding: 0.18rem;
   color: var(--muted);
@@ -320,12 +343,15 @@ code, pre { font-family: var(--mono); }
 .pane-head .ns, .file-path {
   text-transform: none;
   letter-spacing: 0;
-  margin-left: auto;
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.78rem;
 }
-.tree-tools { margin-left: auto; display: flex; gap: 0.25rem; }
+.file-path {
+  min-width: 0;
+  overflow: visible;
+}
+.tree-tools { display: flex; gap: 0.25rem; }
 
 .tree { overflow: auto; padding: 0.4rem 0.35rem 1rem 0.2rem; }
 .tree-children {
@@ -387,7 +413,7 @@ code, pre { font-family: var(--mono); }
   background: var(--gold); display: inline-block;
 }
 
-.editor-host, .empty-editor { flex: 1; min-height: 0; min-width: 0; }
+.editor-host, .empty-editor { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 .editor-host .cm-editor { height: 100%; min-width: 0; }
 .editor-host .cm-scroller { padding-bottom: 2.5rem; }
 .cm-tooltip {
@@ -517,7 +543,7 @@ code, pre { font-family: var(--mono); }
   line-height: 1.45;
   color: var(--ember);
 }
-.live { display: flex; align-items: center; gap: 0.35rem; margin-left: auto; text-transform: none; letter-spacing: 0; }
+.live { display: flex; align-items: center; gap: 0.35rem; text-transform: none; letter-spacing: 0; }
 .live.is-disabled { opacity: 0.55; }
 .live input:disabled { cursor: default; }
 .preview-error { color: var(--ember); text-transform: none; }
@@ -628,6 +654,7 @@ kbd {
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
   z-index: 410;
+  pointer-events: none;
 }
 .toast.err { border-color: var(--ember); color: #ffd1c2; }
 

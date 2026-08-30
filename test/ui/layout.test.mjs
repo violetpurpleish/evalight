@@ -64,6 +64,49 @@ async function startServer() {
   };
 }
 
+function paletteActiveHit(page) {
+  return page.evaluate(() => {
+    const list = document.querySelector(".ui-command-list");
+    const item = document.querySelector(".ui-command-item.is-active");
+    if (!list || !item) return { missing: true };
+    const box = list.getBoundingClientRect();
+    const r = item.getBoundingClientRect();
+    const x = r.left + Math.min(24, Math.max(8, r.width / 2));
+    const y = r.top + Math.min(10, Math.max(6, r.height / 2));
+    const hit = document.elementFromPoint(x, y);
+    return {
+      missing: false,
+      id: item.getAttribute("data-ui-cmd"),
+      scrollH: list.scrollHeight,
+      clientH: list.clientHeight,
+      scrollTop: list.scrollTop,
+      overflowed: list.scrollHeight > list.clientHeight + 1,
+      inView: r.top >= box.top - 1 && r.bottom <= box.bottom + 1,
+      hitActive: Boolean(hit?.closest(".ui-command-item.is-active")),
+      hit: hit && `${hit.tagName}.${String(hit.className).slice(0, 60)}`,
+    };
+  });
+}
+
+function crumbMenuHit(page) {
+  return page.evaluate(() => {
+    const menu = document.querySelector(".ui-crumb-menu");
+    if (!menu) return { missing: true };
+    const r = menu.getBoundingClientRect();
+    const x = r.left + Math.min(24, Math.max(8, r.width / 2));
+    const y = r.top + Math.min(16, Math.max(8, r.height / 2));
+    const hit = document.elementFromPoint(x, y);
+    return {
+      w: r.width,
+      h: r.height,
+      top: r.top,
+      hit: hit && `${hit.tagName}.${String(hit.className).slice(0, 60)}`,
+      hitMenu: Boolean(hit?.closest(".ui-crumb-menu")),
+      hitDismiss: Boolean(hit?.closest(".ui-crumbs-dismiss")),
+    };
+  });
+}
+
 function within(inner, outer, slop = 0.75) {
   return (
     inner.left >= outer.left - slop &&
@@ -178,6 +221,41 @@ try {
     );
   }
 
+  const headHs = await page.evaluate(() => {
+    const h = (sel) => document.querySelector(sel)?.getBoundingClientRect().height ?? 0;
+    return {
+      files: h(".sidebar .pane-head"),
+      editor: h(".editor .pane-head"),
+      preview: h("section.preview .pane-head"),
+    };
+  });
+  check(
+    "Files, editor, and preview heads share a height",
+    Math.abs(headHs.files - headHs.editor) < 1.5 &&
+      Math.abs(headHs.editor - headHs.preview) < 1.5 &&
+      headHs.files > 20,
+    JSON.stringify(headHs)
+  );
+
+  const crumbClick = await page.evaluate(() => {
+    const b = [...document.querySelectorAll(".ui-crumb")].find((el) => el.textContent.trim() === "core.cljs");
+    const r = b?.getBoundingClientRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  });
+  check("core.cljs crumb is on screen", Boolean(crumbClick));
+  if (crumbClick) {
+    await page.mouse.click(crumbClick.x, crumbClick.y);
+    await page.waitForSelector(".ui-crumb-menu", { timeout: 4000 });
+    const menuHit = await crumbMenuHit(page);
+    check(
+      "crumb menu is the hit target",
+      !menuHit.missing && menuHit.h > 8 && menuHit.hitMenu && !menuHit.hitDismiss,
+      JSON.stringify(menuHit)
+    );
+    await page.evaluate(() => document.querySelector(".ui-crumbs-dismiss")?.click());
+    await page.waitForSelector(".ui-crumb-menu", { hidden: true, timeout: 4000 });
+  }
+
   const rows = await page.$$(".tree-row");
   await rows[fileIdx].hover();
   await new Promise((r) => setTimeout(r, 120));
@@ -263,6 +341,8 @@ try {
   check("Add UI dialog title", kitDialog.title === "Add UI", kitDialog.title);
   check("Add UI lists Button", kitDialog.items.includes("Button"), kitDialog.items.join(", "));
   check("Add UI lists Split", kitDialog.items.includes("Split"), kitDialog.items.join(", "));
+  check("Add UI lists Breadcrumbs", kitDialog.items.includes("Breadcrumbs"), kitDialog.items.join(", "));
+  check("Add UI lists Command", kitDialog.items.includes("Command"), kitDialog.items.join(", "));
   check(
     "installed Button is Restore, not Add",
     kitDialog.actions.Button === "Restore",
@@ -541,11 +621,12 @@ try {
       text: document.querySelector(".help")?.innerText ?? "",
     };
   });
-  check("help lists four shortcuts", helpCopy.keys.length === 4, helpCopy.keys.join(", "));
+  check("help lists five shortcuts", helpCopy.keys.length === 5, helpCopy.keys.join(", "));
   check("help lists Tab", helpCopy.keys.includes("Tab"));
   check("help lists Shift+Tab", helpCopy.keys.includes("Shift+Tab"));
   check("help lists Enter", helpCopy.keys.includes("Enter"));
   check("help lists Ctrl+Enter", helpCopy.keys.includes("Ctrl+Enter"));
+  check("help lists Ctrl+K", helpCopy.keys.includes("Ctrl+K"));
   check("help links Open Source Licenses", /Open Source Licenses/.test(helpCopy.text));
   const licenseHref = await page.evaluate(() => document.querySelector(".help-licenses")?.getAttribute("href"));
   check("help licenses href is /licenses.html", licenseHref === "/licenses.html");
@@ -760,11 +841,211 @@ try {
     JSON.stringify(filesHidden)
   );
   check("a files rail can show the pane again", filesHidden.canShow);
+
+  await page.waitForFunction(
+    () => /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 15000 }
+  );
+  const crumbPath = await page.$eval(".file-path", (el) => el.textContent);
+  check(
+    "breadcrumb trail still reads the file path",
+    /src\/app\/core\.cljs/.test(crumbPath),
+    crumbPath
+  );
+  const hiddenCrumb = await page.evaluate(() => {
+    const b = [...document.querySelectorAll(".ui-crumb")].find((el) => el.textContent.trim() === "core.cljs");
+    const r = b?.getBoundingClientRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  });
+  check("core.cljs crumb is on screen with Files hidden", Boolean(hiddenCrumb));
+  if (hiddenCrumb) {
+    await page.mouse.click(hiddenCrumb.x, hiddenCrumb.y);
+  }
+  await page.waitForSelector(".ui-crumb-menu", { timeout: 4000 });
+  const hiddenMenu = await crumbMenuHit(page);
+  check(
+    "crumb menu is the hit target with Files hidden",
+    !hiddenMenu.missing && hiddenMenu.h > 8 && hiddenMenu.hitMenu && !hiddenMenu.hitDismiss,
+    JSON.stringify(hiddenMenu)
+  );
+  const greetOpt = await page.evaluate(() => {
+    const b = [...document.querySelectorAll(".ui-crumb-option")].find((el) =>
+      (el.textContent || "").includes("greet.cljs")
+    );
+    const r = b?.getBoundingClientRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  });
+  check("greet.cljs is a visible crumb option", Boolean(greetOpt));
+  if (greetOpt) {
+    await page.mouse.click(greetOpt.x, greetOpt.y);
+  }
+  await page.waitForFunction(
+    () => /app\/greet\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 8000 }
+  );
+  check(
+    "breadcrumbs switch files while Files is hidden",
+    /greet\.cljs/.test(await page.$eval(".file-path", (el) => el.textContent))
+  );
+
   await page.click(".pane-rail[aria-label='Show files']");
   await page.waitForFunction(
     () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
   );
+
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command", { timeout: 4000 });
+  const paletteGroups = await page.evaluate(() =>
+    [...document.querySelectorAll(".ui-command-group")].map((el) => el.textContent.trim())
+  );
+  check("palette lists Files commands", paletteGroups.includes("Files"), paletteGroups.join(", "));
+  check("palette lists Go to file", paletteGroups.includes("Go to file"), paletteGroups.join(", "));
+  await page.click(".ui-command-input");
+  await page.waitForSelector(".ui-command-item.is-active", { timeout: 4000 });
+  const paletteFirst = await paletteActiveHit(page);
+  check(
+    "palette list overflows so arrow keys have somewhere to scroll",
+    paletteFirst.overflowed,
+    JSON.stringify(paletteFirst)
+  );
+  check(
+    "first active command is in the list viewport",
+    paletteFirst.inView && paletteFirst.hitActive,
+    JSON.stringify(paletteFirst)
+  );
+  await page.keyboard.press("ArrowUp");
+  await page.waitForFunction(
+    () => {
+      const list = document.querySelector(".ui-command-list");
+      const item = document.querySelector(".ui-command-item.is-active");
+      if (!list || !item) return false;
+      const box = list.getBoundingClientRect();
+      const r = item.getBoundingClientRect();
+      return (
+        list.scrollTop > 0 &&
+        r.top >= box.top - 1 &&
+        r.bottom <= box.bottom + 1
+      );
+    },
+    { timeout: 4000 }
+  );
+  const paletteWrap = await paletteActiveHit(page);
+  check(
+    "ArrowUp wraps to a row painted inside the list",
+    paletteWrap.inView &&
+      paletteWrap.hitActive &&
+      paletteWrap.scrollTop > 0 &&
+      paletteWrap.id !== paletteFirst.id,
+    JSON.stringify({ wrap: paletteWrap, first: paletteFirst })
+  );
+  await page.keyboard.press("ArrowDown");
+  await page.waitForFunction(
+    (firstId) => {
+      const list = document.querySelector(".ui-command-list");
+      const item = document.querySelector(".ui-command-item.is-active");
+      if (!list || !item) return false;
+      const box = list.getBoundingClientRect();
+      const r = item.getBoundingClientRect();
+      return (
+        item.getAttribute("data-ui-cmd") === firstId &&
+        r.top >= box.top - 1 &&
+        r.bottom <= box.bottom + 1
+      );
+    },
+    { timeout: 4000 },
+    paletteFirst.id
+  );
+  const paletteHome = await paletteActiveHit(page);
+  check(
+    "ArrowDown from the last row returns the first row into view",
+    paletteHome.inView &&
+      paletteHome.hitActive &&
+      paletteHome.id === paletteFirst.id &&
+      paletteHome.scrollTop < paletteWrap.scrollTop,
+    JSON.stringify({ home: paletteHome, wrap: paletteWrap })
+  );
+  await page.keyboard.type("new file");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".ui-dialog", { timeout: 4000 });
+  const paletteDialog = await page.evaluate(() => ({
+    command: Boolean(document.querySelector(".ui-command")),
+    title: document.querySelector(".ui-dialog h2")?.textContent ?? "",
+  }));
+  check("palette New file closes the palette", !paletteDialog.command, JSON.stringify(paletteDialog));
+  check("palette New file opens the dialog", paletteDialog.title === "New file", paletteDialog.title);
+  await page.click(".ui-dialog .ui-btn-ghost");
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command-input", { timeout: 4000 });
+  await page.click(".ui-command-input");
+  await page.keyboard.type("core.cljs");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () =>
+      !document.querySelector(".ui-command") &&
+      /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 8000 }
+  );
+  const paletteOpenFile = await page.evaluate(() => {
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return {
+      command: Boolean(document.querySelector(".ui-command")),
+      path: document.querySelector(".file-path")?.textContent ?? "",
+      hitCommand: Boolean(hit?.closest(".ui-command, .ui-overlay")),
+    };
+  });
+  check(
+    "opening a file from the palette closes it",
+    !paletteOpenFile.command && !paletteOpenFile.hitCommand && /core\.cljs/.test(paletteOpenFile.path),
+    JSON.stringify(paletteOpenFile)
+  );
+
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command-input", { timeout: 4000 });
+  await page.click(".ui-command-input");
+  await page.keyboard.type("clear repl");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => !document.querySelector(".ui-command"), { timeout: 4000 });
+  const paletteClear = await page.evaluate(() => {
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return {
+      command: Boolean(document.querySelector(".ui-command")),
+      hitCommand: Boolean(hit?.closest(".ui-command, .ui-overlay")),
+    };
+  });
+  check(
+    "Clear REPL from the palette closes it",
+    !paletteClear.command && !paletteClear.hitCommand,
+    JSON.stringify(paletteClear)
+  );
+
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command-input", { timeout: 4000 });
+  await page.click(".ui-command-input");
+  await page.keyboard.type("help");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () => !document.querySelector(".ui-command") && document.querySelector(".help"),
+    { timeout: 4000 }
+  );
+  const paletteHelp = await page.evaluate(() => {
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return {
+      command: Boolean(document.querySelector(".ui-command")),
+      help: Boolean(document.querySelector(".help")),
+      hitCommand: Boolean(hit?.closest(".ui-command, .ui-overlay")),
+      hitHelp: Boolean(hit?.closest(".help")),
+    };
+  });
+  check(
+    "Help from the palette closes it and shows help",
+    !paletteHelp.command && !paletteHelp.hitCommand && paletteHelp.help,
+    JSON.stringify(paletteHelp)
+  );
+  await page.click(".help-close");
+  await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
   await page.click("section.preview [aria-label='Hide preview']");
   await page.waitForFunction(

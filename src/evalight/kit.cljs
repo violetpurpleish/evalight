@@ -44,7 +44,17 @@
     :title "Split"
     :path "src/ui/split.cljs"
     :needs ["core"]
-    :blurb "Two panes and a drag handle. Parent owns :ratio."}])
+    :blurb "Two panes and a drag handle. Parent owns :ratio."}
+   {:id "breadcrumbs"
+    :title "Breadcrumbs"
+    :path "src/ui/breadcrumbs.cljs"
+    :needs ["core"]
+    :blurb "A path of buttons. Click a segment to open a sibling menu."}
+   {:id "command"
+    :title "Command"
+    :path "src/ui/command.cljs"
+    :needs ["input"]
+    :blurb "A filtered list. Overlay for a command palette, panel for a menu."}])
 
 (def ^:private internals
   {"core" {:id "core" :path "src/ui/core.cljs" :needs []}
