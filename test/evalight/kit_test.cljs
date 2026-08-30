@@ -4,8 +4,10 @@
             [evalight.kit :as kit]
             [evalight.template :as template]
             [ui.button :as btn]
+            [ui.command :as cmd]
             [ui.core :as ui]
-            [ui.dialog :as dialog]))
+            [ui.dialog :as dialog]
+            [ui.breadcrumbs :as crumbs]))
 
 (deftest cx-drops-blank-and-names-keywords
   (is (= ["ui-btn" "ui-btn-primary"]
@@ -89,8 +91,33 @@
   (is (= #{} (kit/present-ids [])))
   (is (not (contains? (kit/present-ids ["src/ui/core.cljs"]) "button"))))
 
-(deftest own-file-is-just-the-control
-  (let [file (kit/own-file "button")]
-    (is (= "src/ui/button.cljs" (:path file)))
-    (is (re-find #"\(ns ui.button" (:content file)))
-    (is (nil? (kit/own-file "nope")))))
+(deftest files-for-command-includes-input-and-css
+  (let [paths (set (map :path (kit/files-for "command")))]
+    (is (contains? paths "src/ui/core.cljs"))
+    (is (contains? paths "src/ui/input.cljs"))
+    (is (contains? paths "src/ui/command.cljs"))
+    (is (contains? paths "public/css/ui.css"))))
+
+(deftest files-for-breadcrumbs-includes-core-and-css
+  (let [paths (set (map :path (kit/files-for "breadcrumbs")))]
+    (is (contains? paths "src/ui/core.cljs"))
+    (is (contains? paths "src/ui/breadcrumbs.cljs"))
+    (is (contains? paths "public/css/ui.css"))))
+
+(deftest template-ships-new-kit-controls
+  (let [files (template/files "lamp")]
+    (is (re-find #"\(ns ui.breadcrumbs" (get files "src/ui/breadcrumbs.cljs")))
+    (is (re-find #"\(ns ui.command" (get files "src/ui/command.cljs")))))
+
+(deftest breadcrumbs-hiccup-joins-with-slash-text
+  (let [el (crumbs/breadcrumbs
+            {:items [{:id "src" :label "src"}
+                     {:id "src/app" :label "app" :current? true}]})
+        wrap (nth el 3)
+        sep (nth wrap 2)]
+    (is (= :nav.ui-crumbs (first el)))
+    (is (= :span.ui-crumb-sep (first sep)))
+    (is (= "/" (last sep)))))
+
+(deftest command-closed-when-open?-is-false
+  (is (nil? (cmd/command {:open? false :items [{:id :a :label "A"}]}))))

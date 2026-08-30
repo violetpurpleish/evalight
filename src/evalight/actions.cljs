@@ -10,7 +10,9 @@
             [evalight.preview :as preview]
             [evalight.promise :as p]
             [evalight.state :as state]
-            [evalight.template :as template]))
+            [evalight.template :as template]
+            [evalight.commands :as commands]
+            [evalight.crumbs :as crumbs]))
 
 (defonce !fs (atom nil))
 (defonce !workspace (atom nil))
@@ -426,7 +428,7 @@
                      (refresh-tree!))))))))
 
 (defn set-dialog! [dialog]
-  (swap! state/app assoc :dialog dialog))
+  (swap! state/app assoc :dialog dialog :pick nil))
 
 (defn close-dialog! []
   (swap! state/app assoc :dialog nil))
@@ -580,6 +582,15 @@
                 (flash! (or (.-message e) (str e)) :err)
                 nil))))
 
+(defn crumb-pick! [id]
+  (let [tree (:tree @state/app)
+        node (crumbs/find-node tree id)
+        pick (:pick @state/app)]
+    (cond
+      (nil? node) (commands/close!)
+      (= :file (:type node)) (do (commands/close!) (open-file! id))
+      :else (commands/open! {:via :crumb :anchor (:anchor pick) :path id}))))
+
 (defn handle
   "Replicant dispatch. `action` is a keyword or [op & args]."
   [event-data action]
@@ -603,6 +614,13 @@
       :add-ui (catch-ui (add-ui-component! (first args)))
       :restore-ui (catch-ui (restore-ui-component! (first args)))
       :close-dialog (close-dialog!)
+      :pick-open (commands/open! (first args))
+      :pick-close (commands/close!)
+      :pick-query (when event
+                    (let [t (.-target event)]
+                      (commands/set-query! (when t (.-value t)))))
+      :crumb-open (commands/open! {:via :crumb :anchor (first args)})
+      :crumb-pick (catch-ui (crumb-pick! (first args)))
       :toggle-help (toggle-help!)
       :toggle-beta (toggle-beta!)
       :close-beta (close-beta!)
@@ -691,6 +709,7 @@
   (swap! state/app assoc :fs-status :loading)
   (editor/set-handlers! {:on-change on-editor-change
                          :on-eval on-editor-eval})
+  (commands/bind-keys!)
   (js/setTimeout
    (fn []
      (when (= :loading (:fs-status @state/app))

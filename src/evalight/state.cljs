@@ -20,6 +20,7 @@
          :attached false
          :attach-label nil
          :dialog nil
+         :pick nil
          :help? false
          :beta? false
          :parinfer :smart

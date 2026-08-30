@@ -178,6 +178,22 @@ try {
     );
   }
 
+  const headHs = await page.evaluate(() => {
+    const h = (sel) => document.querySelector(sel)?.getBoundingClientRect().height ?? 0;
+    return {
+      files: h(".sidebar .pane-head"),
+      editor: h(".editor .pane-head"),
+      preview: h("section.preview .pane-head"),
+    };
+  });
+  check(
+    "Files, editor, and preview heads share a height",
+    Math.abs(headHs.files - headHs.editor) < 1.5 &&
+      Math.abs(headHs.editor - headHs.preview) < 1.5 &&
+      headHs.files > 20,
+    JSON.stringify(headHs)
+  );
+
   const rows = await page.$$(".tree-row");
   await rows[fileIdx].hover();
   await new Promise((r) => setTimeout(r, 120));
@@ -263,6 +279,8 @@ try {
   check("Add UI dialog title", kitDialog.title === "Add UI", kitDialog.title);
   check("Add UI lists Button", kitDialog.items.includes("Button"), kitDialog.items.join(", "));
   check("Add UI lists Split", kitDialog.items.includes("Split"), kitDialog.items.join(", "));
+  check("Add UI lists Breadcrumbs", kitDialog.items.includes("Breadcrumbs"), kitDialog.items.join(", "));
+  check("Add UI lists Command", kitDialog.items.includes("Command"), kitDialog.items.join(", "));
   check(
     "installed Button is Restore, not Add",
     kitDialog.actions.Button === "Restore",
@@ -541,11 +559,12 @@ try {
       text: document.querySelector(".help")?.innerText ?? "",
     };
   });
-  check("help lists four shortcuts", helpCopy.keys.length === 4, helpCopy.keys.join(", "));
+  check("help lists five shortcuts", helpCopy.keys.length === 5, helpCopy.keys.join(", "));
   check("help lists Tab", helpCopy.keys.includes("Tab"));
   check("help lists Shift+Tab", helpCopy.keys.includes("Shift+Tab"));
   check("help lists Enter", helpCopy.keys.includes("Enter"));
   check("help lists Ctrl+Enter", helpCopy.keys.includes("Ctrl+Enter"));
+  check("help lists Ctrl+K", helpCopy.keys.includes("Ctrl+K"));
   check("help links Open Source Licenses", /Open Source Licenses/.test(helpCopy.text));
   const licenseHref = await page.evaluate(() => document.querySelector(".help-licenses")?.getAttribute("href"));
   check("help licenses href is /licenses.html", licenseHref === "/licenses.html");
@@ -760,11 +779,62 @@ try {
     JSON.stringify(filesHidden)
   );
   check("a files rail can show the pane again", filesHidden.canShow);
+
+  await page.waitForFunction(
+    () => /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 15000 }
+  );
+  const crumbPath = await page.$eval(".file-path", (el) => el.textContent);
+  check(
+    "breadcrumb trail still reads the file path",
+    /src\/app\/core\.cljs/.test(crumbPath),
+    crumbPath
+  );
+  await page.evaluate(() => {
+    [...document.querySelectorAll(".ui-crumb")]
+      .find((b) => b.textContent.trim() === "core.cljs")
+      ?.click();
+  });
+  await page.waitForSelector(".ui-crumb-menu", { timeout: 4000 });
+  await page.evaluate(() => {
+    [...document.querySelectorAll(".ui-crumb-option")]
+      .find((b) => (b.textContent || "").includes("greet.cljs"))
+      ?.click();
+  });
+  await page.waitForFunction(
+    () => /app\/greet\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 8000 }
+  );
+  check(
+    "breadcrumbs switch files while Files is hidden",
+    /greet\.cljs/.test(await page.$eval(".file-path", (el) => el.textContent))
+  );
+
   await page.click(".pane-rail[aria-label='Show files']");
   await page.waitForFunction(
     () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
   );
+
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command", { timeout: 4000 });
+  const paletteGroups = await page.evaluate(() =>
+    [...document.querySelectorAll(".ui-command-group")].map((el) => el.textContent.trim())
+  );
+  check("palette lists Files commands", paletteGroups.includes("Files"), paletteGroups.join(", "));
+  check("palette lists Go to file", paletteGroups.includes("Go to file"), paletteGroups.join(", "));
+  await page.click(".ui-command-input");
+  await page.keyboard.type("new file");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector(".ui-dialog", { timeout: 4000 });
+  const paletteDialog = await page.evaluate(() => ({
+    command: Boolean(document.querySelector(".ui-command")),
+    title: document.querySelector(".ui-dialog h2")?.textContent ?? "",
+  }));
+  check("palette New file closes the palette", !paletteDialog.command, JSON.stringify(paletteDialog));
+  check("palette New file opens the dialog", paletteDialog.title === "New file", paletteDialog.title);
+  await page.click(".ui-dialog .ui-btn-ghost");
+  await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
 
   await page.click("section.preview [aria-label='Hide preview']");
   await page.waitForFunction(

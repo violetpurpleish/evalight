@@ -68,3 +68,8 @@
   (svg {}
        [:path {:d "M5 5h14v14H5V5Z"}]
        [:path {:d "M14 5v14"}]))
+
+(defn command []
+  (svg {}
+       [:path {:d "M4 8h16M4 16h16" :stroke-linecap "round"}]
+       [:path {:d "m8 5 3 7-3 7M16 5l-3 7 3 7" :stroke-linecap "round" :stroke-linejoin "round"}]))
