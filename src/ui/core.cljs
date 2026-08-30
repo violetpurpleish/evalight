@@ -32,6 +32,17 @@
     (when (.-stopPropagation ev)
       (.stopPropagation ev))))
 
+(defn run
+  "Invoke a Replicant :on value. Functions receive the event. Keywords
+  and vectors go through :replicant/dispatch on a wrapped event."
+  [e handler]
+  (when handler
+    (cond
+      (fn? handler) (handler e)
+      :else
+      (when-let [dispatch (when (map? e) (:replicant/dispatch e))]
+        (dispatch e handler)))))
+
 (defn emit
   "Turn a Replicant handler plus a value into something :on can take.
   A vector becomes (conj handler value). A function is called with the

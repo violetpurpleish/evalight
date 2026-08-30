@@ -79,7 +79,16 @@
               (.click btn)))
         nil))))
 
-(defn- item-el [active on-active {:keys [id label hint action disabled?]}]
+(defn- pick-click [action on-close]
+  (if on-close
+    {:replicant.event/handler
+     (fn [e]
+       (ui/run e on-close)
+       (ui/run e action))
+     :replicant.event/wrap-handler? true}
+    action))
+
+(defn- item-el [active on-active on-close {:keys [id label hint action disabled?]}]
   [:button.ui-command-item
    (cond-> {:type "button"
             :role "option"
@@ -89,7 +98,7 @@
             :aria-disabled (boolean disabled?)
             :disabled (boolean disabled?)
             :class (ui/cx (when (= id active) "is-active"))
-            :on {:click action
+            :on {:click (pick-click action on-close)
                  :mouseenter (when (and on-active (not disabled?))
                                (fn [_] (on-active id)))}}
      (= id active) (assoc :replicant/on-render reveal-in-list!))
@@ -106,11 +115,11 @@
           []
           items))
 
-(defn- list-el [{:keys [active on-active]} vis]
+(defn- list-el [{:keys [active on-active on-close]} vis]
   (if (seq vis)
     (into [:div.ui-command-list {:role "listbox" :id "ui-command-list"}]
           (mapcat (fn [{:keys [group rows]}]
-                    (let [els (mapv #(item-el active on-active %) rows)]
+                    (let [els (mapv #(item-el active on-active on-close %) rows)]
                       (if (seq group)
                         (into [[:div.ui-command-group group]] els)
                         els)))
@@ -124,7 +133,7 @@
   {:id :label :hint :group :action :disabled?}.
 
   :on-query  Replicant handler. Read the input's value from the event.
-  :on-close  Replicant handler. Backdrop and Escape.
+  :on-close  Replicant handler. Backdrop, Escape, and picking a row.
   :on-active (fn [id]) for highlight. Keyboard needs a function.
   :placeholder optional."
   [{:keys [open? query active items frame on-query on-close on-active
@@ -157,7 +166,7 @@
                                         (.focus node)
                                         (.select node))
                   :on {:input on-query}})
-                (list-el {:active active :on-active on-active} vis)]]
+                (list-el {:active active :on-active on-active :on-close on-close} vis)]]
       (if (= frame :panel)
         body
         [:div.ui-overlay {:role "presentation"

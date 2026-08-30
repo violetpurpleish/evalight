@@ -977,6 +977,76 @@ try {
   await page.click(".ui-dialog .ui-btn-ghost");
   await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
 
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command-input", { timeout: 4000 });
+  await page.click(".ui-command-input");
+  await page.keyboard.type("core.cljs");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () =>
+      !document.querySelector(".ui-command") &&
+      /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+    { timeout: 8000 }
+  );
+  const paletteOpenFile = await page.evaluate(() => {
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return {
+      command: Boolean(document.querySelector(".ui-command")),
+      path: document.querySelector(".file-path")?.textContent ?? "",
+      hitCommand: Boolean(hit?.closest(".ui-command, .ui-overlay")),
+    };
+  });
+  check(
+    "opening a file from the palette closes it",
+    !paletteOpenFile.command && !paletteOpenFile.hitCommand && /core\.cljs/.test(paletteOpenFile.path),
+    JSON.stringify(paletteOpenFile)
+  );
+
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command-input", { timeout: 4000 });
+  await page.click(".ui-command-input");
+  await page.keyboard.type("clear repl");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => !document.querySelector(".ui-command"), { timeout: 4000 });
+  const paletteClear = await page.evaluate(() => {
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return {
+      command: Boolean(document.querySelector(".ui-command")),
+      hitCommand: Boolean(hit?.closest(".ui-command, .ui-overlay")),
+    };
+  });
+  check(
+    "Clear REPL from the palette closes it",
+    !paletteClear.command && !paletteClear.hitCommand,
+    JSON.stringify(paletteClear)
+  );
+
+  await page.click("[aria-label='Command palette']");
+  await page.waitForSelector(".ui-command-input", { timeout: 4000 });
+  await page.click(".ui-command-input");
+  await page.keyboard.type("help");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () => !document.querySelector(".ui-command") && document.querySelector(".help"),
+    { timeout: 4000 }
+  );
+  const paletteHelp = await page.evaluate(() => {
+    const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+    return {
+      command: Boolean(document.querySelector(".ui-command")),
+      help: Boolean(document.querySelector(".help")),
+      hitCommand: Boolean(hit?.closest(".ui-command, .ui-overlay")),
+      hitHelp: Boolean(hit?.closest(".help")),
+    };
+  });
+  check(
+    "Help from the palette closes it and shows help",
+    !paletteHelp.command && !paletteHelp.hitCommand && paletteHelp.help,
+    JSON.stringify(paletteHelp)
+  );
+  await page.click(".help-close");
+  await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
+
   await page.click("section.preview [aria-label='Hide preview']");
   await page.waitForFunction(
     () => {

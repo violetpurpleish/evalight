@@ -167,3 +167,24 @@
     (is (fn? (:replicant/on-render (second attrs))))
     (is (nil? (:replicant/on-render (first attrs))))
     (is (some #{"is-active"} (:class (second attrs))))))
+
+(deftest command-pick-closes-then-runs
+  (let [log (atom [])
+        dispatch (fn [_e handler] (swap! log conj handler))
+        el (cmd/command {:open? true
+                         :on-close [:pick-close]
+                         :items [{:id :a :label "A" :action [:go]}]})
+        btn (find-tag el :button.ui-command-item)
+        click (:click (:on (second btn)))
+        handler (:replicant.event/handler click)]
+    (is (map? click))
+    (is (true? (:replicant.event/wrap-handler? click)))
+    (is (fn? handler))
+    (handler {:replicant/dispatch dispatch})
+    (is (= [[:pick-close] [:go]] @log))))
+
+(deftest command-pick-without-on-close-keeps-the-action
+  (let [el (cmd/command {:open? true
+                         :items [{:id :a :label "A" :action [:go]}]})
+        btn (find-tag el :button.ui-command-item)]
+    (is (= [:go] (:click (:on (second btn)))))))
