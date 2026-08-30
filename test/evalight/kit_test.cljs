@@ -152,3 +152,18 @@
     (is (every? #(and (vector? %) (keyword? (first %))) kids))
     (is (some #{:button.ui-command-item} (map first kids)))
     (is (some #{:div.ui-command-group} (map first kids)))))
+
+(deftest command-active-row-reveals-in-list
+  (let [el (cmd/command {:open? true
+                         :active :b
+                         :items [{:id :a :label "A"}
+                                 {:id :b :label "B"}]})
+        list (find-tag el :div.ui-command-list)
+        kids (->> (if (map? (second list)) (nnext list) (next list))
+                  (remove nil?))
+        buttons (filter #(= :button.ui-command-item (first %)) kids)
+        attrs (map second buttons)]
+    (is (= 2 (count buttons)))
+    (is (fn? (:replicant/on-render (second attrs))))
+    (is (nil? (:replicant/on-render (first attrs))))
+    (is (some #{"is-active"} (:class (second attrs))))))

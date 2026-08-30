@@ -43,6 +43,17 @@
               (.click el)
               (recur (inc i)))))))))
 
+(defn- reveal-in-list! [{:keys [replicant/node]}]
+  (when node
+    (when-let [list (.closest node ".ui-command-list")]
+      (let [item (.getBoundingClientRect node)
+            box (.getBoundingClientRect list)
+            top-gap (- (.-top item) (.-top box))
+            bot-gap (- (.-bottom item) (.-bottom box))]
+        (cond
+          (< top-gap 0) (set! (.-scrollTop list) (+ (.-scrollTop list) top-gap))
+          (> bot-gap 0) (set! (.-scrollTop list) (+ (.-scrollTop list) bot-gap)))))))
+
 (defn- on-keydown [props e]
   (let [ev (ui/dom-event e)
         {:keys [items query active on-active]} props
@@ -70,16 +81,18 @@
 
 (defn- item-el [active on-active {:keys [id label hint action disabled?]}]
   [:button.ui-command-item
-   {:type "button"
-    :role "option"
-    :data-ui-cmd (str id)
-    :aria-selected (= id active)
-    :aria-disabled (boolean disabled?)
-    :disabled (boolean disabled?)
-    :class (ui/cx (when (= id active) "is-active"))
-    :on {:click action
-         :mouseenter (when (and on-active (not disabled?))
-                       (fn [_] (on-active id)))}}
+   (cond-> {:type "button"
+            :role "option"
+            :replicant/key id
+            :data-ui-cmd (str id)
+            :aria-selected (= id active)
+            :aria-disabled (boolean disabled?)
+            :disabled (boolean disabled?)
+            :class (ui/cx (when (= id active) "is-active"))
+            :on {:click action
+                 :mouseenter (when (and on-active (not disabled?))
+                               (fn [_] (on-active id)))}}
+     (= id active) (assoc :replicant/on-render reveal-in-list!))
    [:span.ui-command-label label]
    (when hint [:span.ui-command-hint hint])])
 

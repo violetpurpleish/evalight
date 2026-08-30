@@ -64,6 +64,30 @@ async function startServer() {
   };
 }
 
+function paletteActiveHit(page) {
+  return page.evaluate(() => {
+    const list = document.querySelector(".ui-command-list");
+    const item = document.querySelector(".ui-command-item.is-active");
+    if (!list || !item) return { missing: true };
+    const box = list.getBoundingClientRect();
+    const r = item.getBoundingClientRect();
+    const x = r.left + Math.min(24, Math.max(8, r.width / 2));
+    const y = r.top + Math.min(10, Math.max(6, r.height / 2));
+    const hit = document.elementFromPoint(x, y);
+    return {
+      missing: false,
+      id: item.getAttribute("data-ui-cmd"),
+      scrollH: list.scrollHeight,
+      clientH: list.clientHeight,
+      scrollTop: list.scrollTop,
+      overflowed: list.scrollHeight > list.clientHeight + 1,
+      inView: r.top >= box.top - 1 && r.bottom <= box.bottom + 1,
+      hitActive: Boolean(hit?.closest(".ui-command-item.is-active")),
+      hit: hit && `${hit.tagName}.${String(hit.className).slice(0, 60)}`,
+    };
+  });
+}
+
 function crumbMenuHit(page) {
   return page.evaluate(() => {
     const menu = document.querySelector(".ui-crumb-menu");
@@ -878,6 +902,69 @@ try {
   check("palette lists Files commands", paletteGroups.includes("Files"), paletteGroups.join(", "));
   check("palette lists Go to file", paletteGroups.includes("Go to file"), paletteGroups.join(", "));
   await page.click(".ui-command-input");
+  await page.waitForSelector(".ui-command-item.is-active", { timeout: 4000 });
+  const paletteFirst = await paletteActiveHit(page);
+  check(
+    "palette list overflows so arrow keys have somewhere to scroll",
+    paletteFirst.overflowed,
+    JSON.stringify(paletteFirst)
+  );
+  check(
+    "first active command is in the list viewport",
+    paletteFirst.inView && paletteFirst.hitActive,
+    JSON.stringify(paletteFirst)
+  );
+  await page.keyboard.press("ArrowUp");
+  await page.waitForFunction(
+    () => {
+      const list = document.querySelector(".ui-command-list");
+      const item = document.querySelector(".ui-command-item.is-active");
+      if (!list || !item) return false;
+      const box = list.getBoundingClientRect();
+      const r = item.getBoundingClientRect();
+      return (
+        list.scrollTop > 0 &&
+        r.top >= box.top - 1 &&
+        r.bottom <= box.bottom + 1
+      );
+    },
+    { timeout: 4000 }
+  );
+  const paletteWrap = await paletteActiveHit(page);
+  check(
+    "ArrowUp wraps to a row painted inside the list",
+    paletteWrap.inView &&
+      paletteWrap.hitActive &&
+      paletteWrap.scrollTop > 0 &&
+      paletteWrap.id !== paletteFirst.id,
+    JSON.stringify({ wrap: paletteWrap, first: paletteFirst })
+  );
+  await page.keyboard.press("ArrowDown");
+  await page.waitForFunction(
+    (firstId) => {
+      const list = document.querySelector(".ui-command-list");
+      const item = document.querySelector(".ui-command-item.is-active");
+      if (!list || !item) return false;
+      const box = list.getBoundingClientRect();
+      const r = item.getBoundingClientRect();
+      return (
+        item.getAttribute("data-ui-cmd") === firstId &&
+        r.top >= box.top - 1 &&
+        r.bottom <= box.bottom + 1
+      );
+    },
+    { timeout: 4000 },
+    paletteFirst.id
+  );
+  const paletteHome = await paletteActiveHit(page);
+  check(
+    "ArrowDown from the last row returns the first row into view",
+    paletteHome.inView &&
+      paletteHome.hitActive &&
+      paletteHome.id === paletteFirst.id &&
+      paletteHome.scrollTop < paletteWrap.scrollTop,
+    JSON.stringify({ home: paletteHome, wrap: paletteWrap })
+  );
   await page.keyboard.type("new file");
   await page.keyboard.press("Enter");
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
