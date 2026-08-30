@@ -105,6 +105,8 @@
   position: relative;
   z-index: 1;
   width: min(28rem, calc(100vw - 2rem));
+  max-height: min(40rem, calc(100dvh - 2rem));
+  overflow: auto;
   background: var(--ui-bg);
   color: var(--ui-fg);
   border: 1px solid var(--ui-line);

@@ -121,3 +121,24 @@
 
 (deftest command-closed-when-open?-is-false
   (is (nil? (cmd/command {:open? false :items [{:id :a :label "A"}]}))))
+
+(defn- find-tag [el tag]
+  (cond
+    (and (vector? el) (= tag (first el))) el
+    (vector? el) (some #(find-tag % tag) el)
+    (sequential? el) (some #(find-tag % tag) el)
+    :else nil))
+
+(deftest command-list-children-are-elements
+  (let [el (cmd/command {:open? true
+                         :items [{:id :new-file
+                                  :label "New file"
+                                  :group "Files"
+                                  :action [:go]}]})
+        list (find-tag el :div.ui-command-list)
+        kids (->> (if (map? (second list)) (nnext list) (next list))
+                  (remove nil?))]
+    (is (seq kids))
+    (is (every? #(and (vector? %) (keyword? (first %))) kids))
+    (is (some #{:button.ui-command-item} (map first kids)))
+    (is (some #{:div.ui-command-group} (map first kids)))))

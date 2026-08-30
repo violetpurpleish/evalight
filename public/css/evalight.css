@@ -654,6 +654,7 @@ kbd {
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
   z-index: 410;
+  pointer-events: none;
 }
 .toast.err { border-color: var(--ember); color: #ffd1c2; }
 

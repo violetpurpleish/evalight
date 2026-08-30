@@ -99,8 +99,10 @@
   (if (seq vis)
     (into [:div.ui-command-list {:role "listbox" :id "ui-command-list"}]
           (mapcat (fn [{:keys [group rows]}]
-                    (cond-> (mapv #(item-el active on-active %) rows)
-                      (seq group) (cons [:div.ui-command-group group])))
+                    (let [els (mapv #(item-el active on-active %) rows)]
+                      (if (seq group)
+                        (into [[:div.ui-command-group group]] els)
+                        els)))
                   (grouped vis)))
     [:div.ui-command-empty "No matches"]))
 
