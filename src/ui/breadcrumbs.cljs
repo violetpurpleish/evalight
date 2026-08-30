@@ -11,7 +11,8 @@
   (let [items (vec items)
         n (count items)]
     (into
-     (cond-> [:nav.ui-crumbs {:aria-label "Breadcrumb"}]
+     (cond-> [:nav.ui-crumbs {:aria-label "Breadcrumb"
+                              :class (when open-id "is-open")}]
        (and open-id on-dismiss)
        (conj [:div.ui-crumbs-dismiss {:on {:click on-dismiss}}]))
      (if (zero? n)
@@ -33,7 +34,9 @@
                :on {:click (ui/emit on-open id)}}
               label]
              (when (and open? (seq menu))
-               [:div.ui-crumb-menu {:role "menu"}
+               [:div.ui-crumb-menu
+                {:role "menu"
+                 :on {:click ui/stop}}
                 (for [m menu]
                   [:button.ui-crumb-option
                    {:type "button"

@@ -64,6 +64,25 @@ async function startServer() {
   };
 }
 
+function crumbMenuHit(page) {
+  return page.evaluate(() => {
+    const menu = document.querySelector(".ui-crumb-menu");
+    if (!menu) return { missing: true };
+    const r = menu.getBoundingClientRect();
+    const x = r.left + Math.min(24, Math.max(8, r.width / 2));
+    const y = r.top + Math.min(16, Math.max(8, r.height / 2));
+    const hit = document.elementFromPoint(x, y);
+    return {
+      w: r.width,
+      h: r.height,
+      top: r.top,
+      hit: hit && `${hit.tagName}.${String(hit.className).slice(0, 60)}`,
+      hitMenu: Boolean(hit?.closest(".ui-crumb-menu")),
+      hitDismiss: Boolean(hit?.closest(".ui-crumbs-dismiss")),
+    };
+  });
+}
+
 function within(inner, outer, slop = 0.75) {
   return (
     inner.left >= outer.left - slop &&
@@ -193,6 +212,25 @@ try {
       headHs.files > 20,
     JSON.stringify(headHs)
   );
+
+  const crumbClick = await page.evaluate(() => {
+    const b = [...document.querySelectorAll(".ui-crumb")].find((el) => el.textContent.trim() === "core.cljs");
+    const r = b?.getBoundingClientRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  });
+  check("core.cljs crumb is on screen", Boolean(crumbClick));
+  if (crumbClick) {
+    await page.mouse.click(crumbClick.x, crumbClick.y);
+    await page.waitForSelector(".ui-crumb-menu", { timeout: 4000 });
+    const menuHit = await crumbMenuHit(page);
+    check(
+      "crumb menu is the hit target",
+      !menuHit.missing && menuHit.h > 8 && menuHit.hitMenu && !menuHit.hitDismiss,
+      JSON.stringify(menuHit)
+    );
+    await page.evaluate(() => document.querySelector(".ui-crumbs-dismiss")?.click());
+    await page.waitForSelector(".ui-crumb-menu", { hidden: true, timeout: 4000 });
+  }
 
   const rows = await page.$$(".tree-row");
   await rows[fileIdx].hover();
@@ -790,17 +828,33 @@ try {
     /src\/app\/core\.cljs/.test(crumbPath),
     crumbPath
   );
-  await page.evaluate(() => {
-    [...document.querySelectorAll(".ui-crumb")]
-      .find((b) => b.textContent.trim() === "core.cljs")
-      ?.click();
+  const hiddenCrumb = await page.evaluate(() => {
+    const b = [...document.querySelectorAll(".ui-crumb")].find((el) => el.textContent.trim() === "core.cljs");
+    const r = b?.getBoundingClientRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
   });
+  check("core.cljs crumb is on screen with Files hidden", Boolean(hiddenCrumb));
+  if (hiddenCrumb) {
+    await page.mouse.click(hiddenCrumb.x, hiddenCrumb.y);
+  }
   await page.waitForSelector(".ui-crumb-menu", { timeout: 4000 });
-  await page.evaluate(() => {
-    [...document.querySelectorAll(".ui-crumb-option")]
-      .find((b) => (b.textContent || "").includes("greet.cljs"))
-      ?.click();
+  const hiddenMenu = await crumbMenuHit(page);
+  check(
+    "crumb menu is the hit target with Files hidden",
+    !hiddenMenu.missing && hiddenMenu.h > 8 && hiddenMenu.hitMenu && !hiddenMenu.hitDismiss,
+    JSON.stringify(hiddenMenu)
+  );
+  const greetOpt = await page.evaluate(() => {
+    const b = [...document.querySelectorAll(".ui-crumb-option")].find((el) =>
+      (el.textContent || "").includes("greet.cljs")
+    );
+    const r = b?.getBoundingClientRect();
+    return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
   });
+  check("greet.cljs is a visible crumb option", Boolean(greetOpt));
+  if (greetOpt) {
+    await page.mouse.click(greetOpt.x, greetOpt.y);
+  }
   await page.waitForFunction(
     () => /app\/greet\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
     { timeout: 8000 }

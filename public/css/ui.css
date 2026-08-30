@@ -181,9 +181,10 @@
   align-items: center;
   flex-wrap: nowrap;
   min-width: 0;
-  overflow: auto hidden;
+  overflow: visible;
   font: inherit;
 }
+.ui-crumbs.is-open { z-index: 19; }
 .ui-crumbs-dismiss {
   position: fixed;
   inset: 0;

@@ -349,7 +349,7 @@ code, pre { font-family: var(--mono); }
 }
 .file-path {
   min-width: 0;
-  overflow: auto hidden;
+  overflow: visible;
 }
 .tree-tools { display: flex; gap: 0.25rem; }
 

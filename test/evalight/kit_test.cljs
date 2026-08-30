@@ -116,8 +116,18 @@
         wrap (nth el 3)
         sep (nth wrap 2)]
     (is (= :nav.ui-crumbs (first el)))
+    (is (nil? (:class (second el))))
     (is (= :span.ui-crumb-sep (first sep)))
     (is (= "/" (last sep)))))
+
+(deftest breadcrumbs-open-mark-the-nav
+  (let [el (crumbs/breadcrumbs
+            {:items [{:id "src" :label "src"}]
+             :open-id "src"
+             :menu [{:id "src/app" :label "app"}]
+             :on-dismiss [:close]})]
+    (is (= "is-open" (:class (second el))))
+    (is (= :div.ui-crumbs-dismiss (first (nth el 2))))))
 
 (deftest command-closed-when-open?-is-false
   (is (nil? (cmd/command {:open? false :items [{:id :a :label "A"}]}))))
