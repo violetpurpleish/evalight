@@ -42,7 +42,6 @@
         (fs/flatten-files tree)))
 
 (defn items
-  "Palette rows: visible commands plus every file."
   [state]
   (into (visible-registry state) (file-rows (:tree state))))
 
@@ -59,7 +58,6 @@
   (swap! state/app assoc :pick nil))
 
 (defn open!
-  "Replace the session. A second open of the same crumb button closes it."
   [spec]
   (swap! state/app
          (fn [s]

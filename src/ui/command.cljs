@@ -10,8 +10,6 @@
   (str/lower-case (str (or label "") " " (or hint ""))))
 
 (defn visible
-  "Rows whose :label or :hint contain query, case-insensitive.
-  Blank query keeps every row. Order is unchanged."
   [items query]
   (let [q (needle query)]
     (vec

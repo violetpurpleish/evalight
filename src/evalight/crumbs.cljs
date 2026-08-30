@@ -2,7 +2,6 @@
   (:require [evalight.paths :as paths]))
 
 (defn find-node
-  "Tree node at `path`, or a synthetic root when path is blank."
   [tree path]
   (if (or (nil? path) (= "" path))
     {:type :dir :name "" :path "" :children (vec tree)}
@@ -16,12 +15,10 @@
           :else (recur (:children node) (next parts)))))))
 
 (defn children-of
-  "Direct children of `path`. Blank path is the project root."
   [tree path]
   (vec (or (:children (find-node tree path)) [])))
 
 (defn from-path
-  "Trail for the editor bar. One crumb per path segment."
   [path]
   (let [parts (paths/split path)
         n (count parts)]
@@ -33,8 +30,6 @@
           (range n))))
 
 (defn sibling-rows
-  "Menu rows for the directory that contains `crumb-path`.
-  Root crumbs list the project root."
   [tree crumb-path active-path]
   (let [parent (paths/dirname crumb-path)
         nodes (children-of tree parent)]
@@ -45,7 +40,6 @@
           nodes)))
 
 (defn child-rows
-  "Menu rows for the children of `dir-path`."
   [tree dir-path active-path]
   (mapv (fn [{:keys [path name type]}]
           {:id path
