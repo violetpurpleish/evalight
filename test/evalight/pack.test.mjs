@@ -10,6 +10,8 @@ assert.ok(files["evalight/fs-http.mjs"].includes("SKIP_ROOT"));
 assert.ok(files["evalight/static.mjs"].includes("servePublicPath"));
 assert.ok(files["evalight/server.mjs"].includes("servePublicPath"));
 assert.ok(files["evalight/public/index.html"].includes("/js/main.js"));
+assert.ok(files["evalight/public/index.html"].includes('name="description"'));
+assert.ok(files["evalight/public/index.html"].includes("og:image"));
 assert.equal(files["evalight/build-id.mjs"], undefined);
 assert.ok(files["evalight/compiled.mjs"].includes("resolveAttachTarget"));
 assert.ok(files["evalight/server.mjs"].includes("parseEvalightArgs"));

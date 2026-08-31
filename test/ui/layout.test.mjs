@@ -165,6 +165,21 @@ try {
   await page.waitForSelector("#project-select, .project-name", { timeout: 10000 });
   await new Promise((r) => setTimeout(r, 1500));
 
+  const meta = await page.evaluate(() => ({
+    description: document.querySelector('meta[name="description"]')?.getAttribute("content") ?? "",
+    ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content") ?? "",
+    ogImage: document.querySelector('meta[property="og:image"]')?.getAttribute("content") ?? "",
+    twitterCard: document.querySelector('meta[name="twitter:card"]')?.getAttribute("content") ?? "",
+  }));
+  check(
+    "index.html has a meta description",
+    /live ClojureScript/i.test(meta.description),
+    meta.description
+  );
+  check("index.html has Open Graph title", meta.ogTitle === "Evalight", meta.ogTitle);
+  check("index.html has an Open Graph image", /og\.png/.test(meta.ogImage), meta.ogImage);
+  check("index.html has a Twitter card", meta.twitterCard === "summary_large_image", meta.twitterCard);
+
   const pageScroll = await page.evaluate(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -235,6 +250,29 @@ try {
       Math.abs(headHs.editor - headHs.preview) < 1.5 &&
       headHs.files > 20,
     JSON.stringify(headHs)
+  );
+
+  const bannerContrast = await page.evaluate(() => {
+    const host = document.querySelector(".preview-frame") || document.body;
+    const el = document.createElement("div");
+    el.className = "preview-banner";
+    el.innerHTML = "<p>The preview did not start.</p><pre>err</pre>";
+    host.appendChild(el);
+    const p = el.querySelector("p");
+    const bg = getComputedStyle(el).backgroundColor;
+    const fg = getComputedStyle(p).color;
+    el.remove();
+    const parse = (c) => {
+      const m = String(c).match(/(\d+),\s*(\d+),\s*(\d+)/);
+      return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+    };
+    const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return { bg, fg, bgLum: lum(parse(bg)), fgLum: lum(parse(fg)) };
+  });
+  check(
+    "preview error heading is dark on paper",
+    bannerContrast.fgLum < 0.45 && bannerContrast.bgLum > 0.7,
+    JSON.stringify(bannerContrast)
   );
 
   const crumbClick = await page.evaluate(() => {
@@ -576,7 +614,7 @@ try {
     betaOpen.text
   );
 
-  await page.click(".beta-dismiss");
+  await page.$eval(".beta-pop .ui-popover-dismiss", (el) => el.click());
   await page.waitForSelector(".beta-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
   const betaClosed = await page.evaluate(() => ({
     expanded: document.querySelector("button.beta-badge")?.getAttribute("aria-expanded") === "true",
@@ -679,6 +717,30 @@ try {
 
   await page.click(".help-close");
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
+
+  await page.click("button.icon-btn[title='Help']");
+  await page.waitForSelector(".help", { timeout: 3000 });
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
+  check(
+    "Escape closes Help",
+    !(await page.$(".help")),
+    "help still open after Escape"
+  );
+
+  await page.click("button.beta-badge");
+  await page.waitForSelector(".beta-pop .ui-popover-panel", { timeout: 3000 });
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".beta-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
+  const betaEsc = await page.evaluate(() => ({
+    expanded: document.querySelector("button.beta-badge")?.getAttribute("aria-expanded") === "true",
+    panel: Boolean(document.querySelector(".beta-pop .ui-popover-panel")),
+  }));
+  check(
+    "Escape closes the beta popover",
+    !betaEsc.expanded && !betaEsc.panel,
+    JSON.stringify(betaEsc)
+  );
 
   await page.waitForSelector("textarea[name=expr]", { timeout: 5000 });
   await page.waitForFunction(
@@ -888,6 +950,41 @@ try {
     /greet\.cljs/.test(await page.$eval(".file-path", (el) => el.textContent))
   );
 
+  await page.click("textarea[name=expr]");
+  await page.keyboard.type("(+ 1 1)");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () => /\(\+\s*1\s*1\)/.test(document.querySelector(".repl-log")?.innerText ?? ""),
+    { timeout: 8000 }
+  );
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".pane-rail[aria-label='Show files'], .sidebar", { timeout: 20000 });
+  await page.waitForFunction(
+    () => document.querySelector(".repl-log") && document.querySelector(".workspace"),
+    { timeout: 20000 }
+  );
+  const persisted = await page.evaluate(() => {
+    const sidebar = document.querySelector(".sidebar");
+    return {
+      filesHidden:
+        !sidebar ||
+        sidebar.offsetWidth === 0 ||
+        getComputedStyle(sidebar).display === "none",
+      canShow: Boolean(document.querySelector(".pane-rail[aria-label='Show files']")),
+      repl: document.querySelector(".repl-log")?.innerText ?? "",
+    };
+  });
+  check(
+    "files stay hidden after reload",
+    persisted.filesHidden && persisted.canShow,
+    JSON.stringify({ filesHidden: persisted.filesHidden, canShow: persisted.canShow })
+  );
+  check(
+    "REPL history survives reload",
+    /\(\+\s*1\s*1\)/.test(persisted.repl),
+    persisted.repl.slice(0, 240)
+  );
+
   await page.click(".pane-rail[aria-label='Show files']");
   await page.waitForFunction(
     () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
@@ -965,6 +1062,53 @@ try {
       paletteHome.scrollTop < paletteWrap.scrollTop,
     JSON.stringify({ home: paletteHome, wrap: paletteWrap })
   );
+  const paletteLast = await page.evaluate(() => {
+    const list = document.querySelector(".ui-command-list");
+    const items = [...list.querySelectorAll(".ui-command-item")];
+    const last = items.at(-1);
+    list.scrollTop = list.scrollHeight;
+    const box = list.getBoundingClientRect();
+    const r = last.getBoundingClientRect();
+    return {
+      label: last?.textContent?.trim() ?? "",
+      inView: r.top >= box.top - 1 && r.bottom <= box.bottom + 1,
+      panelBottom: document.querySelector(".ui-command")?.getBoundingClientRect().bottom ?? 0,
+      innerHeight: window.innerHeight,
+    };
+  });
+  check(
+    "scrolling the palette shows the last row in full",
+    paletteLast.inView,
+    JSON.stringify(paletteLast)
+  );
+  await page.setViewport({ width: 1280, height: 800 });
+  const paletteFit = await page.evaluate(() => {
+    const panel = document.querySelector(".ui-command");
+    const r = panel.getBoundingClientRect();
+    const list = document.querySelector(".ui-command-list");
+    const items = [...list.querySelectorAll(".ui-command-item")];
+    const last = items.at(-1);
+    list.scrollTop = list.scrollHeight;
+    const box = list.getBoundingClientRect();
+    const lr = last.getBoundingClientRect();
+    return {
+      top: r.top,
+      bottom: r.bottom,
+      innerHeight: window.innerHeight,
+      lastInView: lr.top >= box.top - 1 && lr.bottom <= box.bottom + 1,
+    };
+  });
+  check(
+    "palette stays in a 1280x800 viewport",
+    paletteFit.top >= 0 && paletteFit.bottom <= paletteFit.innerHeight + 1,
+    JSON.stringify(paletteFit)
+  );
+  check(
+    "last palette row is not sliced at 1280x800",
+    paletteFit.lastInView,
+    JSON.stringify(paletteFit)
+  );
+  await page.setViewport({ width: 1440, height: 900 });
   await page.keyboard.type("new file");
   await page.keyboard.press("Enter");
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
@@ -1186,7 +1330,17 @@ try {
     btn?.click();
   });
   await page.waitForSelector(".ui-dialog input[name=name]", { timeout: 4000 });
-  await page.focus(".ui-dialog input[name=name]");
+  const newProjField = await page.$eval(".ui-dialog input[name=name]", (el) => ({
+    value: el.value,
+    placeholder: el.placeholder,
+  }));
+  check("new project field is prefilled", Boolean(newProjField.value), JSON.stringify(newProjField));
+  check(
+    "new project placeholder is not a fake typed name",
+    /project name/i.test(newProjField.placeholder) || newProjField.placeholder === "",
+    newProjField.placeholder
+  );
+  await page.click(".ui-dialog input[name=name]", { clickCount: 3 });
   await page.keyboard.type("doomed");
   await page.click(".ui-dialog .ui-btn-primary");
   await page.waitForFunction(
@@ -1197,6 +1351,81 @@ try {
     () => document.querySelector("#project-select")?.value === "doomed",
     { timeout: 10000 }
   );
+  await page.waitForFunction(
+    () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent.trim() === "greet.cljs"),
+    { timeout: 15000 }
+  );
+
+  const renameHit = await page.evaluate(() => {
+    const name = [...document.querySelectorAll(".tree-name")].find((el) => el.textContent.trim() === "greet.cljs");
+    const row = name?.closest(".tree-row");
+    const ops = row?.querySelector(".tree-ops");
+    if (ops) {
+      ops.style.opacity = "1";
+      ops.style.pointerEvents = "auto";
+    }
+    const btn = row?.querySelector("[aria-label='Rename']");
+    const r = btn?.getBoundingClientRect();
+    return r && r.width > 0 ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  });
+  check("greet.cljs rename control is on screen", Boolean(renameHit));
+  if (renameHit) {
+    await page.mouse.click(renameHit.x, renameHit.y);
+    await page.waitForSelector(".ui-dialog input[name=path]", { timeout: 4000 });
+    await page.click(".ui-dialog input[name=path]", { clickCount: 3 });
+    await page.keyboard.type("src/app/hello.cljs");
+    await page.click(".ui-dialog .ui-btn-primary");
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent.trim() === "hello.cljs"),
+      { timeout: 8000 }
+    );
+    const renameToast = await page.evaluate(() => document.querySelector(".toast")?.textContent ?? "");
+    check(
+      "rename toast mentions the namespace change",
+      /app\.hello/.test(renameToast),
+      renameToast
+    );
+    await page.evaluate(() => {
+      const name = [...document.querySelectorAll(".tree-name")].find((el) => el.textContent.trim() === "core.cljs");
+      name?.closest(".tree-item")?.click();
+    });
+    await page.waitForFunction(
+      () => /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
+      { timeout: 8000 }
+    );
+    const coreText = await page.evaluate(() => document.querySelector(".cm-content")?.innerText ?? "");
+    check("core.cljs require follows the rename", /app\.hello/.test(coreText), coreText.slice(0, 280));
+    check("core.cljs no longer requires app.greet", !/\[app\.greet/.test(coreText), coreText.slice(0, 280));
+  }
+
+  const deleteHit = await page.evaluate(() => {
+    const name = [...document.querySelectorAll(".tree-name")].find((el) => el.textContent.trim() === "stats.cljs");
+    const row = name?.closest(".tree-row");
+    const ops = row?.querySelector(".tree-ops");
+    if (ops) {
+      ops.style.opacity = "1";
+      ops.style.pointerEvents = "auto";
+    }
+    const btn = row?.querySelector("[aria-label='Delete']");
+    const r = btn?.getBoundingClientRect();
+    return r && r.width > 0 ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null;
+  });
+  check("stats.cljs delete control is on screen", Boolean(deleteHit));
+  if (deleteHit) {
+    await page.mouse.click(deleteHit.x, deleteHit.y);
+    await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
+    await page.click(".ui-dialog .ui-btn-danger");
+    await page.waitForFunction(
+      () => /still require/i.test(document.querySelector(".toast")?.textContent ?? ""),
+      { timeout: 8000 }
+    );
+    const delToast = await page.evaluate(() => document.querySelector(".toast")?.textContent ?? "");
+    check(
+      "delete toast says a file still requires app.stats",
+      /app\.stats/.test(delToast) && /still require/i.test(delToast),
+      delToast
+    );
+  }
 
   await page.click("button[aria-label='Delete project']");
   await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });

@@ -124,9 +124,25 @@
 
 (defn- on-window-key [e]
   (cond
-    (and (= "Escape" (.-key e)) (:pick @state/app)
-         (not (.closest (.-target e) ".ui-command")))
-    (do (.preventDefault e) (close!))
+    (and (= "Escape" (.-key e)) (not (.-isComposing e)))
+    (let [s @state/app]
+      (cond
+        (:pick s)
+        (when-not (.closest (.-target e) ".ui-command")
+          (.preventDefault e)
+          (close!))
+
+        (:dialog s)
+        (do (.preventDefault e)
+            (swap! state/app assoc :dialog nil))
+
+        (:beta? s)
+        (do (.preventDefault e)
+            (swap! state/app assoc :beta? false))
+
+        (:help? s)
+        (do (.preventDefault e)
+            (swap! state/app assoc :help? false))))
 
     (palette-hotkey? e)
     (do (.preventDefault e) (toggle-palette!))))

@@ -100,6 +100,33 @@
        "replicant in this folder's config are installed later by `bun install`;\n"
        "they are not copied into the ZIP.\n"))
 
+(defn stale-lamp-css?
+  "True for a lamp stylesheet that still lets the title wrap at hyphens."
+  [text]
+  (and (str/includes? (or text "")
+                      "h1 { font-family: var(--ui-serif); font-weight: 560; font-size: 2.4rem;")
+       (not (str/includes? (or text "") "text-overflow: ellipsis"))))
+
+(defn with-title-wrap
+  [css]
+  (if (stale-lamp-css? css)
+    (str/replace
+     css
+     #"h1 \{ font-family: var\(--ui-serif\); font-weight: 560; font-size: 2\.4rem; margin: 0 0 0\.6rem; \}"
+     (str "h1 {\n"
+          "  font-family: var(--ui-serif);\n"
+          "  font-weight: 560;\n"
+          "  font-size: clamp(1.5rem, 7vw, 2.4rem);\n"
+          "  line-height: 1.18;\n"
+          "  margin: 0 0 0.6rem;\n"
+          "  overflow-wrap: break-word;\n"
+          "  hyphens: none;\n"
+          "  white-space: nowrap;\n"
+          "  overflow: hidden;\n"
+          "  text-overflow: ellipsis;\n"
+          "}"))
+    css))
+
 (defn stale-evalight-readme?
   "True for a lamp README that still tells you to clone Evalight."
   [text]
@@ -164,7 +191,18 @@
        "  color: var(--gold);\n"
        "  margin: 0 0 0.6rem;\n"
        "}\n"
-       "h1 { font-family: var(--ui-serif); font-weight: 560; font-size: 2.4rem; margin: 0 0 0.6rem; }\n"
+       "h1 {\n"
+       "  font-family: var(--ui-serif);\n"
+       "  font-weight: 560;\n"
+       "  font-size: clamp(1.5rem, 7vw, 2.4rem);\n"
+       "  line-height: 1.18;\n"
+       "  margin: 0 0 0.6rem;\n"
+       "  overflow-wrap: break-word;\n"
+       "  hyphens: none;\n"
+       "  white-space: nowrap;\n"
+       "  overflow: hidden;\n"
+       "  text-overflow: ellipsis;\n"
+       "}\n"
        ".lede { color: var(--muted); line-height: 1.5; margin: 0 0 1.8rem; }\n"
        ".toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0 0 1.25rem; }\n"
        ".lamp {\n"

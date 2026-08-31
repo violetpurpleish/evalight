@@ -236,6 +236,10 @@
   position: relative;
   z-index: 1;
   width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--ui-bg);
   color: var(--ui-fg);
   border: 1px solid var(--ui-line);
@@ -258,10 +262,14 @@
 }
 .ui-command-input { margin-bottom: 0.4rem; }
 .ui-command-list {
-  max-height: 22rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(32rem, calc(100dvh - 7rem));
   overflow: auto;
   display: grid;
   gap: 0.1rem;
+  padding-bottom: 0.55rem;
+  scroll-padding-bottom: 0.45rem;
 }
 .ui-command-group {
   font-size: 0.72rem;

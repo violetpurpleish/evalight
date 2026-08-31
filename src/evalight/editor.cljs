@@ -323,12 +323,44 @@
   (when (= path @!path)
     (reset! !path nil)))
 
+(defn drop-tree! [path]
+  (doseq [p (vec (keys @!states))]
+    (when (paths/starts-with-path? p path)
+      (swap! !states dissoc p)))
+  (when (and @!path (paths/starts-with-path? @!path path))
+    (reset! !path nil)))
+
 (defn rename-path! [from to]
-  (when-let [st (get @!states from)]
-    (swap! !states dissoc from)
-    (swap! !states assoc to st))
-  (when (= @!path from)
-    (reset! !path to)))
+  (let [states @!states
+        pairs (vec
+               (keep (fn [[path st]]
+                       (when (paths/starts-with-path? path from)
+                         [path (paths/remap-under path from to) st]))
+                     states))]
+    (doseq [[old-path] pairs]
+      (swap! !states dissoc old-path))
+    (doseq [[_ new-path st] pairs]
+      (swap! !states assoc new-path st))
+    (when-let [p @!path]
+      (when (paths/starts-with-path? p from)
+        (reset! !path (paths/remap-under p from to))))))
+
+(defn text-for
+  "Buffered document text for `path`, or nil if the editor has not opened it."
+  [path]
+  (cond
+    (and (= path @!path) @!view) (current-text)
+    (get @!states path) (.toString (.-doc ^js (get @!states path)))
+    :else nil))
+
+(defn set-doc!
+  "Replace a buffered document. Updates the open editor when it is this file."
+  [path content]
+  (when (or (= path @!path) (contains? @!states path))
+    (let [state (make-state path content)]
+      (swap! !states assoc path state)
+      (when (and @!view (= path @!path))
+        (.setState ^js @!view state)))))
 
 (defn show!
   "Swap the editor to `path`, restoring prior undo state when we have it."
