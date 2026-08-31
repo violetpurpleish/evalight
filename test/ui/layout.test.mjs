@@ -950,41 +950,6 @@ try {
     /greet\.cljs/.test(await page.$eval(".file-path", (el) => el.textContent))
   );
 
-  await page.click("textarea[name=expr]");
-  await page.keyboard.type("(+ 1 1)");
-  await page.keyboard.press("Enter");
-  await page.waitForFunction(
-    () => /\(\+\s*1\s*1\)/.test(document.querySelector(".repl-log")?.innerText ?? ""),
-    { timeout: 8000 }
-  );
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".pane-rail[aria-label='Show files'], .sidebar", { timeout: 20000 });
-  await page.waitForFunction(
-    () => document.querySelector(".repl-log") && document.querySelector(".workspace"),
-    { timeout: 20000 }
-  );
-  const persisted = await page.evaluate(() => {
-    const sidebar = document.querySelector(".sidebar");
-    return {
-      filesHidden:
-        !sidebar ||
-        sidebar.offsetWidth === 0 ||
-        getComputedStyle(sidebar).display === "none",
-      canShow: Boolean(document.querySelector(".pane-rail[aria-label='Show files']")),
-      repl: document.querySelector(".repl-log")?.innerText ?? "",
-    };
-  });
-  check(
-    "files stay hidden after reload",
-    persisted.filesHidden && persisted.canShow,
-    JSON.stringify({ filesHidden: persisted.filesHidden, canShow: persisted.canShow })
-  );
-  check(
-    "REPL history survives reload",
-    /\(\+\s*1\s*1\)/.test(persisted.repl),
-    persisted.repl.slice(0, 240)
-  );
-
   await page.click(".pane-rail[aria-label='Show files']");
   await page.waitForFunction(
     () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
@@ -1819,6 +1784,57 @@ try {
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
   await page.click(".ui-dialog .ui-btn-ghost");
   await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+
+  await page.setViewport({ width: 1440, height: 900 });
+  const filesVisible = await page.evaluate(() => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100);
+  if (filesVisible) {
+    await page.click(".sidebar [aria-label='Hide files']");
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector(".sidebar");
+        return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
+      },
+      { timeout: 4000 }
+    );
+  }
+  await page.waitForSelector("textarea[name=expr]", { timeout: 5000 });
+  await page.click("textarea[name=expr]");
+  await page.keyboard.down("Control");
+  await page.keyboard.press("a");
+  await page.keyboard.up("Control");
+  await page.keyboard.type("(+ 9 9)");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(
+    () => /\(\+\s*9\s*9\)/.test(document.querySelector(".repl-log")?.innerText ?? ""),
+    { timeout: 8000 }
+  );
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".pane-rail[aria-label='Show files'], .sidebar", { timeout: 20000 });
+  await page.waitForFunction(
+    () => document.querySelector(".repl-log") && document.querySelector(".workspace"),
+    { timeout: 20000 }
+  );
+  const persisted = await page.evaluate(() => {
+    const sidebar = document.querySelector(".sidebar");
+    return {
+      filesHidden:
+        !sidebar ||
+        sidebar.offsetWidth === 0 ||
+        getComputedStyle(sidebar).display === "none",
+      canShow: Boolean(document.querySelector(".pane-rail[aria-label='Show files']")),
+      repl: document.querySelector(".repl-log")?.innerText ?? "",
+    };
+  });
+  check(
+    "files stay hidden after reload",
+    persisted.filesHidden && persisted.canShow,
+    JSON.stringify({ filesHidden: persisted.filesHidden, canShow: persisted.canShow })
+  );
+  check(
+    "REPL history survives reload",
+    /\(\+\s*9\s*9\)/.test(persisted.repl),
+    persisted.repl.slice(0, 240)
+  );
 } finally {
   await browser.close();
   await stop();

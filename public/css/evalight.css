@@ -109,11 +109,6 @@ code, pre { font-family: var(--mono); }
   color: var(--text);
 }
 .beta-copy p + p { margin-top: 0.6rem; }
-.beta-dismiss {
-  position: fixed;
-  inset: 0;
-  z-index: 18;
-}
 
 .project { flex: 0 1 auto; min-width: 0; max-width: 16rem; }
 .project-picker { display: block; min-width: 0; }

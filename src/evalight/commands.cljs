@@ -101,7 +101,7 @@
   [id]
   (swap! state/app
          (fn [s]
-           (if-not (:pick s)
+           (if (or (not (:pick s)) (= id (get-in s [:pick :active])))
              s
              (assoc-in s [:pick :active] id)))))
 
