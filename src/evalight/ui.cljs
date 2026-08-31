@@ -7,6 +7,7 @@
             [evalight.state :as state]
             [evalight.commands :as commands]
             [evalight.crumbs :as crumbs]
+            [evalight.history :as history]
             [ui.breadcrumbs :as ui-crumbs]
             [ui.button :as btn]
             [ui.command :as ui-command]
@@ -100,6 +101,7 @@
     [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
     [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
+    [:p.muted "Deletes, renames, and kit restores are listed under History in the toolbar so you can put them back. Code edits still use Ctrl-Z in the editor."]
     (if (= :local (:mode state))
       (if (:attached state)
         [:p.muted "Attached to a shadow-cljs watch you already started (`bun run evalight --attach`). Preview is that app. Evalight will not start or stop the compiler, and Live stays off so it does not fight shadow autoload."]
@@ -199,7 +201,7 @@
          :delete
          [:div
           [:h2.ui-dialog-title "Delete"]
-          [:p "Delete " [:code path] "? This cannot be undone."]
+          [:p "Delete " [:code path] "? You can put it back from History."]
           (ui-dialog/actions
            (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
            (btn/button {:variant :danger :class "danger" :type "submit"} "Delete"))]
@@ -347,6 +349,46 @@
           [:p "This copy of Evalight lives with your files, so later changes on the website do not touch it."]
           [:p "Export your project. The zip freezes this version of Evalight with your files, so you can keep editing after the website changes."])])]))
 
+(defn- history-panel [state]
+  (let [open? (boolean (:history-open? state))
+        entries (or (:history state) [])
+        now (.now js/Date)
+        n (count entries)]
+    [:div.history-pop
+     (popover/popover {:open? open? :align :end :on-close [:close-history]}
+       [:button.icon-btn.history-btn
+        {:type "button"
+         :aria-expanded open?
+         :aria-haspopup "dialog"
+         :title "History"
+         :aria-label "History"
+         :on {:click [:toggle-history]}}
+        (icons/undo)
+        (when (pos? n)
+          [:span.history-count (if (> n 9) "9+" (str n))])]
+       [:div.history-copy
+        [:header.history-head
+         [:h2.history-title "History"]
+         [:span.muted (if (pos? n) (str n) "empty")]]
+        (if (seq entries)
+          [:ul.history-list
+           (for [{:keys [id label ts]} entries]
+             [:li.history-item {:replicant/key id}
+              [:div.history-text
+               [:div.history-label label]
+               [:div.history-age (history/age-label ts now)]]
+              (btn/button {:size :sm
+                           :title "Put this back"
+                           :on {:click [:undo-entry id]}}
+                "Undo")])]
+          [:p.muted.empty-history "Deletes, renames, and kit restores land here so you can put them back. Code edits still use Ctrl-Z."])
+        (when (seq entries)
+          [:div.history-foot
+           (btn/button {:size :sm
+                        :title "Drop every snapshot for this project"
+                        :on {:click [:clear-history]}}
+             "Clear history")])])]))
+
 (defn header [state]
   [:header.top
    [:div.brand
@@ -380,6 +422,7 @@
     (when (= :browser (:mode state))
       [:button.ghost {:on {:click [:export]}} (icons/download) "Export ZIP"])
     [:button.primary {:on {:click [:run]}} (icons/play) "Run"]
+    (history-panel state)
     [:button.icon-btn
      {:on {:click [:pick-open {:via :palette}]}
       :title "Command palette (Ctrl+K)"

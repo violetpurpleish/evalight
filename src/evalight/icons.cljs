@@ -73,3 +73,8 @@
   (svg {}
        [:path {:d "M4 8h16M4 16h16" :stroke-linecap "round"}]
        [:path {:d "m8 5 3 7-3 7M16 5l-3 7 3 7" :stroke-linecap "round" :stroke-linejoin "round"}]))
+
+(defn undo []
+  (svg {}
+       [:path {:d "M3 7v6h6" :stroke-linecap "round" :stroke-linejoin "round"}]
+       [:path {:d "M3.5 13A9 9 0 1 0 7 6.2" :stroke-linecap "round"}]))

@@ -21,6 +21,8 @@
          :attach-label nil
          :dialog nil
          :pick nil
+         :history []
+         :history-open? false
          :help? false
          :beta? false
          :parinfer :smart

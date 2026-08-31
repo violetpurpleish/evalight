@@ -9,6 +9,10 @@
   [{:id :new-file :label "New file" :group "Files" :action [:new-file-dialog]}
    {:id :new-folder :label "New folder" :group "Files" :action [:new-folder-dialog]}
    {:id :add-ui :label "Add UI" :group "Files" :action [:add-ui-dialog]}
+   {:id :history :label "History" :group "Files" :action [:toggle-history]}
+   {:id :undo-last :label "Undo last file change" :group "Files"
+    :when (fn [s] (seq (:history s)))
+    :action [:undo-last]}
    {:id :toggle-files :label "Toggle files pane" :group "View" :action [:toggle-files]}
    {:id :toggle-preview :label "Toggle preview pane" :group "View" :action [:toggle-preview-pane]}
    {:id :toggle-live :label "Toggle live reload" :group "Preview" :action [:toggle-live]}
@@ -135,6 +139,10 @@
         (:dialog s)
         (do (.preventDefault e)
             (swap! state/app assoc :dialog nil))
+
+        (:history-open? s)
+        (do (.preventDefault e)
+            (swap! state/app assoc :history-open? false))
 
         (:beta? s)
         (do (.preventDefault e)

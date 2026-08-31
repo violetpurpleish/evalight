@@ -737,6 +737,7 @@ try {
   check("help lists Enter", helpCopy.keys.includes("Enter"));
   check("help lists Ctrl+Enter", helpCopy.keys.includes("Ctrl+Enter"));
   check("help lists Ctrl+K", helpCopy.keys.includes("Ctrl+K"));
+  check("help mentions History", /History/.test(helpCopy.text));
   check("help links Open Source Licenses", /Open Source Licenses/.test(helpCopy.text));
   const licenseHref = await page.evaluate(() => document.querySelector(".help-licenses")?.getAttribute("href"));
   check("help licenses href is /licenses.html", licenseHref === "/licenses.html");
@@ -813,6 +814,252 @@ try {
     !betaEsc.expanded && !betaEsc.panel,
     JSON.stringify(betaEsc)
   );
+
+  const historyBtn = await page.$("button.icon-btn[aria-label='History']");
+  check("history button is in the toolbar", Boolean(historyBtn));
+  if (historyBtn) {
+    await historyBtn.click();
+    await page.waitForSelector(".history-pop .ui-popover-panel", { timeout: 3000 });
+    const historyOpen = await page.evaluate(() => {
+      const panel = document.querySelector(".history-pop .ui-popover-panel");
+      const r = panel?.getBoundingClientRect();
+      const hit = r
+        ? document.elementFromPoint(r.left + Math.min(24, r.width / 2), r.top + Math.min(16, r.height / 2))
+        : null;
+      return {
+        expanded: document.querySelector("button.icon-btn[aria-label='History']")?.getAttribute("aria-expanded") === "true",
+        title: panel?.querySelector(".history-title")?.textContent ?? "",
+        empty: Boolean(panel?.querySelector(".empty-history")),
+        items: [...(panel?.querySelectorAll(".history-item") ?? [])].map(
+          (li) => li.querySelector(".history-label")?.textContent ?? ""
+        ),
+        top: r?.top ?? -1,
+        bottom: r?.bottom ?? -1,
+        right: r?.right ?? -1,
+        innerWidth: innerWidth,
+        innerHeight: innerHeight,
+        hitPanel: Boolean(hit?.closest(".history-pop .ui-popover-panel")),
+      };
+    });
+    check("history popover opens on click", historyOpen.expanded && historyOpen.title === "History", JSON.stringify(historyOpen));
+    check(
+      "history popover stays in the viewport",
+      historyOpen.top >= 0 &&
+        historyOpen.bottom <= historyOpen.innerHeight + 1 &&
+        historyOpen.right <= historyOpen.innerWidth + 1,
+      JSON.stringify(historyOpen)
+    );
+    check("history popover is the hit target", historyOpen.hitPanel, JSON.stringify(historyOpen));
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".history-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
+    const historyEsc = await page.evaluate(() => ({
+      expanded: document.querySelector("button.icon-btn[aria-label='History']")?.getAttribute("aria-expanded") === "true",
+      panel: Boolean(document.querySelector(".history-pop .ui-popover-panel")),
+    }));
+    check(
+      "Escape closes the history popover",
+      !historyEsc.expanded && !historyEsc.panel,
+      JSON.stringify(historyEsc)
+    );
+
+    await page.click("button.icon-btn[aria-label='History']");
+    await page.waitForSelector(".history-pop .ui-popover-panel", { timeout: 3000 });
+    await page.click(".history-pop .ui-popover-dismiss");
+    await page.waitForSelector(".history-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
+    const historyClosed = await page.evaluate(() => ({
+      expanded: document.querySelector("button.icon-btn[aria-label='History']")?.getAttribute("aria-expanded") === "true",
+      panel: Boolean(document.querySelector(".history-pop .ui-popover-panel")),
+    }));
+    check(
+      "clicking outside closes the history popover",
+      !historyClosed.expanded && !historyClosed.panel,
+      JSON.stringify(historyClosed)
+    );
+
+    await page.evaluate(() => {
+      [...document.querySelectorAll(".tree-tools .tiny")]
+        .find((el) => el.textContent.trim() === "File")
+        ?.click();
+    });
+    await page.waitForSelector(".ui-dialog input[name=path]", { timeout: 4000 });
+    await page.focus(".ui-dialog input[name=path]");
+    await page.keyboard.down("Control");
+    await page.keyboard.press("a");
+    await page.keyboard.up("Control");
+    await page.keyboard.type("src/history-demo.cljs");
+    await page.click(".ui-dialog .ui-btn-primary");
+    await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 6000 });
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
+      { timeout: 6000 }
+    );
+
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".tree-row")].find(
+        (el) => el.querySelector(".tree-name")?.textContent === "history-demo.cljs"
+      );
+      row?.querySelector('[aria-label="Delete"]')?.click();
+    });
+    await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
+    const deleteCopy = await page.evaluate(() => document.querySelector(".ui-dialog")?.innerText ?? "");
+    check("delete dialog points at History", /History/.test(deleteCopy), deleteCopy.slice(0, 300));
+    await page.click(".ui-dialog .ui-btn-danger");
+    await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+    await page.waitForFunction(
+      () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
+      { timeout: 6000 }
+    );
+
+    await page.click("button.icon-btn[aria-label='History']");
+    await page.waitForSelector(".history-pop .ui-popover-panel", { timeout: 3000 });
+    const afterDelete = await page.evaluate(() => {
+      const items = [...document.querySelectorAll(".history-item")].map((li) => ({
+        label: li.querySelector(".history-label")?.textContent ?? "",
+        undo: [...li.querySelectorAll("button")].some((b) => b.textContent.trim() === "Undo"),
+      }));
+      return {
+        count: document.querySelector(".history-count")?.textContent ?? "",
+        items,
+        clear: [...document.querySelectorAll(".history-foot .ui-btn")].some(
+          (b) => b.textContent.trim() === "Clear history"
+        ),
+      };
+    });
+    check(
+      "deleted file appears in history",
+      afterDelete.items.some((it) => it.label.includes("history-demo.cljs") && it.undo),
+      JSON.stringify(afterDelete)
+    );
+    check("history has a clear button", afterDelete.clear, JSON.stringify(afterDelete));
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".history-item")].find((li) =>
+        (li.querySelector(".history-label")?.textContent ?? "").includes("history-demo.cljs")
+      );
+      [...(row?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === "Undo")?.click();
+    });
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
+      { timeout: 6000 }
+    );
+    check(
+      "undo restore puts the deleted file back",
+      await page.evaluate(() =>
+        [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs")
+      )
+    );
+
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".tree-row")].find(
+        (el) => el.querySelector(".tree-name")?.textContent === "history-demo.cljs"
+      );
+      row?.querySelector('[aria-label="Rename"]')?.click();
+    });
+    await page.waitForSelector(".ui-dialog input[name=path]", { timeout: 4000 });
+    await page.focus(".ui-dialog input[name=path]");
+    await page.keyboard.down("Control");
+    await page.keyboard.press("a");
+    await page.keyboard.up("Control");
+    await page.keyboard.type("src/history-renamed.cljs");
+    await page.click(".ui-dialog .ui-btn-primary");
+    await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 6000 });
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-renamed.cljs"),
+      { timeout: 6000 }
+    );
+
+    await page.click("button.icon-btn[aria-label='History']");
+    await page.waitForSelector(".history-pop .ui-popover-panel", { timeout: 3000 });
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".history-item")].find((li) =>
+        /Renamed/.test(li.querySelector(".history-label")?.textContent ?? "")
+      );
+      [...(row?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === "Undo")?.click();
+    });
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
+      { timeout: 6000 }
+    );
+    check(
+      "undo rename restores the original path",
+      await page.evaluate(
+        () =>
+          [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs") &&
+          ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-renamed.cljs")
+      )
+    );
+
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".tree-row")].find(
+        (el) => el.querySelector(".tree-name")?.textContent === "history-demo.cljs"
+      );
+      row?.querySelector('[aria-label="Delete"]')?.click();
+    });
+    await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
+    await page.click(".ui-dialog .ui-btn-danger");
+    await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+    await page.waitForFunction(
+      () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
+      { timeout: 6000 }
+    );
+
+    await page.click("button.icon-btn[aria-label='History']");
+    await page.waitForSelector(".history-foot .ui-btn", { timeout: 3000 });
+    await page.evaluate(() => {
+      [...document.querySelectorAll(".history-foot .ui-btn")]
+        .find((b) => b.textContent.trim() === "Clear history")
+        ?.click();
+    });
+    await page.waitForFunction(
+      () => Boolean(document.querySelector(".empty-history")),
+      { timeout: 4000 }
+    );
+    check(
+      "clear history empties the list",
+      await page.evaluate(() => Boolean(document.querySelector(".empty-history")))
+    );
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".history-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
+
+    await page.evaluate(() => {
+      [...document.querySelectorAll(".tree-tools .tiny")]
+        .find((el) => el.textContent.trim() === "File")
+        ?.click();
+    });
+    await page.waitForSelector(".ui-dialog input[name=path]", { timeout: 4000 });
+    await page.focus(".ui-dialog input[name=path]");
+    await page.keyboard.down("Control");
+    await page.keyboard.press("a");
+    await page.keyboard.up("Control");
+    await page.keyboard.type("src/history-keep.cljs");
+    await page.click(".ui-dialog .ui-btn-primary");
+    await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 6000 });
+    await page.waitForFunction(
+      () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-keep.cljs"),
+      { timeout: 6000 }
+    );
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".tree-row")].find(
+        (el) => el.querySelector(".tree-name")?.textContent === "history-keep.cljs"
+      );
+      row?.querySelector('[aria-label="Delete"]')?.click();
+    });
+    await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
+    await page.click(".ui-dialog .ui-btn-danger");
+    await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
+    await page.waitForFunction(
+      () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-keep.cljs"),
+      { timeout: 6000 }
+    );
+
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".tree-row")].find(
+        (el) => el.querySelector(".tree-name")?.textContent === "core.cljs"
+      );
+      row?.querySelector(".tree-item")?.click();
+    });
+    await page.waitForSelector(".cm-content", { timeout: 8000 });
+  }
+
 
   await page.waitForSelector("textarea[name=expr]", { timeout: 5000 });
   await page.waitForFunction(
@@ -1912,6 +2159,17 @@ try {
     "REPL history survives reload",
     /\(\+\s*9\s*9\)/.test(persisted.repl),
     persisted.repl.slice(0, 240)
+  );
+
+  await page.click("button.icon-btn[aria-label='History']");
+  await page.waitForSelector(".history-pop .ui-popover-panel", { timeout: 4000 });
+  const afterReload = await page.evaluate(() =>
+    [...document.querySelectorAll(".history-item")].map((li) => li.querySelector(".history-label")?.textContent ?? "")
+  );
+  check(
+    "history survives a reload",
+    afterReload.some((label) => label.includes("history-keep.cljs")),
+    afterReload.join(" | ")
   );
 } finally {
   await browser.close();

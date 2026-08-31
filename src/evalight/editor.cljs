@@ -318,6 +318,16 @@
   (when (and @!view @!path)
     (swap! !states assoc @!path (.-state ^js @!view))))
 
+(defn buffer-texts
+  "Path -> current editor text for every cached buffer, including the live doc."
+  []
+  (save-current-state!)
+  (into {}
+        (keep (fn [[path ^js st]]
+                (when (and path st)
+                  [path (.toString (.-doc st))])))
+        @!states))
+
 (defn drop-path! [path]
   (swap! !states dissoc path)
   (when (= path @!path)
