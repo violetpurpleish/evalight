@@ -1305,7 +1305,10 @@ try {
     /project name/i.test(newProjField.placeholder) || newProjField.placeholder === "",
     newProjField.placeholder
   );
-  await page.click(".ui-dialog input[name=name]", { clickCount: 3 });
+  await page.focus(".ui-dialog input[name=name]");
+  await page.keyboard.down("Control");
+  await page.keyboard.press("a");
+  await page.keyboard.up("Control");
   await page.keyboard.type("doomed");
   await page.click(".ui-dialog .ui-btn-primary");
   await page.waitForFunction(
@@ -1337,7 +1340,10 @@ try {
   if (renameHit) {
     await page.mouse.click(renameHit.x, renameHit.y);
     await page.waitForSelector(".ui-dialog input[name=path]", { timeout: 4000 });
-    await page.click(".ui-dialog input[name=path]", { clickCount: 3 });
+    await page.focus(".ui-dialog input[name=path]");
+    await page.keyboard.down("Control");
+    await page.keyboard.press("a");
+    await page.keyboard.up("Control");
     await page.keyboard.type("src/app/hello.cljs");
     await page.click(".ui-dialog .ui-btn-primary");
     await page.waitForFunction(
