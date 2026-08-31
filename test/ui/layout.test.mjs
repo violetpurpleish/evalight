@@ -256,6 +256,78 @@ try {
     await page.waitForSelector(".ui-crumb-menu", { hidden: true, timeout: 4000 });
   }
 
+  const nameClip = await page.evaluate(() => {
+    const row = [...document.querySelectorAll(".tree-row")].find(
+      (el) => el.querySelector(".tree-name")?.textContent === "breadcrumbs.cljs"
+    );
+    if (!row) return { missing: true };
+    const name = row.querySelector(".tree-name");
+    const item = row.querySelector(".tree-item");
+    const ops = row.querySelector(".tree-ops");
+    const prev = name.textContent;
+    name.textContent = "extraordinarily-long-filename.cljs";
+    const nameBox = name.getBoundingClientRect();
+    const itemBox = item.getBoundingClientRect();
+    const opsCs = getComputedStyle(ops);
+    const itemCs = getComputedStyle(item);
+    const measured = {
+      truncated: name.scrollWidth > name.clientWidth + 1,
+      gap: itemBox.right - nameBox.right,
+      padRight: parseFloat(itemCs.paddingRight),
+      opsOpacity: parseFloat(opsCs.opacity),
+      opsEvents: opsCs.pointerEvents,
+    };
+    name.textContent = prev;
+    return { missing: false, ...measured };
+  });
+  check("breadcrumbs.cljs is in the tree", !nameClip.missing, JSON.stringify(nameClip));
+  if (!nameClip.missing) {
+    check(
+      "a long file name fills the row instead of stopping short of the actions",
+      nameClip.truncated,
+      JSON.stringify(nameClip)
+    );
+    check(
+      "hidden file-row actions do not reserve layout space",
+      nameClip.padRight < 12 && nameClip.gap < 12,
+      JSON.stringify(nameClip)
+    );
+    check(
+      "file-row actions are not the hit target until hover",
+      nameClip.opsOpacity === 0 && nameClip.opsEvents === "none",
+      JSON.stringify(nameClip)
+    );
+    const crumbIdx = await page.evaluate(() =>
+      [...document.querySelectorAll(".tree-row")].findIndex(
+        (el) => el.querySelector(".tree-name")?.textContent === "breadcrumbs.cljs"
+      )
+    );
+    const crumbRow = (await page.$$(".tree-row"))[crumbIdx];
+    const widthBefore = await crumbRow.$eval(".tree-name", (el) => el.getBoundingClientRect().width);
+    await crumbRow.hover();
+    await new Promise((r) => setTimeout(r, 80));
+    const hoverClip = await page.evaluate(() => {
+      const row = [...document.querySelectorAll(".tree-row")].find(
+        (el) => el.querySelector(".tree-name")?.textContent === "breadcrumbs.cljs"
+      );
+      const name = row.querySelector(".tree-name");
+      const ops = row.querySelector(".tree-ops");
+      const nameBox = name.getBoundingClientRect();
+      const opsBox = ops.getBoundingClientRect();
+      return {
+        nameW: nameBox.width,
+        opsOpacity: parseFloat(getComputedStyle(ops).opacity),
+        opsLeft: opsBox.left,
+        nameRight: nameBox.right,
+      };
+    });
+    check(
+      "hovering a file row does not shrink the name for the actions",
+      Math.abs(widthBefore - hoverClip.nameW) < 1 && hoverClip.opsOpacity === 1,
+      JSON.stringify({ widthBefore, ...hoverClip })
+    );
+  }
+
   const rows = await page.$$(".tree-row");
   await rows[fileIdx].hover();
   await new Promise((r) => setTimeout(r, 120));

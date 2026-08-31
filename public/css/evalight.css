@@ -373,7 +373,7 @@ code, pre { font-family: var(--mono); }
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.22rem 2.4rem 0.22rem 0.3rem;
+  padding: 0.22rem 0.3rem;
   border-radius: 6px;
   text-align: left;
 }
