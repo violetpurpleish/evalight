@@ -11,6 +11,7 @@
   --ember: #d86a3a;
   --leaf: #8fbe72;
   --paper: #f3ead8;
+  --ink: #1c1610;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
   --sans: "Figtree", "Source Sans 3", system-ui, sans-serif;
   --serif: "Fraunces", Georgia, serif;
@@ -108,11 +109,6 @@ code, pre { font-family: var(--mono); }
   color: var(--text);
 }
 .beta-copy p + p { margin-top: 0.6rem; }
-.beta-dismiss {
-  position: fixed;
-  inset: 0;
-  z-index: 18;
-}
 
 .project { flex: 0 1 auto; min-width: 0; max-width: 16rem; }
 .project-picker { display: block; min-width: 0; }
@@ -534,7 +530,11 @@ code, pre { font-family: var(--mono); }
   color: var(--ink);
   overflow: auto;
 }
-.preview-banner p { margin: 0 0 0.7rem; font-weight: 600; }
+.preview-banner p {
+  margin: 0 0 0.7rem;
+  font-weight: 600;
+  color: var(--ink);
+}
 .preview-banner pre {
   margin: 0;
   white-space: pre-wrap;

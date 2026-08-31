@@ -52,6 +52,14 @@
   (or (= path prefix)
       (str/starts-with? (str path "/") (str prefix "/"))))
 
+(defn remap-under
+  "Rewrite `path` after `from` was renamed to `to`."
+  [path from to]
+  (cond
+    (= path from) to
+    (starts-with-path? path from) (join to (subs path (inc (count from))))
+    :else path))
+
 (defn slug [s]
   (-> (or s "")
       str/lower-case

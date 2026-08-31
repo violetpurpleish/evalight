@@ -17,8 +17,9 @@
     (reset! !root el)
     (r/set-dispatch! actions/handle)
     (add-watch state/app ::render
-               (fn [_ _ _ next]
-                 (render next)))
+               (fn [_ _ old next]
+                 (when (not= old next)
+                   (render next))))
     (render)
     (actions/boot!)))
 

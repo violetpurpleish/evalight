@@ -8,7 +8,9 @@
             [evalight.paths :as paths]
             [evalight.kit :as kit]
             [evalight.preview :as preview]
+            [evalight.prefs :as prefs]
             [evalight.promise :as p]
+            [evalight.ns-graph :as ns-graph]
             [evalight.state :as state]
             [evalight.template :as template]
             [evalight.commands :as commands]
@@ -31,6 +33,58 @@
      (js/clearTimeout t))
    (reset! !notice-timer
            (js/setTimeout #(swap! state/app assoc :notice nil) 2800))))
+
+(defn- cljs-file? [path]
+  (boolean (re-find #"\.(cljs|cljc)$" (or path ""))))
+
+(defn- cljs-sources []
+  (let [files (->> (fs/flatten-files (:tree @state/app))
+                   (filter #(cljs-file? (:path %))))]
+    (p/reduce-p
+     (fn [acc {:keys [path]}]
+       (if-let [buffered (editor/text-for path)]
+         (p/ok (conj acc {:path path :source buffered}))
+         (.then (fs/read-file (now-fs) path)
+                (fn [source]
+                  (conj acc {:path path :source source})))))
+     []
+     files)))
+
+(defn- write-sources! [files]
+  (p/reduce-p
+   (fn [_ {:keys [path source]}]
+     (.then (fs/write-file (now-fs) path source)
+            (fn [_]
+              (editor/set-doc! path source)
+              (swap! state/app update :dirty disj path)
+              nil)))
+   nil
+   files))
+
+(defn- ns-label [file]
+  (str (or (ns-graph/ns-name-of file) (:path file))))
+
+(defn- format-ns-names [files]
+  (str/join ", " (map ns-label files)))
+
+(defn- unused-project-name [base names]
+  (let [taken (set names)]
+    (if-not (contains? taken base)
+      base
+      (loop [i 2]
+        (let [n (str base "-" i)]
+          (if (contains? taken n)
+            (recur (inc i))
+            n))))))
+
+(defn suggested-project-name []
+  (unused-project-name "amber-counter" (:projects @state/app)))
+
+(declare schedule-live-reload!)
+
+(defn- reload-after-files! []
+  (when-not (:attached @state/app)
+    (schedule-live-reload!)))
 
 (defn refresh-tree! []
   (-> (fs/read-tree (now-fs) "")
@@ -209,18 +263,32 @@
                           (let [next (export/with-evalight-script text)]
                             (if (= next text)
                               (p/ok nil)
-                              (fs/write-file fs "package.json" next))))))))))
+                              (fs/write-file fs "package.json" next))))))))
+      (.then (fn [_] (fs/exists? fs "public/style.css")))
+      (.then (fn [exists]
+               (if-not exists
+                 (p/ok nil)
+                 (.then (fs/read-file fs "public/style.css")
+                        (fn [text]
+                          (let [next (template/with-title-wrap text)]
+                            (if (= next text)
+                              (p/ok nil)
+                              (fs/write-file fs "public/style.css" next))))))))))
 
 (defn open-project! [name]
   (let [mode (:mode @state/app)
+        prev (:project @state/app)
         fs-p (if (= :local mode)
                (p/ok (now-fs))
                (opfs/open ["evalight" "projects" name]))]
+    (when (and prev (not= prev name))
+      (prefs/save-repl!))
     (-> fs-p
         (.then (fn [project-fs]
                  (reset! !fs project-fs)
                  (editor/clear-buffers!)
                  (swap! state/app assoc :project name :active-file nil :dirty #{} :tree [])
+                 (prefs/restore-repl! name)
                  (if-let [ws @!workspace]
                    (fs/write-file ws "workspace.json"
                                  (js/JSON.stringify (clj->js {:active name})))
@@ -247,13 +315,17 @@
       (p/ok (flash! "Browser projects need OPFS." :err))
 
       :else
-      (-> (opfs/open ["evalight" "projects" name])
-          (.then (fn [dest] (write-template! dest name)))
-          (.then (fn [_] (refresh-projects!)))
-          (.then (fn [_]
-                   (swap! state/app assoc :dialog nil)
-                   (open-project! name)))
-          (.then (fn [_] (flash! (str "Created " name))))))))
+      (-> (fs/exists? @!workspace (paths/join "projects" name))
+          (.then (fn [exists]
+                   (if exists
+                     (p/ok (flash! (str name " already exists.") :err))
+                     (-> (opfs/open ["evalight" "projects" name])
+                         (.then (fn [dest] (write-template! dest name)))
+                         (.then (fn [_] (refresh-projects!)))
+                         (.then (fn [_]
+                                  (swap! state/app assoc :dialog nil)
+                                  (open-project! name)))
+                         (.then (fn [_] (flash! (str "Created " name))))))))))))
 
 (defn- read-saved-project [ws names]
   (-> (fs/read-file ws "workspace.json")
@@ -303,14 +375,42 @@
                    (refresh-tree!)))))))
 
 (defn delete-path! [path]
-  (-> (fs/delete (now-fs) path)
-      (.then (fn [_]
-               (editor/drop-path! path)
-               (swap! state/app assoc :dialog nil)
-               (when (= path (:active-file @state/app))
-                 (swap! state/app assoc :active-file nil))
-               (refresh-tree!)))
-      (.then (fn [_] (flash! (str "Deleted " path))))))
+  (-> (cljs-sources)
+      (.then (fn [files]
+               (let [removed (filterv #(or (= (:path %) path)
+                                           (paths/starts-with-path? (:path %) path))
+                                      files)
+                     kept (filterv #(not (or (= (:path %) path)
+                                             (paths/starts-with-path? (:path %) path)))
+                                   files)
+                     missing (->> removed
+                                  (map ns-graph/ns-name-of)
+                                  (remove nil?)
+                                  distinct
+                                  vec)
+                     leftover (filterv (fn [f]
+                                         (some (fn [ns-sym]
+                                                 (seq (ns-graph/requiring [f] ns-sym)))
+                                               missing))
+                                       kept)]
+                 (.then (fs/delete (now-fs) path)
+                        (fn [_]
+                          (editor/drop-tree! path)
+                          (swap! state/app assoc :dialog nil)
+                          (when (and (:active-file @state/app)
+                                     (paths/starts-with-path? (:active-file @state/app) path))
+                            (swap! state/app assoc :active-file nil))
+                          (.then (refresh-tree!)
+                                 (fn [_]
+                                   (reload-after-files!)
+                                   (if (seq leftover)
+                                     (flash! (str "Deleted " path ". "
+                                                  (format-ns-names leftover)
+                                                  " still require"
+                                                  (if (= 1 (count leftover)) "s " " ")
+                                                  (str/join ", " (map str missing)) ".")
+                                             :err)
+                                     (flash! (str "Deleted " path))))))))))))
 
 (defn- seed-lamp! []
   (-> (opfs/open ["evalight" "projects" "lamp"])
@@ -346,13 +446,55 @@
 
 (defn rename-path! [from to]
   (let [to (paths/normalize to)]
-    (-> (fs/rename (now-fs) from to)
-        (.then (fn [_]
-                 (editor/rename-path! from to)
-                 (swap! state/app assoc :dialog nil)
-                 (when (= from (:active-file @state/app))
-                   (swap! state/app assoc :active-file to))
-                 (refresh-tree!))))))
+    (if (or (str/blank? to) (= from to))
+      (p/ok (swap! state/app assoc :dialog nil))
+      (-> (cljs-sources)
+          (.then (fn [files]
+                   (.then (fs/rename (now-fs) from to)
+                          (fn [_]
+                            (editor/rename-path! from to)
+                            (swap! state/app assoc :dialog nil)
+                            (when-let [active (:active-file @state/app)]
+                              (when (paths/starts-with-path? active from)
+                                (swap! state/app assoc :active-file (paths/remap-under active from to))))
+                            (let [moved (mapv (fn [f]
+                                                (assoc f :path (paths/remap-under (:path f) from to)
+                                                       :from-path (:path f)))
+                                              files)
+                                  mapping (into []
+                                                (keep (fn [{:keys [from-path path source]}]
+                                                        (ns-graph/conventional-move from-path source path)))
+                                                moved)
+                                  rewritten (mapv (fn [f]
+                                                    (assoc f :source (ns-graph/rewrite-ns-syms (:source f) mapping)))
+                                                  moved)
+                                  changed (filterv (fn [f]
+                                                     (let [old (first (filter #(= (:path %) (:path f)) moved))]
+                                                       (not= (:source f) (:source old))))
+                                                   rewritten)
+                                  others (filterv (fn [f]
+                                                    (not (paths/starts-with-path? (:path f) to)))
+                                                  changed)]
+                              (.then (write-sources! changed)
+                                     (fn [_]
+                                       (.then (refresh-tree!)
+                                              (fn [_]
+                                                (reload-after-files!)
+                                                (cond
+                                                  (and (= 1 (count mapping)) (seq others))
+                                                  (let [[from-ns to-ns] (first mapping)]
+                                                    (flash! (str from-ns " is now " to-ns ". Updated "
+                                                                 (format-ns-names others) ".")))
+                                                  (= 1 (count mapping))
+                                                  (let [[from-ns to-ns] (first mapping)]
+                                                    (flash! (str from-ns " is now " to-ns ".")))
+                                                  (seq mapping)
+                                                  (flash! (str "Updated " (count mapping)
+                                                               " namespaces after the rename."))
+                                                  (seq others)
+                                                  (flash! (str "Updated " (format-ns-names others)
+                                                               " after the rename."))
+                                                  :else nil))))))))))))))
 
 (defn toggle-expanded! [path]
   (swap! state/app update :expanded
@@ -604,7 +746,7 @@
       :toggle-dir (toggle-expanded! (first args))
       :new-file-dialog (set-dialog! {:kind :new-file :value "src/"})
       :new-folder-dialog (set-dialog! {:kind :new-folder :value "src/"})
-      :new-project-dialog (set-dialog! {:kind :new-project :value ""})
+      :new-project-dialog (set-dialog! {:kind :new-project :value (suggested-project-name)})
       :rename-dialog (set-dialog! {:kind :rename :from (first args) :value (first args)})
       :delete-dialog (set-dialog! {:kind :delete :path (first args)})
       :delete-project-dialog (set-dialog! {:kind :delete-project
@@ -681,6 +823,7 @@
                                  :attach-label (:attach-label meta)))
                attached? (assoc-in [:preview :live?] false)))))
   (reset! !fs (http-fs/open))
+  (prefs/restore-repl! (or (:name meta) "local"))
   (-> (refresh-tree!)
       (.then (fn [_] (preferred-file (now-fs))))
       (.then (fn [preferred]
@@ -707,6 +850,8 @@
 
 (defn boot! []
   (swap! state/app assoc :fs-status :loading)
+  (prefs/restore-layout!)
+  (prefs/bind!)
   (editor/set-handlers! {:on-change on-editor-change
                          :on-eval on-editor-eval})
   (commands/bind-keys!)

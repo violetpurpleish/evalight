@@ -175,10 +175,11 @@
           [:h2.ui-dialog-title "New project"]
           [:p.muted "A fresh ClojureScript project stored in this browser."]
           (ui-input/input {:name "name"
-                           :placeholder "amber-counter"
-                           :value value
+                           :placeholder "Project name"
+                           :value (or value "")
                            :replicant/on-mount (fn [{:keys [replicant/node]}]
-                                                 (.focus node))})
+                                                 (.focus node)
+                                                 (.select node))})
           (ui-dialog/actions
            (btn/button {:type "button" :class "ghost" :on {:click [:close-dialog]}} "Cancel")
            (btn/button {:variant :primary :class "primary" :type "submit"} "Create"))]
@@ -332,7 +333,7 @@
 (defn- beta-badge [state]
   (let [open? (boolean (:beta? state))]
     [:div.beta-pop
-     (popover/popover {:open? open?}
+     (popover/popover {:open? open? :on-close [:close-beta]}
        [:button.beta-badge
         {:type "button"
          :aria-expanded open?
@@ -453,8 +454,6 @@
     [:div.shell {:class (str "tab-" (name (:mobile-tab state)))}
      [:div.workspace
       (header state)
-      (when (:beta? state)
-        [:div.beta-dismiss {:on {:click [:close-beta]}}])
       [:div.stage
        {:class [(when-not files-open? "is-files-closed")
                 (when-not preview-open? "is-preview-closed")

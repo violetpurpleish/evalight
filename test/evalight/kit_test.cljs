@@ -69,6 +69,15 @@
     (is (re-find #"ui.button" (get files "src/app/core.cljs")))
     (is (re-find #"public/css/ui.css" (get files "evalight.edn")))))
 
+(deftest lamp-css-keeps-the-title-on-one-line
+  (let [css (template/public-css)]
+    (is (re-find #"white-space: nowrap" css))
+    (is (re-find #"text-overflow: ellipsis" css))
+    (is (not (template/stale-lamp-css? css)))
+    (let [old "h1 { font-family: var(--ui-serif); font-weight: 560; font-size: 2.4rem; margin: 0 0 0.6rem; }\n"]
+      (is (template/stale-lamp-css? old))
+      (is (re-find #"text-overflow: ellipsis" (template/with-title-wrap old))))))
+
 (deftest lamp-rename-save-is-a-click-not-a-submit
   (let [src (get (template/files "lamp") "src/app/core.cljs")]
     (is (re-find #":type \"button\".*Save" src))

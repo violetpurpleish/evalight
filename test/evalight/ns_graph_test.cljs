@@ -60,4 +60,43 @@
   (is (= "src/app" (paths/dirname "src/app/core.cljs")))
   (is (= "cljs" (paths/ext "src/app/core.cljs")))
   (is (paths/clojure-file? "src/app/core.cljs"))
-  (is (= "amber-counter" (paths/slug "Amber Counter!"))))
+  (is (= "amber-counter" (paths/slug "Amber Counter!")))
+  (is (= "src/app/hello.cljs" (paths/remap-under "src/app/greet.cljs" "src/app/greet.cljs" "src/app/hello.cljs")))
+  (is (= "src/foo/greet.cljs" (paths/remap-under "src/app/greet.cljs" "src/app" "src/foo")))
+  (is (= "src/ui/button.cljs" (paths/remap-under "src/ui/button.cljs" "src/app" "src/foo"))))
+
+(deftest path->ns-strips-src
+  (is (= 'app.greet (ns-graph/path->ns "src/app/greet.cljs")))
+  (is (= 'app.hello (ns-graph/path->ns "src/app/hello.cljs"))))
+
+(deftest rewrite-ns-sym-updates-require-and-declaration
+  (let [core "(ns app.core\n  (:require [app.greet :as greet]\n            [app.stats :as stats]))\n\n(defn init [] (greet/greet \"x\"))\n"
+        greet "(ns app.greet)\n\n(defn greet [name] name)\n"]
+    (is (= "(ns app.core\n  (:require [app.hello :as greet]\n            [app.stats :as stats]))\n\n(defn init [] (greet/greet \"x\"))\n"
+           (ns-graph/rewrite-ns-sym core 'app.greet 'app.hello)))
+    (is (= "(ns app.hello)\n\n(defn greet [name] name)\n"
+           (ns-graph/rewrite-ns-sym greet 'app.greet 'app.hello)))
+    (is (= core (ns-graph/rewrite-ns-sym core 'app.greet.extra 'app.x)))
+    (let [both "(ns app.core (:require [app.greet.extra :as x] [app.greet :as g]))"
+          out (ns-graph/rewrite-ns-sym both 'app.greet 'app.hello)]
+      (is (re-find #"app\.greet\.extra" out))
+      (is (re-find #"app\.hello" out)))))
+
+(deftest requiring-finds-callers
+  (let [files [{:path "src/app/core.cljs"
+                :source "(ns app.core (:require [app.greet :as g] [app.stats :as s]))"}
+               {:path "src/app/greet.cljs"
+                :source "(ns app.greet)"}]]
+    (is (= ["src/app/core.cljs"] (mapv :path (ns-graph/requiring files 'app.greet))))
+    (is (= [] (ns-graph/requiring files 'app.missing)))))
+
+(deftest conventional-move-follows-path
+  (is (= ['app.greet 'app.hello]
+         (ns-graph/conventional-move
+          "src/app/greet.cljs"
+          "(ns app.greet)\n"
+          "src/app/hello.cljs")))
+  (is (nil? (ns-graph/conventional-move
+             "src/app/greet.cljs"
+             "(ns weird.custom)\n"
+             "src/app/hello.cljs"))))

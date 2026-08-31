@@ -157,11 +157,67 @@
              (subs source cut))
         (str "(declare " (str/join " " names) ")\n" source)))))
 
-(defn- path->ns-guess [path]
+(defn path->ns
+  "Namespace symbol implied by a source path, or nil."
+  [path]
   (when (re-find #"\.(cljs?|cljc)$" (or path ""))
     (let [no-ext (str/replace path #"\.(cljs?|cljc)$" "")
           trimmed (str/replace no-ext #"^src/" "")]
       (symbol (str/replace trimmed "/" ".")))))
+
+(defn- re-quote [s]
+  (str/replace (str s) #"([.*+?^${}()|\[\]\\])" (fn [[_ ch]] (str "\\" ch))))
+
+(defn rewrite-ns-sym
+  "Replace namespace symbol `from` with `to` inside the first (ns ...) form."
+  [source from to]
+  (let [from (str from)
+        to (str to)]
+    (if (or (str/blank? from) (str/blank? to) (= from to))
+      source
+      (if-let [end (ns-form-end source)]
+        (let [pat (re-pattern (str "(?<![A-Za-z0-9*+!?_\\-])"
+                                   (re-quote from)
+                                   "(?![A-Za-z0-9*+!?_\\-.])"))]
+          (str (str/replace (subs source 0 end) pat to)
+               (subs source end)))
+        source))))
+
+(defn rewrite-ns-syms
+  "Apply from→to namespace replacements, longest name first."
+  [source mapping]
+  (reduce (fn [s [from to]]
+            (rewrite-ns-sym s from to))
+          source
+          (->> mapping
+               (remove (fn [[from to]] (= (str from) (str to))))
+               (sort-by (fn [[from]] (- (count (str from))))))))
+
+(defn ns-name-of
+  "Declared ns, or the path guess, or nil."
+  [{:keys [path source]}]
+  (or (:name (parse-ns source))
+      (path->ns path)))
+
+(defn requiring
+  "Files whose ns form requires `ns-sym`."
+  [files ns-sym]
+  (let [want (symbol (str ns-sym))]
+    (filterv (fn [{:keys [source]}]
+               (when-let [info (parse-ns source)]
+                 (some #{want} (:requires info))))
+             files)))
+
+(defn conventional-move
+  "If this file's ns matches its path, the ns that should follow a rename."
+  [path source new-path]
+  (let [guessed (path->ns path)
+        actual (or (:name (parse-ns source)) guessed)
+        next (path->ns new-path)]
+    (when (and guessed next actual
+               (= (str actual) (str guessed))
+               (not= (str actual) (str next)))
+      [actual next])))
 
 (defn load-order
   "Return files in an order that satisfies ns :require when possible.
@@ -170,7 +226,7 @@
   [files main]
   (let [parsed (mapv (fn [{:keys [path source] :as file}]
                        (let [info (parse-ns source)
-                             name (or (:name info) (path->ns-guess path))]
+                             name (or (:name info) (path->ns path))]
                          (assoc file
                                 :ns name
                                 :requires (or (:requires info) []))))
