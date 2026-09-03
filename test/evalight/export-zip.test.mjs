@@ -112,6 +112,14 @@ function assertZip(files, names) {
     files["evalight/compiled.mjs"]?.includes("nrepl-select"),
     "compiled.mjs missing nrepl-select",
   );
+  assert.ok(
+    files["evalight/project.mjs"]?.includes("classifyProject"),
+    "packed Evalight must classify Clojure vs ClojureScript",
+  );
+  assert.ok(
+    files["evalight/clj.mjs"]?.includes("startCljRuntime"),
+    "packed Evalight must include the JVM nREPL runtime",
+  );
   assert.ok(files["evalight/static.mjs"]?.includes("servePublicPath"));
   assert.ok(files["evalight/fs-http.mjs"]?.includes("SKIP_ROOT"));
   assert.ok(

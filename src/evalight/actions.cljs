@@ -22,7 +22,23 @@
 (defonce !history-fs (atom nil))
 (defonce !save-timer (atom nil))
 (defonce !live-timer (atom nil))
+(defonce !frame-timer (atom nil))
 (defonce !notice-timer (atom nil))
+
+(defn- schedule-native-frame!
+  "GPUI preview is a snapshot, not an iframe. Eval already mutated the
+  live window, so refresh immediately. Save goes through clj-gpui's
+  watcher first, so wait a beat. No-op unless Preview is native."
+  [ms]
+  (when (preview/native-preview?)
+    (when-let [t @!frame-timer]
+      (js/clearTimeout t))
+    (reset! !frame-timer
+            (js/setTimeout
+             (fn []
+               (reset! !frame-timer nil)
+               (preview/fetch-frame!))
+             ms))))
 
 (defn- now-fs []
   (or @!fs (throw (js/Error. "Filesystem is not ready."))))
@@ -166,7 +182,8 @@
   (if (:ok result)
     (do (swap! state/app assoc-in [:preview :status] :ok)
         (swap! state/app assoc-in [:preview :error] nil)
-        (preview/refresh-intel!))
+        (preview/refresh-intel!)
+        (preview/fetch-frame!))
     (do (swap! state/app assoc-in [:preview :status] :error)
         (swap! state/app assoc-in [:preview :error]
                (or (get-in result [:error :message]) "Preview failed to load."))))
@@ -181,7 +198,7 @@
    (swap! state/app assoc-in [:preview :error] nil)
    (-> (save-current! {:reload? false})
        (.then (fn [_]
-                (when reset?
+                (when (and reset? (preview/iframe-runtime?))
                   (preview/reload-frame!))
                 (preview/load-project (now-fs) {:reset? reset?})))
        (.then apply-preview-result)
@@ -192,7 +209,8 @@
 
 (defn- schedule-live-reload! []
   (when (and (:live? (:preview @state/app))
-             (not (:attached @state/app)))
+             (not (:attached @state/app))
+             (preview/iframe-runtime?))
     (when-let [t @!live-timer]
       (js/clearTimeout t))
     (reset! !live-timer
@@ -203,6 +221,9 @@
                    (preview/reload-frame!))
                  (-> (preview/load-project (now-fs) {:reset? false})
                      (.then apply-preview-result)
+                     (.then (fn [r]
+                              (preview/fetch-frame!)
+                              r))
                      (.catch (fn [e]
                                (swap! state/app assoc-in [:preview :status] :error)
                                (swap! state/app assoc-in [:preview :error] (.-message e)))))))
@@ -218,7 +239,8 @@
            (.then (fn [_]
                     (swap! state/app update :dirty disj path)
                     (when reload?
-                      (schedule-live-reload!))
+                      (schedule-live-reload!)
+                      (schedule-native-frame! 450))
                     path)))
        (p/ok nil)))))
 
@@ -249,7 +271,8 @@
                          (repl-out (:stdout result)))
                        (if (:ok result)
                          (do (repl-out (or (:value result) "nil"))
-                             (preview/refresh-intel!))
+                             (preview/refresh-intel!)
+                             (schedule-native-frame! 0))
                          (repl-err (or (get-in result [:error :message])
                                        "Evaluation failed.")))))
               (.catch (fn [e]
@@ -279,12 +302,23 @@
    nil
    (template/files project-name)))
 
+(def ^:private preferred-candidates
+  ["src/app/core.cljs" "src/my/app.clj" "src/app/core.clj"])
+
 (defn- preferred-file [project-fs]
-  (-> (fs/exists? project-fs "src/app/core.cljs")
-      (.then (fn [exists]
-               (if exists
-                 "src/app/core.cljs"
-                 (some :path (fs/flatten-files (:tree @state/app))))))))
+  (-> (p/reduce-p
+       (fn [found path]
+         (if found
+           (p/ok found)
+           (.then (fs/exists? project-fs path)
+                  (fn [exists] (when exists path)))))
+       nil
+       preferred-candidates)
+      (.then (fn [found]
+               (or found
+                   (some (fn [{:keys [path]}]
+                           (when (re-find #"\.(clj|cljs|cljc)$" path) path))
+                         (fs/flatten-files (:tree @state/app))))))))
 
 (defn- migrate-project-docs! [fs name]
   (-> (fs/exists? fs "README.md")
@@ -978,21 +1012,43 @@
                                                              (:name (:dialog @state/app)))))
       nil)))
 
+(defn- app-var-ns [app]
+  (when (and app (not (str/blank? (str app))))
+    (let [s (str app)]
+      (if (re-find #"/" s)
+        (first (str/split s #"/"))
+        s))))
+
 (defn- boot-local [meta]
-  (let [compiled? (= "compiled" (str (:runtime meta)))
-        attached? (boolean (:attached meta))]
+  (let [rt (preview/coerce-runtime (or (:runtime meta) (:kind meta)))
+        attached? (boolean (:attached meta))
+        preview-kind (keyword (or (:preview meta) (:preview-kind meta)))
+        gpui? (= rt :gpui)
+        clj? (= rt :clj)
+        app (or (:app meta) (:mainNs meta) (:main-ns meta))
+        repl-ns (app-var-ns app)]
     (swap! state/app
            (fn [s]
              (cond-> (-> s
                           (assoc :mode :local
-                                 :runtime (if compiled? :compiled :sci)
+                                 :runtime rt
+                                 :preview-kind preview-kind
                                  :preview-url (or (:preview-url meta) (:previewUrl meta))
+                                 :nrepl-port (or (:nrepl-port meta) (:nreplPort meta))
+                                 :app-var (or app (get-in s [:repl :ns]))
                                  :project (or (:name meta) "local")
                                  :attached attached?
                                  :attach-label (:attach-label meta)))
-               attached? (assoc-in [:preview :live?] false)))))
-  (reset! !fs (http-fs/open))
-  (prefs/restore-repl! (or (:name meta) "local"))
+               (and clj? (not gpui?)) (assoc-in [:layout :preview-open?] false)
+               gpui? (assoc-in [:layout :preview-open?] true)
+               (or attached? gpui?) (assoc-in [:preview :live?] false)
+               repl-ns (assoc-in [:repl :ns] repl-ns))))
+    (reset! !fs (http-fs/open))
+    (prefs/restore-repl! (or (:name meta) "local"))
+    ;; History restore can put back a ClojureScript ns. Only JVM apps
+    ;; should ignore that and keep the nREPL main ns.
+    (when (and repl-ns (or clj? gpui?))
+      (swap! state/app assoc-in [:repl :ns] repl-ns)))
   (-> (load-history!)
       (.then (fn [_] (refresh-tree!)))
       (.then (fn [_] (preferred-file (now-fs))))

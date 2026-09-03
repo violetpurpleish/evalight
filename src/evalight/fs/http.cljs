@@ -108,7 +108,7 @@
   (if-let [mode (some-> js/window .-EVALIGHT_MODE)]
     (js/Promise.resolve {:mode mode})
     (let [ctrl (js/AbortController.)]
-      (js/setTimeout #(.abort ctrl) 1200)
+      (js/setTimeout #(.abort ctrl) 5000)
       (-> (js/fetch "/api/meta" #js {:signal (.-signal ctrl)})
           (.then (fn [res]
                    (if (.-ok res)

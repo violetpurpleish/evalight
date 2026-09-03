@@ -38,6 +38,24 @@
   (intel/set-live! [{:name "bump" :kind "var" :ns "app.core"}] "app.core")
   (is (re-find #"Increment" (:doc (intel/lookup "bump")))))
 
+(deftest live-intel-hovers-referred-core
+  (intel/index-sources! [] "todomvc.app")
+  (intel/set-live!
+   [{:name "toggle-item" :kind "var" :ns "todomvc.app" :doc "Flip one todo."}
+    {:name "defn" :kind "core" :ns "clojure.core" :macro true
+     :arglists "([name doc-string? attr-map? [params*] prepost-map? body*] [name doc-string? attr-map? ([params*] prepost-map? body*)+])"
+     :doc "Same as (def name (fn [params*] exprs*)) …"}
+    {:name "swap!" :kind "core" :ns "clojure.core"
+     :arglists "([atom f] [atom f x] [atom f x y] [atom f x y & args])"
+     :doc "Atomically swaps the value of atom to be (apply f current-value-of-atom args)."}]
+   "todomvc.app")
+  (is (re-find #"def name" (:doc (intel/lookup "defn"))))
+  (is (re-find #"Atomically swaps" (:doc (intel/lookup "swap!"))))
+  (is (= "clojure.core" (:ns (intel/lookup "swap!"))))
+  (is (some #(= "swap!" (:name %)) (intel/candidates "swa")))
+  (is (not (some #(= "swap!" (:name %)) (intel/candidates "")))
+      "blank completions stay on project vars, not the whole of clojure.core"))
+
 (deftest live-intel-unwraps-quoted-arglists
   (intel/index-sources! [] "app.core")
   (intel/set-live!

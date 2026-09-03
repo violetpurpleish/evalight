@@ -4,7 +4,8 @@
             [evalight.intel :as intel]
             [evalight.ns-graph :as ns-graph]
             [evalight.promise :as p]
-            [evalight.state :as state]))
+            [evalight.state :as state]
+            [clojure.string :as str]))
 
 (defonce !iframe (atom nil))
 (defonce !id (atom 0))
@@ -15,13 +16,54 @@
 
 (declare reload-frame!)
 
+(def known-runtimes #{:sci :compiled :clj :gpui})
+
+(defn coerce-runtime
+  "Map /api/meta :runtime (or detectProject :kind) onto the four
+  client runtimes. detectProject says :cljs / :workshop; the editor
+  must not store those, or iframe Live / Add UI / SCI eval all drop.
+
+  Do not round-trip keywords through str. (keyword (str :compiled))
+  is not :compiled, and compiled REPL eval would fall back to SCI."
+  [x]
+  (let [k (cond
+            (keyword? x) x
+            (and (string? x) (not (str/blank? x))) (keyword x)
+            :else :sci)]
+    (case k
+      (:compiled :cljs) :compiled
+      :clj :clj
+      :gpui :gpui
+      :sci)))
+
+(defn runtime []
+  (let [rt (:runtime @state/app)]
+    (if (contains? known-runtimes rt)
+      rt
+      (coerce-runtime rt))))
+
 (defn compiled-runtime? []
-  (= :compiled (:runtime @state/app)))
+  (= :compiled (runtime)))
+
+(defn nrepl-runtime? []
+  (contains? #{:compiled :clj :gpui} (runtime)))
+
+(defn iframe-runtime? []
+  (contains? #{:sci :compiled} (runtime)))
+
+(defn native-preview? []
+  (or (= :gpui (runtime))
+      (= :native (keyword (:preview-kind @state/app)))))
+
+(defn preview-pane? []
+  (not (or (= :clj (runtime))
+           (= :none (keyword (:preview-kind @state/app))))))
 
 (defn preview-src []
-  (if (compiled-runtime?)
-    (or (:preview-url @state/app) "about:blank")
-    "/preview.html"))
+  (cond
+    (compiled-runtime?) (or (:preview-url @state/app) "about:blank")
+    (iframe-runtime?) "/preview.html"
+    :else "about:blank"))
 
 (defn- runtime-json [url body]
   (let [opts (if body
@@ -49,11 +91,16 @@
                                 (:connected st)
                                 (resolve st)
 
+                                (:fatal st)
+                                (reject (js/Error. (or (:error st) "Runtime failed to start.")))
+
                                 (> (- (.now js/Date) t0) ms)
                                 (reject (js/Error. (or (:error st)
-                                                       "The compiled app did not connect. Need a JDK and bun install, and Preview must stay open.")))
+                                                       (if (compiled-runtime?)
+                                                         "The compiled app did not connect. Need a JDK and bun install, and Preview must stay open."
+                                                         "Clojure nREPL did not connect. Need a JDK and the Clojure CLI."))))
 
-                                (and (:ready st) (not @!reloaded))
+                                (and (compiled-runtime?) (:ready st) (not @!reloaded))
                                 (do (reset! !reloaded true)
                                     (reload-frame!)
                                     (js/setTimeout step 600))
@@ -137,7 +184,7 @@
   (when-not @!listening
     (.addEventListener js/window "message" handle-message)
     (reset! !listening true))
-  (when-not (compiled-runtime?)
+  (when (and (iframe-runtime?) (not (compiled-runtime?)))
     (js/setTimeout
      (fn []
        (post {:type "evalight/hello"}))
@@ -163,7 +210,10 @@
       (.then
        (fn [tree]
          (let [cljs (->> (fs/flatten-files tree)
-                         (filter #(re-find #"\.(cljs|cljc)$" (:path %)))
+                         (filter #(re-find (if (contains? #{:clj :gpui} (runtime))
+                                             #"\.(clj|cljs|cljc)$"
+                                             #"\.(cljs|cljc)$")
+                                           (:path %)))
                          vec)]
            (p/reduce-p
             (fn [acc {:keys [path]}]
@@ -199,13 +249,15 @@
 (defn load-project
   ([fs] (load-project fs {:reset? true}))
   ([fs {:keys [reset?]}]
-   (if (compiled-runtime?)
+   (if (nrepl-runtime?)
      (-> (project-payload fs)
          (.then (fn [payload]
                   (intel/index-sources! (:files payload) (:main payload))
                   (wait-compiled 120000)))
          (.then (fn [st]
-                  {:ok true :runtime "compiled" :preview-url (or (:preview-url st) (:previewUrl st))})))
+                  {:ok true
+                   :runtime (or (:runtime st) "compiled")
+                   :preview-url (or (:preview-url st) (:previewUrl st))})))
      (let [id (next-id)
            result (wait-for id)]
        (-> (project-payload fs)
@@ -216,20 +268,39 @@
                                  :id id))
                     result)))))))
 
+(defn- eval-ns []
+  (or (get-in @state/app [:repl :ns])
+      (let [app (:app-var @state/app)]
+        (cond
+          (and app (re-find #"/" (str app))) (first (str/split (str app) #"/"))
+          (seq (str app)) (str app)
+          (compiled-runtime?) "app.core"
+          :else "user"))))
+
 (defn eval-code [code]
-  (if (compiled-runtime?)
-    (let [ns-name (or (get-in @state/app [:repl :ns]) "app.core")]
-      (runtime-json "/api/runtime/eval" {:code code :ns ns-name}))
+  (if (nrepl-runtime?)
+    (runtime-json "/api/runtime/eval" {:code code :ns (eval-ns)})
     (let [id (next-id)
           p (wait-for id)]
       (send {:type "evalight/eval" :id id :code code})
       p)))
 
+(defn fetch-frame!
+  "Ask local Evalight for a PNG of the GPUI window, if the image provides one."
+  []
+  (when (native-preview?)
+    (-> (runtime-json "/api/runtime/frame" nil)
+        (.then (fn [data]
+                 (when (:ok data)
+                   (swap! state/app assoc :preview-frame (or (:png data) nil)))
+                 data))
+        (.catch (fn [_] nil)))))
+
 (defn refresh-intel!
   "Ask the live image for interned names, arglists, and docstrings."
   []
-  (if (compiled-runtime?)
-    (let [ns-name (or (get-in @state/app [:repl :ns]) "app.core")]
+  (if (nrepl-runtime?)
+    (let [ns-name (eval-ns)]
       (-> (runtime-json "/api/runtime/intel" {:ns ns-name})
           (.then (fn [data]
                    (when (:ok data)

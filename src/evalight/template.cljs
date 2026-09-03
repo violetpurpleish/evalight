@@ -2,6 +2,30 @@
   (:require [clojure.string :as str]
             [evalight.kit :as kit]))
 
+(defn gpui-evalight-edn
+  "evalight.edn for a clj-gpui app. Copy into that project's template."
+  [project-name main]
+  (str "{:name " (pr-str project-name) "\n"
+       " :main " (or main "my.app/app") "\n"
+       " :runtime :gpui\n"
+       " :preview {:kind :native}}\n"))
+
+(defn clj-evalight-edn
+  "evalight.edn for a generic JVM Clojure project. Preview stays hidden."
+  [project-name main]
+  (str "{:name " (pr-str project-name) "\n"
+       " :main " (or main "user") "\n"
+       " :runtime :clj}\n"))
+
+(defn clj-package-json [project-name]
+  (str "{\n"
+       "  \"name\": " (pr-str project-name) ",\n"
+       "  \"private\": true,\n"
+       "  \"scripts\": {\n"
+       "    \"evalight\": \"bun evalight/server.mjs\"\n"
+       "  }\n"
+       "}\n"))
+
 (defn evalight-edn [project-name]
   (str "{:name " (pr-str project-name) "\n"
        " :main app.core\n"

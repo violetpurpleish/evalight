@@ -4,6 +4,10 @@
   (atom {:mode :browser
          :runtime :sci
          :preview-url nil
+         :preview-kind nil
+         :preview-frame nil
+         :nrepl-port nil
+         :app-var nil
          :fs-status :loading
          :fs-error nil
          :projects []

@@ -9,17 +9,20 @@
  *   bun evalight/server.mjs
  *   bun evalight/server.mjs --attach
  *   bun evalight/server.mjs --attach --preview-url=http://127.0.0.1:3456/
+ *
+ * ClojureScript projects start shadow-cljs watch. JVM Clojure / clj-gpui
+ * start (or attach to) nREPL. Generic Clojure has no preview pane.
  */
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  compiledMeta,
   handleRuntimeRequest,
   parseEvalightArgs,
-  startCompiledRuntime,
-  stopCompiledRuntime,
-} from "./compiled.mjs";
+  runtimeMeta,
+  startRuntime,
+  stopRuntime,
+} from "./runtime.mjs";
 import { createFsApi, error, json } from "./fs-http.mjs";
 import { servePublicPath } from "./static.mjs";
 
@@ -54,8 +57,7 @@ const flags = (() => {
   }
 })();
 
-console.log(`Starting compiled runtime…`);
-await startCompiledRuntime(FS_ROOT, {
+await startRuntime(FS_ROOT, {
   attach: flags.attach,
   previewUrl: flags.previewUrl,
   nreplPort: flags.nreplPort,
@@ -71,7 +73,7 @@ Bun.serve({
         mode: "local",
         name: FS_ROOT.split(/[\\/]/).filter(Boolean).at(-1),
         root: FS_ROOT,
-        ...compiledMeta(),
+        ...runtimeMeta(),
       });
     }
     const runtimeRes = await handleRuntimeRequest(req, url);
@@ -96,7 +98,7 @@ console.log(`Evalight  http://127.0.0.1:${PORT}`);
 console.log(`  project  ${FS_ROOT}`);
 
 function shutdown() {
-  stopCompiledRuntime();
+  stopRuntime();
   process.exit(0);
 }
 process.on("SIGINT", shutdown);

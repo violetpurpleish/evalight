@@ -91,7 +91,10 @@
       :aria-label "Close help"}
      (icons/close)]]
    [:div.help-body
-    [:p "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler."]
+    [:p (case (:runtime state)
+          :gpui "Evalight is editing a clj-gpui app. Ctrl-Enter talks to the JVM nREPL. The native window is the running program."
+          :clj "Evalight is editing JVM Clojure. Ctrl-Enter talks to nREPL. There is no preview pane: this project has no window to show."
+          "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler.")]
     [:ul.shortcuts
      (shortcut ["Tab"] "Indent this line, or accept a completion when the list is showing")
      (shortcut ["Shift" "Tab"] "Dedent. Parinfer moves the parentheses.")
@@ -99,14 +102,21 @@
      (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")
      (shortcut ["Ctrl" "K"] "Command palette")]
     [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
-    [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running preview."]
-    [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original file over one you edited."]
+    [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running image."]
+    (when (contains? #{:sci :compiled} (or (:runtime state) :sci))
+      [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original kit file over one you edited."])
     [:p.muted "Deletes, renames, and kit restores are listed under History in the toolbar so you can put them back. Code edits still use Ctrl-Z in the editor."]
     (if (= :local (:mode state))
-      (if (:attached state)
+      (cond
+        (= :gpui (:runtime state))
+        [:p.muted "These files are on disk. Evalight started `clj -M:dev` (or attached to it). The GPUI window is the preview. A browser iframe cannot host that window; if the image interned gpui.runtime/preview-png, this pane can show a snapshot. Live stays off because the clj-gpui watcher already reloads on save."]
+        (= :clj (:runtime state))
+        [:p.muted "These files are on disk. Ctrl-Enter talks to a JVM nREPL. Preview stays hidden unless this is a clj-gpui app. You need a JDK and the Clojure CLI. SCI is only used on the hosted ClojureScript playground."]
+        (:attached state)
         [:p.muted "Attached to a shadow-cljs watch you already started (`bun run evalight --attach`). Preview is that app. Evalight will not start or stop the compiler, and Live stays off so it does not fight shadow autoload."]
+        :else
         [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground. Live reloads that preview after you save; off keeps the current page. `bun run evalight --attach` joins a watch you already started instead of starting one."])
-      [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop."])
+      [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop. JVM Clojure and clj-gpui need local mode on a real directory."])
     [:p.muted
      [:a.help-licenses {:href "/licenses.html" :target "_blank" :rel "noopener noreferrer"}
       "Open Source Licenses"]]]])
@@ -224,7 +234,7 @@
    (into [:div.pane-start] (remove nil? start))
    (into [:div.pane-end] (remove nil? end))])
 
-(defn repl-pane [{:keys [repl]}]
+(defn repl-pane [{:keys [repl runtime]}]
   [:section.repl {:replicant/key "repl-pane"}
      (pane-head
       [[:span "REPL"]
@@ -239,14 +249,16 @@
         [:div {:replicant/key id :class ["repl-line" (str "is-" (name kind))]}
          [:span.gutter (case kind :in "›" :err "!" "=")]
          [:pre text]])
-      [:p.muted.empty "Enter evaluates. Shift-Enter adds a line. Results come from the live preview, so (bump) will move the lamp."])]
+      [:p.muted.empty (if (contains? #{:clj :gpui} runtime)
+                        "Enter evaluates. Shift-Enter adds a line. Results come from the JVM nREPL."
+                        "Enter evaluates. Shift-Enter adds a line. Results come from the live preview, so (bump) will move the lamp.")])]
    [:form.repl-input
     {:replicant/key "repl-form"
      :on {:submit [:submit-repl]}}
     [:span.gutter "›"]
     [:textarea {:name "expr"
                 :rows 1
-                :placeholder "(bump)"
+                :placeholder (if (contains? #{:clj :gpui} runtime) "(+ 1 1)" "(bump)")
                 :autocomplete "off"
                 :autocorrect "off"
                 :autocapitalize "off"
@@ -255,10 +267,30 @@
                 :replicant/key "repl-expr"
                 :on {:keydown [:repl-expr-keydown]}}]]])
 
+(defn- native-preview-body [state]
+  (let [{:keys [preview preview-frame nrepl-port app-var attached attach-label]} state]
+    [:div.preview-native
+     [:p.eyebrow "Native GPUI"]
+     [:h2 (or app-var "GPUI window")]
+     [:p.lede "The running program is the native window. It cannot live inside this browser pane. Leave that window open; Ctrl-Enter still talks to it over nREPL."]
+     (when-let [err (:error preview)]
+       [:pre.preview-native-error err])
+     (if preview-frame
+       [:img.preview-capture {:src preview-frame :alt "GPUI window"}]
+       [:div.preview-native-window
+        {:aria-hidden "true"}
+        [:span.preview-native-chrome]])
+     [:dl.preview-native-meta
+      [:div [:dt "nREPL"] [:dd (str (or nrepl-port "—"))]]
+      (when attached
+        [:div [:dt "Attach"] [:dd (or attach-label "yes")]])]]))
+
 (defn preview-pane [state]
   (let [{:keys [preview layout runtime preview-url attached attach-label]} state
         compiled? (= :compiled runtime)
+        gpui? (or (= :gpui runtime) (= :native (:preview-kind state)))
         attached? (boolean attached)
+        live-off? (or attached? gpui?)
         w (or (:preview-width layout) 360)
         src (if compiled? (or preview-url "about:blank") "/preview.html")]
     [:section.preview
@@ -272,36 +304,40 @@
         (icons/panel-right)]
        [:span (cond
                 attached? (or attach-label "Attached")
+                gpui? "Preview · GPUI"
                 compiled? "Preview · compiled"
                 :else "Preview")]
        (when (= :loading (:status preview))
          [:span.muted "loading"])
        (when (:error preview)
          [:span.preview-error {:title (:error preview)} "error"])]
-      [[:label.live
-        {:class (when attached? "is-disabled")
-         :title (cond
-                  attached?
-                  "shadow-cljs autoload reloads this app. Evalight Live stays off while attached."
-                  compiled?
-                  "Reload Preview after you save. Off keeps this page until you reload it."
-                  :else
-                  "Reload the SCI preview as you type.")}
-        [:input {:type "checkbox"
-                 :checked (boolean (:live? preview))
-                 :disabled attached?
-                 :on {:change [:toggle-live]}}]
-        "Live"]])
-     [:div.preview-frame
-      (when-let [err (:error preview)]
-        [:div.preview-banner
-         [:p "The preview did not start."]
-         [:pre err]])
-      [:iframe (cond-> {:src src
-                        :title "Live application preview"
-                        :replicant/key (if compiled? "preview-compiled" "preview-sci")
-                        :replicant/on-mount preview-mount}
-                 (not compiled?) (assoc :sandbox "allow-scripts"))]]]))
+      (when-not gpui?
+        [[:label.live
+          {:class (when live-off? "is-disabled")
+           :title (cond
+                    attached?
+                    "shadow-cljs autoload reloads this app. Evalight Live stays off while attached."
+                    compiled?
+                    "Reload Preview after you save. Off keeps this page until you reload it."
+                    :else
+                    "Reload the SCI preview as you type.")}
+          [:input {:type "checkbox"
+                   :checked (boolean (:live? preview))
+                   :disabled live-off?
+                   :on {:change [:toggle-live]}}]
+          "Live"]]))
+     (if gpui?
+       (native-preview-body state)
+       [:div.preview-frame
+        (when-let [err (:error preview)]
+          [:div.preview-banner
+           [:p "The preview did not start."]
+           [:pre err]])
+        [:iframe (cond-> {:src src
+                          :title "Live application preview"
+                          :replicant/key (if compiled? "preview-compiled" "preview-sci")
+                          :replicant/on-mount preview-mount}
+                   (not compiled?) (assoc :sandbox "allow-scripts"))]])]))
 
 (defn- editor-crumbs [state]
   (let [path (:active-file state)
@@ -402,7 +438,14 @@
     (beta-badge state)]
    [:div.project
     (if (= :local (:mode state))
-      [:span.project-name (:project state)]
+      [:div.project-local
+       [:span.project-name (:project state)]
+       (when-let [tag (case (:runtime state)
+                        :gpui "GPUI"
+                        :clj "Clojure"
+                        :compiled "ClojureScript"
+                        nil)]
+         [:span.runtime-tag tag])]
       [:label.project-picker
        [:span.sr-only "Project"]
        [:select {:id "project-select"
@@ -441,7 +484,8 @@
       [[:div.tree-tools
         [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
         [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]
-        [:button.tiny {:on {:click [:add-ui-dialog]}} "UI"]
+        (when (preview/iframe-runtime?)
+          [:button.tiny {:on {:click [:add-ui-dialog]}} "UI"])
         [:button.icon-btn.pane-hide
          {:on {:click [:toggle-files]}
           :title "Hide files"
@@ -449,12 +493,15 @@
          (icons/panel-left)]]])
      (file-tree state)]))
 
-(defn mobile-tabs [{:keys [mobile-tab]}]
-  [:nav.mobile-tabs
-   (for [[tab label] [[:files "Files"] [:editor "Edit"] [:preview "Preview"] [:repl "REPL"]]]
-     [:button {:class (when (= tab mobile-tab) "is-active")
-               :on {:click [:mobile-tab tab]}}
-      label])])
+(defn mobile-tabs [state]
+  (let [tabs (cond-> [[:files "Files"] [:editor "Edit"]]
+               (preview/preview-pane?) (conj [:preview "Preview"])
+               true (conj [:repl "REPL"]))]
+    [:nav.mobile-tabs
+     (for [[tab label] tabs]
+       [:button {:class (when (= tab (:mobile-tab state)) "is-active")
+                 :on {:click [:mobile-tab tab]}}
+        label])]))
 
 (defn loading-screen []
   [:div.boot
@@ -493,23 +540,26 @@
            :dblclick (if files? [:reset-files-width] [:reset-preview-width])}}]))
 
 (defn workspace [state]
-  (let [{:keys [files-open? preview-open? dragging?]} (:layout state)]
+  (let [{:keys [files-open? preview-open? dragging?]} (:layout state)
+        show-preview? (preview/preview-pane?)]
     [:div.shell {:class (str "tab-" (name (:mobile-tab state)))}
      [:div.workspace
       (header state)
-      [:div.stage
-       {:class [(when-not files-open? "is-files-closed")
-                (when-not preview-open? "is-preview-closed")
-                (when dragging? "is-dragging")]}
-       (when-not files-open? (pane-rail :files))
-       (sidebar state)
-       (splitter :files)
-       [:div.main
-        (editor-pane state)
-        (repl-pane state)]
-       (splitter :preview)
-       (preview-pane state)
-       (when-not preview-open? (pane-rail :preview))]
+      (into
+       [:div.stage
+        {:class [(when-not files-open? "is-files-closed")
+                 (when (or (not show-preview?) (not preview-open?)) "is-preview-closed")
+                 (when dragging? "is-dragging")]}
+        (when-not files-open? (pane-rail :files))
+        (sidebar state)
+        (splitter :files)
+        [:div.main
+         (editor-pane state)
+         (repl-pane state)]]
+       (when show-preview?
+         [(splitter :preview)
+          (preview-pane state)
+          (when-not preview-open? (pane-rail :preview))]))
       (mobile-tabs state)]
      (when (:help? state) (help-panel state))
      (when (= :palette (:via (:pick state)))

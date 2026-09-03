@@ -14,7 +14,7 @@
 
 (def skip-names
   #{"node_modules" ".git" ".shadow-cljs" ".cpcache" ".nrepl-port"
-    ".cljs_node_repl" "out" ".DS_Store"})
+    ".cljs_node_repl" "out" "target" ".DS_Store"})
 
 (def skip-roots
   "Top-level folders that are this workshop, not the project."

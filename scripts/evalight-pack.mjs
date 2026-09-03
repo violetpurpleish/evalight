@@ -18,6 +18,9 @@ import { join, relative } from "node:path";
 
 export const EMBED_FILES = [
   "server.mjs",
+  "runtime.mjs",
+  "project.mjs",
+  "clj.mjs",
   "compiled.mjs",
   "nrepl.mjs",
   "bencode.mjs",

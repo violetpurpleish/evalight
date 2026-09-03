@@ -8,14 +8,20 @@
 (def registry
   [{:id :new-file :label "New file" :group "Files" :action [:new-file-dialog]}
    {:id :new-folder :label "New folder" :group "Files" :action [:new-folder-dialog]}
-   {:id :add-ui :label "Add UI" :group "Files" :action [:add-ui-dialog]}
+   {:id :add-ui :label "Add UI" :group "Files"
+    :when (fn [s] (contains? #{:sci :compiled} (:runtime s)))
+    :action [:add-ui-dialog]}
    {:id :history :label "History" :group "Files" :action [:toggle-history]}
    {:id :undo-last :label "Undo last file change" :group "Files"
     :when (fn [s] (seq (:history s)))
     :action [:undo-last]}
    {:id :toggle-files :label "Toggle files pane" :group "View" :action [:toggle-files]}
-   {:id :toggle-preview :label "Toggle preview pane" :group "View" :action [:toggle-preview-pane]}
-   {:id :toggle-live :label "Toggle live reload" :group "Preview" :action [:toggle-live]}
+   {:id :toggle-preview :label "Toggle preview pane" :group "View"
+    :when (fn [s] (not (or (= :clj (:runtime s)) (= :none (:preview-kind s)))))
+    :action [:toggle-preview-pane]}
+   {:id :toggle-live :label "Toggle live reload" :group "Preview"
+    :when (fn [s] (contains? #{:sci :compiled} (:runtime s)))
+    :action [:toggle-live]}
    {:id :run :label "Run" :group "Preview" :action [:run]}
    {:id :clear-repl :label "Clear REPL" :group "View" :action [:clear-repl]}
    {:id :toggle-help :label "Help" :group "View" :action [:toggle-help]}

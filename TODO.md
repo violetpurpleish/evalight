@@ -68,3 +68,19 @@ Do not "unify" these unless the constraint changes.
 ## Next steps (once this base holds)
 
 These are product, not cleanup. None queued.
+
+### Clojure / clj-gpui (spike on this branch)
+
+Feasible in local mode. Hosted SCI stays ClojureScript. See
+`docs/clojure-support.md`.
+
+- [x] Detect cljs vs clj vs clj-gpui vs this checkout
+- [x] JVM nREPL eval / intel without `nrepl-select`
+- [x] Hide Preview for generic Clojure
+- [x] Native preview pane for clj-gpui (window is the program; optional `gpui.runtime/preview-png`)
+- [x] `bun run local` serves release workshop JS (`evalight-ui`), not leftover `public/js` watch (that HUD was "shadow-cljs reconnecting" over a SCI preview while `clj -M:dev` still opened GPUI)
+- [ ] clj-gpui intern `preview-png` so the pane can show pixels
+- [ ] Copy packed `evalight/` into the clj-gpui `template/`
+- [ ] Optional `evalight.edn` `:nrepl {:cmd [...]}` for non-default aliases
+- [ ] End-to-end Chrome test against a fixture clj-gpui app (needs Clojure CLI + a display)
+

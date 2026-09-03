@@ -34,4 +34,13 @@ assert.equal(intel.items[0].name, "stats/record!");
 assert.equal(intel.items[0].doc, "Bump the stats tally.");
 assert.equal(parseEvalightEdn("nil"), null);
 
+const core = parseEvalightEdn(
+  `{:ns "todomvc.app" :items [{:name "swap!" :kind "core" :ns "clojure.core" :doc "Atomically swaps the value of atom.\\nReturns the new value." :macro false :arglists "([a f])"} {:name "defn" :kind "core" :ns "clojure.core" :doc "Same as (def name (fn [params*] exprs*))." :macro true}]}`,
+);
+assert.equal(core.items[0].kind, "core");
+assert.match(core.items[0].doc, /Atomically swaps/);
+assert.match(core.items[0].doc, /Returns the new value/);
+assert.equal(core.items[1].name, "defn");
+assert.equal(core.items[1].macro, true);
+
 console.log("overlay.test.mjs ok");

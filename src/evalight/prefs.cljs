@@ -69,7 +69,9 @@
                          :kind (keyword (or (:kind e) "out"))
                          :text (str (:text e))})
                       (take-last 80 (or (:entries saved) [])))]
-    (swap! state/app assoc :repl {:ns (or (:ns saved) "app.core")
+    (swap! state/app assoc :repl {:ns (or (:ns saved)
+                                          (get-in @state/app [:repl :ns])
+                                          "user")
                                   :entries entries})))
 
 (defn schedule-save-repl! []

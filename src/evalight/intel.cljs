@@ -1,8 +1,9 @@
 (ns evalight.intel
-  "Completions and hover docs from the live preview, with a source index
+  "Completions and hover docs from the live image, with a source index
   as a fallback before the image is ready. Nightlight asked the JVM it
-  lived in. The playground asks SCI. An exported project asks the
-  compiled app through nREPL."
+  lived in. The playground asks SCI. An exported ClojureScript project
+  asks the compiled app through nREPL. JVM Clojure / clj-gpui ask that
+  same nREPL client without nrepl-select."
   (:require [clojure.string :as str]
             [evalight.ns-graph :as ns-graph]))
 

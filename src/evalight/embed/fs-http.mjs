@@ -9,7 +9,9 @@ export const SKIP = new Set([
   ".git",
   ".shadow-cljs",
   ".cpcache",
+  ".nrepl-port",
   "out",
+  "target",
   ".DS_Store",
 ]);
 

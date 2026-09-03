@@ -38,7 +38,7 @@ bun run dev
 | `bun run dev` | Watch-compile the IDE and the preview runtime |
 | `bun run release` | Production build into `public/js` |
 | `bun run embed` | Release-compile the UI that Export puts in the zip |
-| `bun run local [dir]` | Same UI, filesystem API over a real directory |
+| `bun run local [dir]` | Same UI over a real directory. Serves the **release** workshop JS (`evalight-ui/js`), not leftover `public/js` from `bun run dev`. |
 | `bun run test` | Node tests, then Chrome layout checks |
 | `bun run test:ui` | Chrome layout checks only |
 | `bun run licenses` | Regenerate `THIRD_PARTY_LICENSES.md` and `public/licenses.html` |
@@ -72,7 +72,7 @@ Open http://127.0.0.1:48721. Evalight is already in the zip. You need [Bun](http
 
 `bun run dev` in that folder is only the compiled site, without the workshop. Do not run it at the same time as `bun run evalight`.
 
-Working on Evalight itself, `bun run local /path/to/a/folder` still points this checkout at a directory on disk.
+Working on Evalight itself, `bun run local /path/to/a/folder` still points this checkout at a directory on disk. That command builds (or reuses) the release workshop UI so a leftover `shadow-cljs watch` of `:app` cannot paint the **shadow-cljs – Reconnecting…** overlay on the IDE. `bun run dev` is the watch HUD; do not use that JS for local mode.
 
 ## Architecture
 
@@ -110,6 +110,27 @@ bun run evalight --attach
 That uses the running shadow nREPL and does not stop it. Evalight Live stays off so it does not fight shadow autoload. If the app URL cannot be read from `:dev-http`, pass `--preview-url=http://127.0.0.1:3456/`. If there is no `.nrepl-port` file, attach reads `:nrepl {:port ...}` from `shadow-cljs.edn`. A leftover `.nrepl-port` file is ignored unless you pass `--attach`.
 
 Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
+
+## JVM Clojure and clj-gpui (experimental)
+
+Local mode can open a real Clojure directory. Detection lives in
+`src/evalight/embed/project.mjs`. clj-gpui apps get a JVM nREPL and a
+native-window preview pane; other Clojure projects get the editor and
+REPL with Preview hidden. The hosted playground stays ClojureScript.
+
+See [docs/clojure-support.md](docs/clojure-support.md). To put Evalight
+next to a [clj-gpui](https://github.com/gitwyrm/clj-gpui) template:
+
+```clojure
+;; evalight.edn
+{:name "my-app"
+ :main my.app/app
+ :runtime :gpui
+ :preview {:kind :native}}
+```
+
+Then `bun run evalight` from that folder (after copying a packed
+`evalight/` tree). First run still needs `clj -M:dev`'s host build.
 
 ## Tests
 

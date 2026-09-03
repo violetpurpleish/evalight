@@ -14,6 +14,7 @@ import { mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { connectNrepl, pingNrepl } from "./nrepl.mjs";
+import { detectProject } from "./project.mjs";
 
 const APP_PORT = Number(process.env.EVALIGHT_APP_PORT || 48741);
 const NREPL_PORT = Number(process.env.EVALIGHT_NREPL_PORT || 7879);
@@ -95,12 +96,8 @@ async function readText(p) {
 }
 
 export async function isUserProject(root) {
-  const edn = await readText(join(root, "evalight.edn"));
-  if (edn.includes(":main")) return true;
-  const shadow = await readText(join(root, "shadow-cljs.edn"));
-  if (!shadow) return false;
-  if (shadow.includes(":workshop")) return false;
-  return shadow.includes(":app");
+  const project = await detectProject(root);
+  return project.kind === "cljs";
 }
 
 function parseDevHttp(shadowText) {
