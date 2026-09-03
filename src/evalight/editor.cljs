@@ -23,6 +23,10 @@
 (defonce !view (atom nil))
 (defonce !path (atom nil))
 (defonce !states (atom {}))
+;; Path -> {:top :left :snap}. CodeMirror 6 keeps scroll on the view DOM,
+;; not EditorState, so swapping buffers with setState leaves the previous
+;; file's scrollTop behind unless we restore it ourselves.
+(defonce !scrolls (atom {}))
 (defonce !handlers (atom {}))
 (defonce wrap-compartment (cm-state/Compartment.))
 
@@ -336,12 +340,52 @@
   (reset! !view nil)
   (reset! !path nil))
 
+(defn- save-current-scroll! []
+  (when (and @!view @!path)
+    (let [^js v @!view
+          ^js dom (.-scrollDOM v)]
+      (swap! !scrolls assoc @!path
+             {:top (.-scrollTop dom)
+              :left (.-scrollLeft dom)
+              :snap (.scrollSnapshot v)}))))
+
+(defn- set-scroll-xy! [^js view left top]
+  (let [^js dom (.-scrollDOM view)]
+    (set! (.-scrollLeft dom) left)
+    (set! (.-scrollTop dom) top)))
+
+(defn- after-layout [f]
+  (js/requestAnimationFrame
+   (fn []
+     (js/requestAnimationFrame f))))
+
+(defn- apply-scroll!
+  "Restore a previously visited file's scroll, or jump to the top on first open."
+  [path]
+  (when-let [^js view @!view]
+    (if-let [{:keys [top left snap]} (get @!scrolls path)]
+      (let [top (or top 0)
+            left (or left 0)
+            go #(set-scroll-xy! view left top)]
+        (go)
+        (when snap
+          (.dispatch view #js {:effects snap}))
+        (after-layout go))
+      (let [go #(set-scroll-xy! view 0 0)]
+        (go)
+        (.dispatch view #js {:effects (.scrollIntoView view/EditorView 0 #js {:y "start"
+                                                                            :x "start"
+                                                                            :yMargin 0})})
+        (after-layout go)))))
+
 (defn clear-buffers! []
   (reset! !states {})
+  (reset! !scrolls {})
   (reset! !path nil))
 
 (defn save-current-state! []
   (when (and @!view @!path)
+    (save-current-scroll!)
     (swap! !states assoc @!path (.-state ^js @!view))))
 
 (defn park!
@@ -363,6 +407,7 @@
 
 (defn drop-path! [path]
   (swap! !states dissoc path)
+  (swap! !scrolls dissoc path)
   (when (= path @!path)
     (reset! !path nil)))
 
@@ -370,20 +415,33 @@
   (doseq [p (vec (keys @!states))]
     (when (paths/starts-with-path? p path)
       (swap! !states dissoc p)))
+  (doseq [p (vec (keys @!scrolls))]
+    (when (paths/starts-with-path? p path)
+      (swap! !scrolls dissoc p)))
   (when (and @!path (paths/starts-with-path? @!path path))
     (reset! !path nil)))
 
 (defn rename-path! [from to]
   (let [states @!states
+        scrolls @!scrolls
         pairs (vec
                (keep (fn [[path st]]
                        (when (paths/starts-with-path? path from)
                          [path (paths/remap-under path from to) st]))
-                     states))]
+                     states))
+        scroll-pairs (vec
+                      (keep (fn [[path snap]]
+                              (when (paths/starts-with-path? path from)
+                                [path (paths/remap-under path from to) snap]))
+                            scrolls))]
     (doseq [[old-path] pairs]
       (swap! !states dissoc old-path))
     (doseq [[_ new-path st] pairs]
       (swap! !states assoc new-path st))
+    (doseq [[old-path] scroll-pairs]
+      (swap! !scrolls dissoc old-path))
+    (doseq [[_ new-path snap] scroll-pairs]
+      (swap! !scrolls assoc new-path snap))
     (when-let [p @!path]
       (when (paths/starts-with-path? p from)
         (reset! !path (paths/remap-under p from to))))))
@@ -415,13 +473,15 @@
       (reset! !path path)
       (swap! !states assoc path state)
       (.setState v state)
+      (apply-scroll! path)
       (when (and content (not (get @!states path)))
         nil)
       ;; If we restored a cached state, keep it. If the file on disk differs
       ;; because it was rewritten elsewhere, replace the doc.
       (let [current (.toString (.-doc (.-state v)))]
         (when (and content (not= current content) (not (contains? @!states path)))
-          (.setState v (make-state path content)))))))
+          (do (.setState v (make-state path content))
+              (apply-scroll! path)))))))
 
 (defn load-fresh!
   "Always replace editor contents from disk (used when opening a file)."
@@ -433,7 +493,8 @@
           state (if same? cached (make-state path content))]
       (reset! !path path)
       (swap! !states assoc path state)
-      (.setState v state))))
+      (.setState v state)
+      (apply-scroll! path))))
 
 (defn focus! []
   (when-let [^js v @!view]
