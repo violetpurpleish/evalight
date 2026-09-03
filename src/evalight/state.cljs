@@ -30,6 +30,7 @@
          :help? false
          :beta? false
          :parinfer :smart
+         :word-wrap? false
          :mobile-tab :editor
          :notice nil
          :layout {:files-open? true

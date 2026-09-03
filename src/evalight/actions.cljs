@@ -821,6 +821,12 @@
 (defn toggle-preview-pane! []
   (swap! state/app update-in [:layout :preview-open?] not))
 
+(defn toggle-word-wrap! []
+  (let [on? (not (boolean (:word-wrap? @state/app)))]
+    (swap! state/app assoc :word-wrap? on?)
+    (editor/apply-wrap!)
+    (flash! (if on? "Word wrap on" "Word wrap off"))))
+
 (defn- clamp-pane [pane w]
   (let [{:keys [files-open? preview-open? files-width preview-width]} (:layout @state/app)
         stage (some-> js/document (.querySelector ".stage") .-clientWidth)
@@ -989,6 +995,7 @@
       :toggle-live (toggle-live!)
       :toggle-files (toggle-files!)
       :toggle-preview-pane (toggle-preview-pane!)
+      :toggle-word-wrap (toggle-word-wrap!)
       :resize-files (when event (start-pane-resize! :files event))
       :resize-preview (when event (start-pane-resize! :preview event))
       :pane-resize-move (when event (pane-resize-move! event))
