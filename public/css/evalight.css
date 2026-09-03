@@ -187,9 +187,20 @@ code, pre { font-family: var(--mono); }
 }
 
 .project { flex: 0 1 auto; min-width: 0; max-width: 16rem; }
-.project-local { display: flex; flex-direction: column; gap: 0.12rem; min-width: 0; }
+.project:has(.project-local) { max-width: none; }
+.project-local {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.project-local .project-name {
+  width: auto;
+}
 .runtime-tag {
-  padding-left: 0.7rem;
+  flex: none;
+  white-space: nowrap;
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
