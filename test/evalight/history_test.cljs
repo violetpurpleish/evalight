@@ -50,6 +50,21 @@
     (is (= :overwrite (:kind (second out))))
     (is (= "old" (:content (second out))))))
 
+(deftest json-roundtrip-keeps-binary-payloads
+  (let [png {:encoding :base64
+             :mime "image/png"
+             :content "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}
+        entry {:id "p"
+               :ts 4
+               :kind :delete
+               :label "Deleted resources/icon.png"
+               :path "resources/icon.png"
+               :files {"resources/icon.png" png}
+               :dirs []}
+        back (first (history/parse (history/stringify [entry])))]
+    (is (= :delete (:kind back)))
+    (is (= png (get (:files back) "resources/icon.png")))))
+
 (deftest parse-bad-json-is-empty
   (is (= [] (history/parse "{not json")))
   (is (= [] (history/parse nil)))

@@ -1,5 +1,6 @@
 (ns evalight.actions
   (:require [clojure.string :as str]
+            [evalight.bytes :as bytes]
             [evalight.editor :as editor]
             [evalight.export :as export]
             [evalight.fs :as fs]
@@ -174,9 +175,25 @@
     (-> (fs/read-file (now-fs) path)
         (.then (fn [content]
                  (swap! state/app assoc :active-file path :mobile-tab :editor)
-                 (editor/load-fresh! path content)
-                 (editor/focus!)
-                 path)))))
+                 (cond
+                   (paths/image-file? path)
+                   (do (editor/park!)
+                       (swap! state/app assoc :media
+                              {:kind :image
+                               :src (when (bytes/packed? content)
+                                      (bytes/data-url content))})
+                       path)
+
+                   (or (paths/binary-file? path) (bytes/packed? content))
+                   (do (editor/park!)
+                       (swap! state/app assoc :media {:kind :binary})
+                       path)
+
+                   :else
+                   (do (swap! state/app dissoc :media)
+                       (editor/load-fresh! path content)
+                       (editor/focus!)
+                       path)))))))
 
 (defn- apply-preview-result [result]
   (if (:ok result)
@@ -234,7 +251,7 @@
   ([{:keys [reload?]}]
    (let [path (editor/current-path)
          text (editor/current-text)]
-     (if (and path text)
+     (if (and path text (not (paths/binary-file? path)))
        (-> (fs/write-file (now-fs) path text)
            (.then (fn [_]
                     (swap! state/app update :dirty disj path)
@@ -363,7 +380,7 @@
         (.then (fn [project-fs]
                  (reset! !fs project-fs)
                  (editor/clear-buffers!)
-                 (swap! state/app assoc :project name :active-file nil :dirty #{} :tree [] :history-open? false)
+                 (swap! state/app assoc :project name :active-file nil :dirty #{} :tree [] :history-open? false :media nil)
                  (prefs/restore-repl! name)
                  (if-let [ws @!workspace]
                    (fs/write-file ws "workspace.json"
@@ -478,9 +495,9 @@
                         (fn [_]
                           (editor/drop-tree! path)
                           (swap! state/app assoc :dialog nil)
-                          (when (and (:active-file @state/app)
+                            (when (and (:active-file @state/app)
                                      (paths/starts-with-path? (:active-file @state/app) path))
-                            (swap! state/app assoc :active-file nil))
+                            (swap! state/app assoc :active-file nil :media nil))
                           (record-entry! (history/delete-entry snap))
                           (.then (refresh-tree!)
                                  (fn [_]
@@ -518,7 +535,7 @@
         (-> (fs/delete @!workspace (paths/join "projects" name))
             (.then (fn [_]
                      (editor/clear-buffers!)
-                     (swap! state/app assoc :active-file nil :dirty #{} :tree [] :project nil :history [])
+                     (swap! state/app assoc :active-file nil :dirty #{} :tree [] :project nil :history [] :media nil)
                      (history/drop-store @!history-fs (history/store-path :browser name))))
             (.then (fn [_] (refresh-projects!)))
             (.then (fn [names]
