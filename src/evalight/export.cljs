@@ -1,6 +1,7 @@
 (ns evalight.export
   (:require ["jszip" :as JSZip]
             [clojure.string :as str]
+            [evalight.bytes :as bytes]
             [evalight.fs :as fs]
             [evalight.promise :as p]
             [evalight.template :as template]))
@@ -134,7 +135,9 @@
                      merged (merge files pack)
                      zip (new JSZip)]
                  (doseq [[path content] merged]
-                   (.file zip path content))
+                   (if (bytes/packed? content)
+                     (.file zip path (bytes/unpack-u8 content))
+                     (.file zip path content)))
                  (-> (p/reduce-p
                       (fn [_ [path content]]
                         (fs/write-file fs path content))

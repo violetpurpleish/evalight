@@ -1,5 +1,6 @@
 (ns evalight.fs.opfs
   (:require [clojure.string :as str]
+            [evalight.bytes :as bytes]
             [evalight.fs.protocol :as proto]
             [evalight.paths :as paths]
             [evalight.promise :as p]))
@@ -64,26 +65,34 @@
   (-read-file [_ path]
     (-> (get-file-handle root path false)
         (.then (fn [fh] (.getFile fh)))
-        (.then (fn [file] (.text file)))))
+        (.then (fn [file]
+                 (if (paths/binary-file? path)
+                   (.then (.arrayBuffer file)
+                          (fn [buf]
+                            (bytes/pack-path path (js/Uint8Array. buf))))
+                   (.text file))))))
   (-write-file [_ path content]
     (-> (get-file-handle root path true)
         (.then (fn [fh] (.createWritable fh)))
         (.then (fn [w]
-                 (-> (.write w content)
-                     (.then (fn [_] (.close w)))
-                     (.then (fn [_] path)))))))
+                 (let [body (if (bytes/packed? content)
+                              (bytes/unpack-u8 content)
+                              content)]
+                   (-> (.write w body)
+                       (.then (fn [_] (.close w)))
+                       (.then (fn [_] path))))))))
   (-mkdir [_ path]
     (-> (get-dir root path true)
         (.then (fn [_] path))))
   (-rename [_ from to]
     (-> (get-file-handle root from false)
         (.then (fn [fh] (.getFile fh)))
-        (.then (fn [file] (.text file)))
-        (.then (fn [content]
+        (.then (fn [file] (.arrayBuffer file)))
+        (.then (fn [buf]
                  (-> (get-file-handle root to true)
                      (.then (fn [fh] (.createWritable fh)))
                      (.then (fn [w]
-                              (-> (.write w content)
+                              (-> (.write w buf)
                                   (.then (fn [_] (.close w)))))))))
         (.then (fn [_] (parent-and-name root from false)))
         (.then (fn [{:keys [dir name]}]

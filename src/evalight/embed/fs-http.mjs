@@ -17,6 +17,14 @@ export const SKIP = new Set([
 
 export const SKIP_ROOT = new Set(["evalight", "evalight-ui"]);
 
+/** Keep in sync with evalight.paths/binary-exts. */
+const BINARY_EXT =
+  /\.(png|jpe?g|gif|webp|ico|bmp|avif|woff2?|ttf|otf|eot|wasm|zip|gz|tgz|7z|rar|bin|pdf|mp3|mp4|webm|ogg|wav|mov|class|jar)$/i;
+
+export function isBinaryPath(p) {
+  return BINARY_EXT.test(p || "");
+}
+
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -71,6 +79,10 @@ export function createFsApi(fsRoot) {
         return json({ entries: await listDir(path) });
       }
       if (url.pathname.endsWith("/read") && req.method === "GET") {
+        if (isBinaryPath(path)) {
+          const buf = await readFile(safe(path));
+          return json({ path, content: buf.toString("base64"), encoding: "base64" });
+        }
         const content = await readFile(safe(path), "utf8");
         return json({ path, content });
       }
@@ -86,7 +98,11 @@ export function createFsApi(fsRoot) {
         const body = await readBody(req);
         const target = safe(body.path);
         await mkdir(dirname(target), { recursive: true });
-        await writeFile(target, body.content ?? "", "utf8");
+        if (body.encoding === "base64") {
+          await writeFile(target, Buffer.from(body.content ?? "", "base64"));
+        } else {
+          await writeFile(target, body.content ?? "", "utf8");
+        }
         return json({ path: body.path });
       }
       if (url.pathname.endsWith("/mkdir") && req.method === "POST") {

@@ -3,6 +3,7 @@
             [evalight.editor :as editor]
             [evalight.icons :as icons]
             [evalight.kit :as kit]
+            [evalight.paths :as paths]
             [evalight.preview :as preview]
             [evalight.state :as state]
             [evalight.commands :as commands]
@@ -24,6 +25,7 @@
     (actions/open-file! path)))
 
 (defn- editor-unmount [_]
+  (editor/save-current-state!)
   (editor/destroy!))
 
 (defn- preview-mount [{:keys [replicant/node]}]
@@ -354,19 +356,34 @@
        :on-dismiss [:pick-close]})]))
 
 (defn editor-pane [state]
-  [:section.editor
-   (pane-head
-    [(editor-crumbs state)]
-    [(when (and (:active-file state) (dirty? state (:active-file state)))
-       [:span.pill "saving"])])
-   (if (:active-file state)
-     [:div.editor-host
-      {:replicant/key "editor-host"
-       :replicant/on-mount editor-mount
-       :replicant/on-unmount editor-unmount}]
-     [:div.empty-editor
-      [:p "Open a file from the tree, or create one."]
-      [:button.primary {:on {:click [:new-file-dialog]}} "New file"]])])
+  (let [path (:active-file state)
+        media (:media state)]
+    [:section.editor
+     (pane-head
+      [(editor-crumbs state)]
+      [(when (and path (dirty? state path))
+         [:span.pill "saving"])])
+     (cond
+       (nil? path)
+       [:div.empty-editor
+        [:p "Open a file from the tree, or create one."]
+        [:button.primary {:on {:click [:new-file-dialog]}} "New file"]]
+
+       (= :image (:kind media))
+       [:div.media-host
+        [:img.media-image {:src (:src media)
+                           :alt (paths/basename path)}]]
+
+       (= :binary (:kind media))
+       [:div.media-host.media-binary
+        [:p (str (paths/basename path) " is a binary file.")]
+        [:p.muted "Evalight shows pictures here. Other binary files stay on disk."]]
+
+       :else
+       [:div.editor-host
+        {:replicant/key "editor-host"
+         :replicant/on-mount editor-mount
+         :replicant/on-unmount editor-unmount}])]))
 
 (defn- beta-badge [state]
   (let [open? (boolean (:beta? state))]

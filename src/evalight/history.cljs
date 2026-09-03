@@ -4,6 +4,7 @@
   Code edits stay with CodeMirror (Ctrl/Cmd-Z). This log is for things
   the editor cannot put back: deletes, renames, and kit Restore overwrites."
   (:require [clojure.string :as str]
+            [evalight.bytes :as bytes]
             [evalight.fs :as fs]
             [evalight.paths :as paths]
             [evalight.promise :as p]))
@@ -62,8 +63,9 @@
     :path (:path entry)
     :from (:from entry)
     :to (:to entry)
-    :content (:content entry)
-    :files (:files entry)
+    :content (bytes/json-value (:content entry))
+    :files (when (map? (:files entry))
+             (into {} (map (fn [[k v]] [k (bytes/json-value v)]) (:files entry))))
     :dirs (vec (:dirs entry))}))
 
 (defn json->entry [m]
@@ -72,7 +74,7 @@
           files (or (get m "files") (:files m))
           dirs (or (get m "dirs") (:dirs m))
           str-files (when (map? files)
-                      (into {} (map (fn [[k v]] [(str k) (str v)]) files)))]
+                      (into {} (map (fn [[k v]] [(str k) (bytes/from-json-value v)]) files)))]
       (compact
        {:id (or (get m "id") (:id m))
         :ts (or (get m "ts") (:ts m))
@@ -81,7 +83,8 @@
         :path (or (get m "path") (:path m))
         :from (or (get m "from") (:from m))
         :to (or (get m "to") (:to m))
-        :content (or (get m "content") (:content m))
+        :content (let [c (or (get m "content") (:content m))]
+                   (when (some? c) (bytes/from-json-value c)))
         :files str-files
         :dirs (when dirs (mapv str dirs))}))))
 

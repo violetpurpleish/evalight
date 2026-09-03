@@ -1,5 +1,7 @@
 (ns evalight.fs.http
-  (:require [evalight.fs.protocol :as proto]
+  (:require [evalight.bytes :as bytes]
+            [evalight.fs.protocol :as proto]
+            [evalight.paths :as paths]
             [goog.object :as gobj]))
 
 (defn- json [res]
@@ -67,6 +69,23 @@
             :else (js-get data "content"))]
     (if (string? c) c "")))
 
+(defn- file-encoding [data]
+  (let [e (cond
+            (map? data) (or (:encoding data) (get data "encoding"))
+            :else (js-get data "encoding"))]
+    (when (string? e) e)))
+
+(defn- file-payload [path data]
+  (let [content (file-text data)]
+    (if (= "base64" (file-encoding data))
+      (bytes/pack-b64 (paths/mime path) content)
+      content)))
+
+(defn- write-body [path content]
+  (if (bytes/packed? content)
+    {:path path :content (:content content) :encoding "base64"}
+    {:path path :content content}))
+
 (defrecord HttpFS [base]
   proto/FileSystem
   (-list-dir [_ path]
@@ -77,9 +96,9 @@
   (-read-file [_ path]
     (-> (request "GET" (str base "/read?path=" (js/encodeURIComponent path)))
         (.then (fn [res] (.json res)))
-        (.then file-text)))
+        (.then (fn [data] (file-payload path data)))))
   (-write-file [_ path content]
-    (-> (request "PUT" (str base "/write") {:path path :content content})
+    (-> (request "PUT" (str base "/write") (write-body path content))
         (.then json)
         (.then path-of)))
   (-mkdir [_ path]

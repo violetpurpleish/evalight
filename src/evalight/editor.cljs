@@ -318,6 +318,13 @@
   (when (and @!view @!path)
     (swap! !states assoc @!path (.-state ^js @!view))))
 
+(defn park!
+  "Detach the live editor from a path so a media view can take the pane.
+  Keeps buffered undo states."
+  []
+  (save-current-state!)
+  (reset! !path nil))
+
 (defn buffer-texts
   "Path -> current editor text for every cached buffer, including the live doc."
   []

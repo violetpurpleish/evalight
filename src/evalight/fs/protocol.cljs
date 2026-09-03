@@ -19,7 +19,8 @@
   (-read-file fs path))
 
 (defn write-file [fs path content]
-  (-write-file fs path (or content "")))
+  ;; Binary payloads are maps; do not coerce them to "".
+  (-write-file fs path (if (nil? content) "" content)))
 
 (defn mkdir [fs path]
   (-mkdir fs path))
