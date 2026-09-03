@@ -30,26 +30,33 @@
     (str "evalight.repl." project)))
 
 (defn save-layout! []
-  (let [l (:layout @state/app)]
+  (let [s @state/app
+        l (:layout s)]
     (write-json layout-key
                 {:filesOpen (boolean (:files-open? l))
                  :previewOpen (boolean (:preview-open? l))
                  :filesWidth (:files-width l)
-                 :previewWidth (:preview-width l)})))
+                 :previewWidth (:preview-width l)
+                 :wordWrap (boolean (:word-wrap? s))})))
 
 (defn restore-layout! []
   (when-let [saved (read-json layout-key)]
-    (swap! state/app update :layout
-           (fn [l]
-             (cond-> l
-               (contains? saved :filesOpen)
-               (assoc :files-open? (boolean (:filesOpen saved)))
-               (contains? saved :previewOpen)
-               (assoc :preview-open? (boolean (:previewOpen saved)))
-               (number? (:filesWidth saved))
-               (assoc :files-width (:filesWidth saved))
-               (number? (:previewWidth saved))
-               (assoc :preview-width (:previewWidth saved)))))))
+    (swap! state/app
+           (fn [s]
+             (let [s (update s :layout
+                             (fn [l]
+                               (cond-> l
+                                 (contains? saved :filesOpen)
+                                 (assoc :files-open? (boolean (:filesOpen saved)))
+                                 (contains? saved :previewOpen)
+                                 (assoc :preview-open? (boolean (:previewOpen saved)))
+                                 (number? (:filesWidth saved))
+                                 (assoc :files-width (:filesWidth saved))
+                                 (number? (:previewWidth saved))
+                                 (assoc :preview-width (:previewWidth saved)))))]
+               (cond-> s
+                 (contains? saved :wordWrap)
+                 (assoc :word-wrap? (boolean (:wordWrap saved)))))))))
 
 (defn save-repl! []
   (let [s @state/app
@@ -88,8 +95,9 @@
   (add-watch state/app ::prefs
              (fn [_ _ old new]
                (let [keys [:files-open? :preview-open? :files-width :preview-width]]
-                 (when (not= (select-keys (:layout old) keys)
-                             (select-keys (:layout new) keys))
+                 (when (or (not= (select-keys (:layout old) keys)
+                                 (select-keys (:layout new) keys))
+                           (not= (:word-wrap? old) (:word-wrap? new)))
                    (save-layout!)))
                (when (not= (get-in old [:repl :entries])
                            (get-in new [:repl :entries]))

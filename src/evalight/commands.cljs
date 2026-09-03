@@ -19,6 +19,8 @@
    {:id :toggle-preview :label "Toggle preview pane" :group "View"
     :when (fn [s] (not (or (= :clj (:runtime s)) (= :none (:preview-kind s)))))
     :action [:toggle-preview-pane]}
+   {:id :toggle-word-wrap :label "Toggle word wrap" :group "View"
+    :action [:toggle-word-wrap]}
    {:id :toggle-live :label "Toggle live reload" :group "Preview"
     :when (fn [s] (contains? #{:sci :compiled} (:runtime s)))
     :action [:toggle-live]}
@@ -35,11 +37,17 @@
     :when (fn [s] (= :browser (:mode s)))
     :action [:delete-project-dialog]}])
 
+(defn- decorate [state row]
+  (cond-> row
+    (= :toggle-word-wrap (:id row))
+    (assoc :hint (if (:word-wrap? state) "On" "Off"))))
+
 (defn- visible-registry [state]
   (->> registry
        (filter (fn [row]
                  (if-let [w (:when row)] (w state) true)))
        (map #(dissoc % :when))
+       (map #(decorate state %))
        vec))
 
 (defn- file-rows [tree]

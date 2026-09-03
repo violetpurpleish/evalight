@@ -17,12 +17,14 @@
             ["@nextjournal/clojure-mode" :as clj-mode]
             ["@nextjournal/clojure-mode/extensions/eval-region" :as eval-region]
             [evalight.intel :as intel]
-            [evalight.paths :as paths]))
+            [evalight.paths :as paths]
+            [evalight.state :as state]))
 
 (defonce !view (atom nil))
 (defonce !path (atom nil))
 (defonce !states (atom {}))
 (defonce !handlers (atom {}))
+(defonce wrap-compartment (cm-state/Compartment.))
 
 (defn- mac? []
   (boolean (re-find #"Mac|iPhone|iPad" (or (.-platform js/navigator) ""))))
@@ -250,6 +252,29 @@
         (.appendChild (.-body js/document) el)
         el)))
 
+(defn- wrap-on? []
+  (boolean (:word-wrap? @state/app)))
+
+(defn- wrap-ext [on?]
+  (.of wrap-compartment
+      (if on? (.-lineWrapping view/EditorView) #js [])))
+
+(defn apply-wrap!
+  "Reconfigure line wrapping on the live editor and every cached buffer."
+  []
+  (let [effect (.reconfigure wrap-compartment
+                             (if (wrap-on?)
+                               (.-lineWrapping view/EditorView)
+                               #js []))]
+    (when-let [^js v @!view]
+      (.dispatch v #js {:effects effect}))
+    (swap! !states
+           (fn [m]
+             (into {}
+                   (map (fn [[path ^js st]]
+                          [path (.-state (.update st #js {:effects effect}))]))
+                   m)))))
+
 (defn extensions [{:keys [path on-change on-eval]}]
   (let [lang (language-for path)]
     (flatten-exts
@@ -269,6 +294,7 @@
       (.of view/keymap (.-searchKeymap search))
       (tab-indent-keymap)
       (on-change-ext on-change)
+      (wrap-ext (wrap-on?))
       (when (= lang :clojure) (clojure-exts on-eval))
       (lang-ext lang)])))
 
