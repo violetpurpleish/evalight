@@ -13,6 +13,7 @@ const PORT = Number(process.env.UI_TEST_PORT || 0);
 function chromePath() {
   const candidates = [
     process.env.CHROME_PATH,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/usr/local/bin/google-chrome",
     "/usr/bin/google-chrome",
     "/usr/bin/chromium",
@@ -161,6 +162,13 @@ try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(url, { waitUntil: "domcontentloaded" });
+  const isMac = await page.evaluate(() => /Mac/.test(navigator.platform));
+  const moveToDocumentEnd = async () => {
+    await page.keyboard.down(isMac ? "Meta" : "Control");
+    await page.keyboard.press(isMac ? "ArrowDown" : "End");
+    await page.keyboard.up(isMac ? "Meta" : "Control");
+  };
+
   await page.waitForSelector(".tree-row", { timeout: 20000 });
   await page.waitForSelector("#project-select, .project-name", { timeout: 10000 });
   await new Promise((r) => setTimeout(r, 1500));
@@ -1749,9 +1757,7 @@ try {
   );
 
   await page.click(".cm-content");
-  await page.keyboard.down("Control");
-  await page.keyboard.press("End");
-  await page.keyboard.up("Control");
+  await moveToDocumentEnd();
   await page.keyboard.press("Enter");
   await page.keyboard.type("bum");
   const completionVisible = () => {
@@ -1966,19 +1972,24 @@ try {
 
   await page.keyboard.press("Escape").catch(() => {});
   await page.click(".cm-content");
-  await page.keyboard.down("Control");
-  await page.keyboard.press("End");
-  await page.keyboard.up("Control");
+  await moveToDocumentEnd();
 
   const editorFocus = () =>
     page.evaluate(() => Boolean(document.activeElement?.closest(".cm-editor")));
-  const editorText = () => page.$eval(".cm-content", (el) => el.innerText);
+  // CodeMirror virtualizes its DOM. Read the document, including offscreen
+  // lines, so the assertions really detect changes outside the current line.
+  const editorText = () => page.evaluate(() => evalight.editor.current_text());
   const docLines = (text) => {
     const lines = text.split("\n");
     if (lines.length && lines[lines.length - 1] === "") lines.pop();
     return lines;
   };
 
+  await page.keyboard.press("Enter");
+  assert.ok(
+    (await editorText()).endsWith("\n"),
+    "Indentation probe must start on the empty final line"
+  );
   const beforeShift = await editorText();
   await page.keyboard.down("Shift");
   await page.keyboard.press("Tab");
@@ -1990,7 +2001,6 @@ try {
     "document changed on Shift-Tab"
   );
 
-  await page.keyboard.press("Enter");
   await page.keyboard.type(";;tab-probe");
   const beforeTab = await editorText();
   const beforeLines = docLines(beforeTab);
@@ -1999,6 +2009,7 @@ try {
   const afterLines = docLines(afterTab);
   const lastBefore = beforeLines.at(-1) ?? "";
   const lastAfter = afterLines.at(-1) ?? "";
+  assert.equal(lastBefore, ";;tab-probe", "Probe must be the unindented final line");
   assert.ok(
     /^\s+/.test(lastAfter) && lastAfter.trim() === lastBefore.trim(),
     `Tab should indent the current line, got ${JSON.stringify({ lastBefore, lastAfter })}`
@@ -2013,9 +2024,9 @@ try {
   await page.keyboard.up("Shift");
   check("Shift-Tab still keeps focus after indent", await editorFocus());
   check(
-    "Shift-Tab dedents the current line",
-    (docLines(await editorText()).at(-1) ?? "") === lastBefore,
-    JSON.stringify(docLines(await editorText()).at(-1))
+    "Shift-Tab restores the document after indent",
+    (await editorText()) === beforeTab,
+    "document differs after Tab / Shift-Tab round trip"
   );
 
   await page.keyboard.press("Enter");
