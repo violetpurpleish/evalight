@@ -236,6 +236,48 @@ try {
   await page.mouse.move(1, 1);
   await waitForUI(page, () => !document.querySelector("#workshop-icon-tooltip")?.matches(":popover-open"));
 
+  // Every workshop popover uses the kit component and the same outside-click
+  // behavior. An outside toolbar action must still receive its original click.
+  for (const [trigger, panel] of [
+    [".beta-badge", ".beta-pop .ui-popover-panel"],
+    ["#project-select", ".project-menu"],
+    ["[aria-label='Project actions']", ".project-actions .ui-popover-panel"],
+    ["[aria-label='History']", ".history-pop .ui-popover-panel"],
+  ]) {
+    await page.click(trigger);
+    await page.waitForSelector(panel);
+    await page.$eval(panel, node => node.click());
+    assert.ok(await page.$(panel), `Inside click closed ${panel}`);
+    await page.click(".wordmark");
+    await page.waitForSelector(panel, { hidden: true });
+
+    await page.click(trigger);
+    await page.waitForSelector(panel);
+    await page.click("[aria-label='Command palette']");
+    await page.waitForSelector(panel, { hidden: true });
+    await page.waitForSelector(".ui-command");
+    await page.keyboard.press("Escape");
+    await page.waitForSelector(".ui-command", { hidden: true });
+
+    await page.click(trigger);
+    await page.waitForSelector(panel);
+    const previewFrame = page.frames().find(frame => frame.url().includes("/preview.html"));
+    await previewFrame.waitForSelector("h1");
+    await previewFrame.click("h1");
+    await page.waitForSelector(panel, { hidden: true });
+  }
+
+  // Fresh projects execute the copied ui.popover source in SCI too.
+  const kitFrame = page.frames().find(frame => frame.url().includes("/preview.html"));
+  await kitFrame.click(".ui-popover > button");
+  await kitFrame.waitForSelector(".ui-popover-panel");
+  await kitFrame.click("h1");
+  await kitFrame.waitForSelector(".ui-popover-panel", { hidden: true });
+  await kitFrame.click(".ui-popover > button");
+  await kitFrame.waitForSelector(".ui-popover-panel");
+  await page.click(".wordmark");
+  await kitFrame.waitForSelector(".ui-popover-panel", { hidden: true });
+
   const meta = await page.evaluate(() => ({
     description: document.querySelector('meta[name="description"]')?.getAttribute("content") ?? "",
     ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content") ?? "",
@@ -361,7 +403,7 @@ try {
       !menuHit.missing && menuHit.h > 8 && menuHit.hitMenu && !menuHit.hitDismiss,
       JSON.stringify(menuHit)
     );
-    await page.evaluate(() => document.querySelector(".ui-crumbs-dismiss")?.click());
+    await page.click(".wordmark");
     await page.waitForSelector(".ui-crumb-menu", { hidden: true, timeout: 4000 });
   }
 
@@ -749,7 +791,7 @@ try {
     betaOpen.text
   );
 
-  await page.$eval(".beta-pop .ui-popover-dismiss", (el) => el.click());
+  await page.click(".wordmark");
   await page.waitForSelector(".beta-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
   const betaClosed = await page.evaluate(() => ({
     expanded: document.querySelector("button.beta-badge")?.getAttribute("aria-expanded") === "true",
@@ -927,7 +969,7 @@ try {
 
     await page.click("button.icon-btn[aria-label='History']");
     await page.waitForSelector(".history-pop .ui-popover-panel", { timeout: 3000 });
-    await page.click(".history-pop .ui-popover-dismiss");
+    await page.click(".wordmark");
     await page.waitForSelector(".history-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
     const historyClosed = await page.evaluate(() => ({
       expanded: document.querySelector("button.icon-btn[aria-label='History']")?.getAttribute("aria-expanded") === "true",

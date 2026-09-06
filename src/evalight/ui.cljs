@@ -12,7 +12,6 @@
             [evalight.history :as history]
             [ui.breadcrumbs :as ui-crumbs]
             [ui.button :as btn]
-            [ui.core :as ui-core]
             [ui.command :as ui-command]
             [ui.dialog :as ui-dialog]
             [ui.input :as ui-input]
@@ -446,18 +445,6 @@
 
 (defn- project-actions [s]
   [:div.project-actions
-   {:on {:keydown (fn [wrapped]
-                    (let [e (ui-core/dom-event wrapped)]
-                      (when (= "Escape" (.-key e))
-                        (.preventDefault e)
-                        (.stopPropagation e)
-                        (swap! state/app assoc :project-actions-open? false)
-                        (some-> (.querySelector (.-currentTarget e) ".project-actions-trigger") .focus))))
-         :focusout (fn [wrapped]
-                     (let [e (ui-core/dom-event wrapped)]
-                       (when (and (.-relatedTarget e)
-                                  (not (.contains (.-currentTarget e) (.-relatedTarget e))))
-                         (swap! state/app assoc :project-actions-open? false))))}}
    (popover/popover
     {:open? (:project-actions-open? s) :align :start :on-close [:close-project-actions]}
     [:button.icon-btn.project-actions-trigger

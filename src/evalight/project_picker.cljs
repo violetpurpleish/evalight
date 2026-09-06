@@ -3,7 +3,8 @@
             [evalight.icons :as icons]
             [evalight.projects :as projects]
             [evalight.state :as state]
-            [ui.core :as ui]))
+            [ui.core :as ui]
+            [ui.popover :as popover]))
 
 (defonce !clock (atom nil))
 (defonce !position (atom nil))
@@ -55,12 +56,11 @@
   (let [open? (:project-picker-open? s)
         names (projects/matching (:projects s) (:project-query s))
         now (or (:project-clock s) (.now js/Date))]
-    [:div.project-picker.ui-popover
-     {:on {:focusout (fn [wrapped]
-                       (let [e (ui/dom-event wrapped)]
-                         (when (and (.-relatedTarget e)
-                                    (not (.contains (.-currentTarget e) (.-relatedTarget e))))
-                           (swap! state/app assoc :project-picker-open? false))))}}
+    (popover/popover
+     {:open? open? :on-close [:close-project-picker] :class "project-picker"
+      :panel-attrs {:id "project-menu" :class "project-menu" :aria-label "Switch project"
+                    :replicant/on-mount mount-panel :replicant/on-unmount unmount-panel
+                    :on {:keydown keydown}}}
      [:button.project-trigger
       {:id "project-select" :type "button" :value (:project s)
        :aria-label (str "Switch project, " (:project s))
@@ -71,13 +71,7 @@
       [:span.project-trigger-name (:project s)]
       (icons/svg {:class "project-chevron"}
                  [:path {:d "m8 10 4 4 4-4" :stroke-linecap "round" :stroke-linejoin "round"}])]
-     (when open?
-       [:div.ui-popover-dismiss {:on {:click [:close-project-picker]}}])
-     (when open?
-       [:div.project-menu.ui-popover-panel
-        {:id "project-menu" :role "dialog" :aria-label "Switch project"
-         :replicant/on-mount mount-panel :replicant/on-unmount unmount-panel
-         :on {:keydown keydown}}
+     [:div.project-menu-content
         [:div.project-menu-heading
          [:h2 "Projects"]
          [:span (str (count (:projects s)) " in this browser")]]
@@ -109,4 +103,4 @@
           [:p.project-empty "No matching projects"])
         [:div.project-menu-footer
          [:button {:type "button" :on {:click [:new-project-dialog]}}
-          (icons/plus) "New project"]]])]))
+          (icons/plus) "New project"]]])))

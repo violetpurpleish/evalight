@@ -14,7 +14,9 @@
      (cond-> [:nav.ui-crumbs {:aria-label "Breadcrumb"
                               :class (when open-id "is-open")}]
        (and open-id on-dismiss)
-       (conj [:div.ui-crumbs-dismiss {:on {:click on-dismiss}}]))
+       (conj [:button.ui-crumbs-dismiss
+              (merge (ui/outside-dismiss-attrs ".ui-crumb-menu" ".ui-crumb")
+                     {:type "button" :hidden true :tabindex -1 :on {:click on-dismiss}})]))
      (if (zero? n)
        [[:span.ui-crumb-empty "No file open"]]
        (mapv

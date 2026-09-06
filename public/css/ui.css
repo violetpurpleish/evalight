@@ -129,11 +129,7 @@
 }
 
 .ui-popover { position: relative; display: inline-flex; }
-.ui-popover-dismiss {
-  position: fixed;
-  inset: 0;
-  z-index: 18;
-}
+.ui-popover-dismiss, .ui-crumbs-dismiss { display: none; }
 .ui-popover-panel {
   position: absolute;
   top: calc(100% + 0.4rem);
@@ -185,11 +181,7 @@
   font: inherit;
 }
 .ui-crumbs.is-open { z-index: 19; }
-.ui-crumbs-dismiss {
-  position: fixed;
-  inset: 0;
-  z-index: 18;
-}
+
 .ui-crumb-wrap { position: relative; display: inline-flex; align-items: center; flex: none; }
 .ui-crumb-sep { opacity: 0.55; user-select: none; }
 .ui-crumb,

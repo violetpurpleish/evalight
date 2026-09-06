@@ -121,7 +121,7 @@ try {
   });
   assert.ok(bounds.left >= 0 && bounds.right <= bounds.width, JSON.stringify(bounds));
   assert.ok(bounds.bottom <= bounds.height && bounds.footerBottom <= bounds.height, JSON.stringify(bounds));
-  await page.click(".ui-popover-dismiss");
+  await page.click(".wordmark");
   await page.waitForSelector(".project-menu", { hidden: true });
   console.log("project-switcher: creation, edit tracking, persisted ordering, search, keyboard, and mobile layout passed");
 } finally {

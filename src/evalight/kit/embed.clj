@@ -1,7 +1,8 @@
 (ns evalight.kit.embed
   "Compile-time slurp of src/ui and public/css/ui.css so the browser
   playground can copy those files into a project without a filesystem."
-  (:require [clojure.java.io :as io]))
+  (:require [clojure.string :as str]
+            [shadow.resource :as resource]))
 
 (def paths
   ["src/ui/core.cljs"
@@ -20,4 +21,4 @@
   []
   (into {}
         (for [p paths]
-          [p (slurp (io/file p))])))
+          [p (resource/slurp-resource &env (str/replace p #"^(src/|public/css/)" ""))])))

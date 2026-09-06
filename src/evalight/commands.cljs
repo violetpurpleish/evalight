@@ -143,33 +143,22 @@
 (defn- on-window-key [e]
   (cond
     (and (= "Escape" (.-key e)) (not (.-isComposing e)))
-    (let [s @state/app]
-      (cond
-        (:project-picker-open? s)
-        (do (.preventDefault e)
-            (swap! state/app assoc :project-picker-open? false)
-            (some-> (.getElementById js/document "project-select") .focus))
+    ;; Kit popovers and breadcrumb menus own Escape, including focus return.
+    (when-not (.querySelector js/document ".ui-popover-dismiss, .ui-crumbs-dismiss")
+      (let [s @state/app]
+        (cond
+          (:pick s)
+          (when-not (.closest (.-target e) ".ui-command")
+            (.preventDefault e)
+            (close!))
 
-        (:pick s)
-        (when-not (.closest (.-target e) ".ui-command")
-          (.preventDefault e)
-          (close!))
+          (:dialog s)
+          (do (.preventDefault e)
+              (swap! state/app assoc :dialog nil))
 
-        (:dialog s)
-        (do (.preventDefault e)
-            (swap! state/app assoc :dialog nil))
-
-        (:history-open? s)
-        (do (.preventDefault e)
-            (swap! state/app assoc :history-open? false))
-
-        (:beta? s)
-        (do (.preventDefault e)
-            (swap! state/app assoc :beta? false))
-
-        (:help? s)
-        (do (.preventDefault e)
-            (swap! state/app assoc :help? false))))
+          (:help? s)
+          (do (.preventDefault e)
+              (swap! state/app assoc :help? false)))))
 
     (palette-hotkey? e)
     (do (.preventDefault e) (toggle-palette!))))

@@ -999,3 +999,5 @@ kbd {
   font: 0.75rem/1.4 var(--sans);
   pointer-events: none;
 }
+
+.project-menu-content { display: contents; }

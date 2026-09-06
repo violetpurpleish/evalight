@@ -1,5 +1,6 @@
 (ns evalight.kit-test
-  (:require [cljs.test :refer [deftest is] :include-macros true]
+  (:require ["node:fs" :as node-fs]
+            [cljs.test :refer [deftest is] :include-macros true]
             [evalight.export :as export]
             [evalight.kit :as kit]
             [evalight.template :as template]
@@ -136,7 +137,7 @@
              :menu [{:id "src/app" :label "app"}]
              :on-dismiss [:close]})]
     (is (= "is-open" (:class (second el))))
-    (is (= :div.ui-crumbs-dismiss (first (nth el 2))))))
+    (is (= :button.ui-crumbs-dismiss (first (nth el 2))))))
 
 (deftest command-closed-when-open?-is-false
   (is (nil? (cmd/command {:open? false :items [{:id :a :label "A"}]}))))
@@ -197,3 +198,8 @@
                          :items [{:id :a :label "A" :action [:go]}]})
         btn (find-tag el :button.ui-command-item)]
     (is (= [:go] (:click (:on (second btn)))))))
+
+(deftest bundled-kit-matches-current-source
+  (doseq [[path content] kit/sources]
+    (is (= content (.readFileSync node-fs path "utf8"))
+        (str "Stale bundled kit source: " path))))
