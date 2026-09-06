@@ -5,6 +5,7 @@
             [evalight.kit :as kit]
             [evalight.paths :as paths]
             [evalight.preview :as preview]
+            [evalight.project-picker :as project-picker]
             [evalight.state :as state]
             [evalight.commands :as commands]
             [evalight.crumbs :as crumbs]
@@ -463,13 +464,7 @@
                         :compiled "ClojureScript"
                         nil)]
          [:span.runtime-tag tag])]
-      [:label.project-picker
-       [:span.sr-only "Project"]
-       [:select {:id "project-select"
-                 :on {:change [:switch-project]}
-                 :value (:project state)}
-        (for [name (:projects state)]
-          [:option {:value name :replicant/key name} name])]])]
+      (project-picker/view state))]
    [:nav.actions
     (when (= :browser (:mode state))
       [:button.ghost {:on {:click [:new-project-dialog]}} "New project"])

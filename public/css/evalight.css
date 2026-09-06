@@ -206,35 +206,54 @@ code, pre { font-family: var(--mono); }
   text-transform: uppercase;
   color: var(--muted);
 }
+/* The project menu is app chrome, not an OS-native select. */
 .project-picker { display: block; min-width: 0; }
-.project select,
-.project-name {
-  display: block;
-  width: 100%;
-  min-width: 8rem;
-  max-width: 16rem;
-  background-color: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 0.38rem 1.75rem 0.38rem 0.7rem;
+.project-trigger, .project-name {
+  width: 100%; min-width: 8rem; max-width: 16rem;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 0.42rem 0.65rem;
 }
-.project select {
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239a8b70' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><path d='M3 4.5 6 8l3-3.5'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 0.55rem center;
-  background-size: 0.75rem;
-  cursor: pointer;
+.project-trigger {
+  display: flex; align-items: center; gap: 0.55rem;
+  appearance: none; text-align: left; font-size: 0.9rem;
 }
-.project select:hover,
-.project select:focus {
-  border-color: var(--gold-dim);
-  outline: none;
+.project-trigger svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
+.project-trigger-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-trigger .project-chevron { margin-left: auto; width: 14px; }
+.project-trigger:hover, .project-trigger[aria-expanded="true"] { border-color: var(--gold-dim); }
+.project-trigger:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.project-name { display: block; }
+.project-menu.ui-popover-panel {
+  position: fixed; width: min(360px, calc(100vw - 24px));
+  min-width: 0; max-width: none; padding: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 12px; background: var(--panel-2);
 }
-.project-name {
-  padding-right: 0.7rem;
-}
+.project-menu-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 18px 18px 14px; }
+.project-menu-heading h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.project-menu-heading > span { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.project-search { position: relative; margin: 0 12px; }
+.project-search > svg { position: absolute; left: 11px; top: 11px; width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
+.project-search input { width: 100%; min-width: 0; padding: 10px 12px 10px 34px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 7px; font-size: 0.85rem; outline: none; }
+.project-search input:focus { border-color: var(--gold-dim); }
+.project-sort-label { padding: 16px 18px 8px; color: var(--muted); font-size: 0.73rem; }
+.project-options { list-style: none; padding: 0 6px 6px; margin: 0; overflow-y: auto; min-height: 0; max-height: 340px; overscroll-behavior: contain; }
+.project-options li + li { border-top: 1px solid rgba(154, 139, 112, 0.12); }
+.project-option { display: flex; flex-direction: column; gap: 5px; width: 100%; padding: 13px 12px; text-align: left; background: transparent; border: 0; border-radius: 7px; }
+.project-option:hover, .project-option:focus-visible { background: rgba(228, 179, 76, 0.07); outline: none; }
+.project-option:focus-visible { box-shadow: inset 0 0 0 1px var(--gold-dim); }
+.project-option.is-current { background: rgba(228, 179, 76, 0.045); }
+.project-option-top { display: flex; align-items: center; gap: 12px; width: 100%; }
+.project-option-name { font-size: 0.93rem; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-current { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; color: var(--gold); font-size: 0.7rem; }
+.project-current svg { width: 13px; height: 13px; }
+.project-edited { color: var(--text); opacity: 0.8; font-size: 0.78rem; }
+.project-created { color: var(--muted); font-size: 0.73rem; }
+.project-empty { margin: 0; padding: 26px 18px; color: var(--muted); text-align: center; font-size: 0.85rem; }
+.project-menu-footer { border-top: 1px solid var(--line); padding: 8px; flex: none; }
+.project-menu-footer button { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; background: transparent; border-radius: 6px; padding: 9px; color: var(--gold); font-size: 0.85rem; text-align: left; }
+.project-menu-footer button:hover, .project-menu-footer button:focus-visible { background: rgba(228, 179, 76, 0.07); outline: 1px solid var(--gold-dim); }
+.project-menu-footer svg { width: 16px; height: 16px; }
 
 .actions { display: flex; gap: 0.45rem; align-items: center; margin-left: auto; }
 .ghost, .primary, .danger, .icon-btn, .tiny {
@@ -908,5 +927,10 @@ kbd {
   .tab-repl .main { grid-template-rows: 1fr; }
   .mobile-tabs { display: flex; }
   .actions .ghost span, .actions .primary { font-size: 0.82rem; }
-  .project { display: none; }
+  .top { flex-wrap: wrap; gap: 0.6rem; }
+  .brand { flex: 1; }
+  .project { display: block; max-width: 48%; }
+  .project-trigger { min-width: 7rem; }
+  .actions { width: 100%; justify-content: flex-end; gap: 0.35rem; }
+  .actions > .ghost:first-child { display: none; }
 }

@@ -10,10 +10,11 @@
     "release": "shadow-cljs release app preview && bun scripts/copy-embed.mjs",
     "embed": "shadow-cljs release workshop workshop-preview",
     "local": "bun scripts/local-server.mjs",
-    "test": "bun scripts/licenses.mjs --check && shadow-cljs compile test && bun out/node-tests.js && bun test/evalight/smart_indent.test.mjs && bun test/evalight/bencode.test.mjs && bun test/evalight/overlay.test.mjs && bun test/evalight/attach.test.mjs && bun test/evalight/build-id.test.mjs && bun test/evalight/licenses.test.mjs && bun test/evalight/pack.test.mjs && bun test/evalight/project.test.mjs && bun test/evalight/local-ui.test.mjs && bun test/evalight/clj.test.mjs && bun test/evalight/fs-http.test.mjs && bun test/ui/layout.test.mjs && bun test/evalight/export-zip.test.mjs && bun test/evalight/attach-chrome.test.mjs && bun test/evalight/repl-intel.test.mjs && bun test/evalight/embed.test.mjs && bun test/evalight/media-chrome.test.mjs && bun test/evalight/word-wrap.test.mjs && bun test/evalight/editor-scroll.test.mjs && bun test/evalight/file-safety.test.mjs",
+    "test": "bun scripts/licenses.mjs --check && shadow-cljs compile test && bun out/node-tests.js && bun test/evalight/smart_indent.test.mjs && bun test/evalight/bencode.test.mjs && bun test/evalight/overlay.test.mjs && bun test/evalight/attach.test.mjs && bun test/evalight/build-id.test.mjs && bun test/evalight/licenses.test.mjs && bun test/evalight/pack.test.mjs && bun test/evalight/project.test.mjs && bun test/evalight/local-ui.test.mjs && bun test/evalight/clj.test.mjs && bun test/evalight/fs-http.test.mjs && bun test/ui/layout.test.mjs && bun test/evalight/export-zip.test.mjs && bun test/evalight/attach-chrome.test.mjs && bun test/evalight/repl-intel.test.mjs && bun test/evalight/embed.test.mjs && bun test/evalight/media-chrome.test.mjs && bun test/evalight/word-wrap.test.mjs && bun test/evalight/editor-scroll.test.mjs && bun test/evalight/file-safety.test.mjs && bun test/evalight/project-switcher.test.mjs",
     "licenses": "bun scripts/licenses.mjs",
     "licenses:check": "bun scripts/licenses.mjs --check",
     "test:file-safety": "shadow-cljs compile app preview && bun test/evalight/fs-http.test.mjs && bun test/evalight/file-safety.test.mjs",
+    "test:projects": "shadow-cljs compile app preview test && bun test/evalight/project-switcher.test.mjs",
     "test:ui": "bun test/ui/layout.test.mjs",
     "postinstall": "bun scripts/dedupe-codemirror.mjs"
   },

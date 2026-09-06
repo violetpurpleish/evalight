@@ -603,20 +603,20 @@ try {
     return {
       wrap: wrap.getBoundingClientRect().toJSON(),
       select: select.getBoundingClientRect().toJSON(),
-      appearance: cs.appearance || cs.webkitAppearance,
+      custom: select.tagName === "BUTTON" && select.getAttribute("aria-haspopup") === "dialog",
       radius: cs.borderRadius,
     };
   });
-  check("project select is present", !project.missing);
+  check("project switcher is present", !project.missing);
   if (!project.missing) {
     check(
-      "project select uses custom appearance, not the native widget",
-      project.appearance === "none",
-      project.appearance
+      "project switcher opens a custom dialog",
+      project.custom,
+      String(project.custom)
     );
     const radius = parseFloat(project.radius);
     check(
-      "project select is not a pill",
+      "project trigger is not a pill",
       Number.isFinite(radius) && radius > 0 && radius < 20,
       project.radius
     );
@@ -1631,10 +1631,6 @@ try {
   await page.keyboard.type("doomed");
   await page.click(".ui-dialog .ui-btn-primary");
   await page.waitForFunction(
-    () => [...document.querySelectorAll("#project-select option")].some((o) => o.value === "doomed"),
-    { timeout: 15000 }
-  );
-  await page.waitForFunction(
     () => document.querySelector("#project-select")?.value === "doomed",
     { timeout: 10000 }
   );
@@ -1723,17 +1719,19 @@ try {
   await page.waitForFunction(
     () =>
       !document.querySelector(".ui-dialog") &&
-      document.querySelector("#project-select")?.value !== "doomed" &&
-      ![...document.querySelectorAll("#project-select option")].some((o) => o.value === "doomed"),
+      document.querySelector("#project-select")?.value !== "doomed",
     { timeout: 15000 }
   );
+  await page.click("#project-select");
+  await page.waitForSelector(".project-option");
   const afterDelete = await page.evaluate(() => {
     const select = document.querySelector("#project-select");
     return {
       value: select?.value ?? "",
-      names: [...document.querySelectorAll("#project-select option")].map((o) => o.value),
+      names: [...document.querySelectorAll(".project-option")].map((o) => o.dataset.project),
     };
   });
+  await page.keyboard.press("Escape");
   check("deleted project is gone from the picker", !afterDelete.names.includes("doomed"), afterDelete.names.join(", "));
   check("another project is open after delete", Boolean(afterDelete.value) && afterDelete.value !== "doomed", afterDelete.value);
 

@@ -11,6 +11,9 @@
          :fs-status :loading
          :fs-error nil
          :projects []
+         :project-details {}
+         :project-picker-open? false
+         :project-query ""
          :project nil
          :tree []
          :expanded #{"src" "public" "src/app" "src/ui" "public/css"}

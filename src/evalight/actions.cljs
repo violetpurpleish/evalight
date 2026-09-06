@@ -11,6 +11,7 @@
             [evalight.kit :as kit]
             [evalight.preview :as preview]
             [evalight.prefs :as prefs]
+            [evalight.projects :as projects]
             [evalight.promise :as p]
             [evalight.ns-graph :as ns-graph]
             [evalight.state :as state]
@@ -166,9 +167,41 @@
                                   (map :name)
                                   sort
                                   vec)]
-                   (swap! state/app assoc :projects names)
-                   names))))
+                   (-> (p/reduce-p
+                        (fn [details name]
+                          (-> (projects/load! ws name)
+                              (.then (fn [metadata] (assoc details name metadata)))))
+                        {} names)
+                       (.then (fn [details]
+                                (let [ordered (projects/ordered names details)]
+                                  (swap! state/app assoc :projects ordered :project-details details)
+                                  ordered))))))))
     (p/ok [])))
+
+(defn- track-project [project-fs name]
+  (if-let [ws @!workspace]
+    (projects/->TrackedFS
+     project-fs
+     (fn []
+       (-> (projects/touch! ws name)
+           (.then (fn [metadata]
+                    (swap! state/app
+                           (fn [s]
+                             (let [details (assoc (:project-details s) name metadata)]
+                               (assoc s :project-details details
+                                      :projects (projects/ordered (:projects s) details))))))))))
+    project-fs))
+
+(defn close-project-picker! []
+  (swap! state/app assoc :project-picker-open? false)
+  (when-let [el (.getElementById js/document "project-select")]
+    (.focus el)))
+
+(defn toggle-project-picker! []
+  (let [open? (not (:project-picker-open? @state/app))]
+    (swap! state/app assoc :project-picker-open? open? :project-query ""
+           :project-clock (.now js/Date) :pick nil :history-open? false :help? false :beta? false)
+    (when open? (refresh-projects!))))
 
 (declare save-current!)
 
@@ -414,6 +447,7 @@
                    (p/ok nil))))
         (.then (fn [_] (load-history!)))
         (.then (fn [_] (migrate-project-docs! (now-fs) name)))
+        (.then (fn [_] (reset! !fs (track-project (now-fs) name))))
         (.then (fn [_] (refresh-tree!)))
         (.then (fn [_] (preferred-file (now-fs))))
         (.then (fn [preferred]
@@ -441,6 +475,9 @@
                      (p/ok (flash! (str name " already exists.") :err))
                      (-> (opfs/open ["evalight" "projects" name])
                          (.then (fn [dest] (write-template! dest name)))
+                         (.then (fn [_]
+                                  (let [now (.now js/Date)]
+                                    (projects/save! @!workspace name {:created-at now :edited-at now}))))
                          (.then (fn [_] (refresh-projects!)))
                          (.then (fn [_]
                                   (swap! state/app assoc :dialog nil)
@@ -546,6 +583,9 @@
 (defn- seed-lamp! []
   (-> (opfs/open ["evalight" "projects" "lamp"])
       (.then (fn [dest] (write-template! dest "lamp")))
+      (.then (fn [_]
+               (let [now (.now js/Date)]
+                 (projects/save! @!workspace "lamp" {:created-at now :edited-at now}))))
       (.then (fn [_] (refresh-projects!)))
       (.then (fn [_] (open-project! "lamp")))))
 
@@ -566,6 +606,7 @@
         (swap! state/app assoc :dialog nil)
         (-> (save-current! {:reload? false})
             (.then (fn [_] (fs/delete @!workspace (paths/join "projects" name))))
+            (.then (fn [_] (fs/delete @!workspace (projects/metadata-path name))))
             (.then (fn [_]
                      (editor/clear-buffers!)
                      (swap! state/app assoc :active-file nil :dirty #{} :tree [] :project nil :history [] :media nil)
@@ -817,7 +858,7 @@
       (.then (fn [_] (flash! "Cleared history")))))
 
 (defn set-dialog! [dialog]
-  (swap! state/app assoc :dialog dialog :pick nil :history-open? false))
+  (swap! state/app assoc :dialog dialog :pick nil :history-open? false :project-picker-open? false))
 
 (defn close-dialog! []
   (swap! state/app assoc :dialog nil))
@@ -1054,7 +1095,12 @@
       :clear-repl (clear-repl!)
       :run (catch-ui (run-preview! {:reset? true}))
       :export (catch-ui (export-zip!))
-      :switch-project (catch-ui (open-project! (.-value (.-target event))))
+      :toggle-project-picker (catch-ui (toggle-project-picker!))
+      :close-project-picker (close-project-picker!)
+      :project-query (swap! state/app assoc :project-query (.-value (.-target event)))
+      :switch-project (do (close-project-picker!)
+                          (when (not= (first args) (:project @state/app))
+                            (catch-ui (open-project! (first args)))))
       :submit-new-file (when event
                          (let [v (.-value (.querySelector (.-target event) "input"))]
                            (catch-ui (create-file! v))))

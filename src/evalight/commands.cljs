@@ -145,6 +145,11 @@
     (and (= "Escape" (.-key e)) (not (.-isComposing e)))
     (let [s @state/app]
       (cond
+        (:project-picker-open? s)
+        (do (.preventDefault e)
+            (swap! state/app assoc :project-picker-open? false)
+            (some-> (.getElementById js/document "project-select") .focus))
+
         (:pick s)
         (when-not (.closest (.-target e) ".ui-command")
           (.preventDefault e)
