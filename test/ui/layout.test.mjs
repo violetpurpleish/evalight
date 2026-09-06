@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -144,6 +144,17 @@ function replPromptMetrics(page) {
   });
 }
 
+// Puppeteer's Bun stack can omit the caller of a timed-out predicate.
+// Include the condition itself so CI failures identify what never became true.
+async function waitForUI(page, predicate, ...args) {
+  try {
+    return await page.waitForFunction(predicate, ...args);
+  } catch (error) {
+    throw new Error(`UI condition failed: ${String(predicate)}
+${error.message}`, { cause: error });
+  }
+}
+
 const failures = [];
 function check(name, cond, detail) {
   if (!cond) failures.push(detail ? `${name}: ${detail}` : name);
@@ -158,8 +169,9 @@ const browser = await puppeteer.launch({
   args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
 });
 
+let page;
 try {
-  const page = await browser.newPage();
+  page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
   await page.goto(url, { waitUntil: "domcontentloaded" });
   const isMac = await page.evaluate(() => /Mac/.test(navigator.platform));
@@ -483,7 +495,7 @@ try {
       .find((b) => b.textContent.trim() === "Restore")
       ?.click();
   });
-  await page.waitForFunction(
+  await waitForUI(page,
     () => (document.querySelector(".toast")?.textContent ?? "").includes("Restored Button"),
     { timeout: 4000 }
   );
@@ -507,7 +519,7 @@ try {
   await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
   await page.click(".ui-dialog .ui-btn-danger");
   await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
-  await page.waitForFunction(
+  await waitForUI(page,
     () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "split.cljs"),
     { timeout: 6000 }
   );
@@ -897,7 +909,7 @@ try {
     await page.keyboard.type("src/history-demo.cljs");
     await page.click(".ui-dialog .ui-btn-primary");
     await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 6000 });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
       { timeout: 6000 }
     );
@@ -913,7 +925,7 @@ try {
     check("delete dialog points at History", /History/.test(deleteCopy), deleteCopy.slice(0, 300));
     await page.click(".ui-dialog .ui-btn-danger");
     await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
       { timeout: 6000 }
     );
@@ -945,7 +957,7 @@ try {
       );
       [...(row?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === "Undo")?.click();
     });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
       { timeout: 6000 }
     );
@@ -970,7 +982,7 @@ try {
     await page.keyboard.type("src/history-renamed.cljs");
     await page.click(".ui-dialog .ui-btn-primary");
     await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 6000 });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-renamed.cljs"),
       { timeout: 6000 }
     );
@@ -983,7 +995,7 @@ try {
       );
       [...(row?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === "Undo")?.click();
     });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
       { timeout: 6000 }
     );
@@ -1005,7 +1017,7 @@ try {
     await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
     await page.click(".ui-dialog .ui-btn-danger");
     await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-demo.cljs"),
       { timeout: 6000 }
     );
@@ -1017,7 +1029,7 @@ try {
         .find((b) => b.textContent.trim() === "Clear history")
         ?.click();
     });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => Boolean(document.querySelector(".empty-history")),
       { timeout: 4000 }
     );
@@ -1041,7 +1053,7 @@ try {
     await page.keyboard.type("src/history-keep.cljs");
     await page.click(".ui-dialog .ui-btn-primary");
     await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 6000 });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-keep.cljs"),
       { timeout: 6000 }
     );
@@ -1054,7 +1066,7 @@ try {
     await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
     await page.click(".ui-dialog .ui-btn-danger");
     await page.waitForSelector(".ui-dialog", { hidden: true, timeout: 4000 });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => ![...document.querySelectorAll(".tree-name")].some((el) => el.textContent === "history-keep.cljs"),
       { timeout: 6000 }
     );
@@ -1070,7 +1082,7 @@ try {
 
 
   await page.waitForSelector("textarea[name=expr]", { timeout: 5000 });
-  await page.waitForFunction(
+  await waitForUI(page,
     () => {
       const head = document.querySelector("section.preview .pane-head");
       return head && !/loading|error/i.test(head.innerText);
@@ -1122,7 +1134,7 @@ try {
 
   await page.keyboard.press("Enter");
   try {
-    await page.waitForFunction(
+    await waitForUI(page,
       () => [...document.querySelectorAll(".repl-line.is-out, .repl-line.is-err")].length > 0,
       { timeout: 10000 }
     );
@@ -1148,7 +1160,7 @@ try {
   await page.focus("textarea[name=expr]");
   await page.keyboard.type("(squared 12)");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => (document.querySelector(".repl-log")?.innerText ?? "").includes("144"),
     { timeout: 8000 }
   );
@@ -1209,7 +1221,7 @@ try {
   }
 
   await page.click(".sidebar [aria-label='Hide files']");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => {
       const el = document.querySelector(".sidebar");
       return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
@@ -1231,7 +1243,7 @@ try {
   );
   check("a files rail can show the pane again", filesHidden.canShow);
 
-  await page.waitForFunction(
+  await waitForUI(page,
     () => /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
     { timeout: 15000 }
   );
@@ -1268,7 +1280,7 @@ try {
   if (greetOpt) {
     await page.mouse.click(greetOpt.x, greetOpt.y);
   }
-  await page.waitForFunction(
+  await waitForUI(page,
     () => /app\/greet\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
     { timeout: 8000 }
   );
@@ -1278,7 +1290,7 @@ try {
   );
 
   await page.click(".pane-rail[aria-label='Show files']");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
   );
@@ -1304,7 +1316,7 @@ try {
     JSON.stringify(paletteFirst)
   );
   await page.keyboard.press("ArrowUp");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => {
       const list = document.querySelector(".ui-command-list");
       const item = document.querySelector(".ui-command-item.is-active");
@@ -1329,7 +1341,7 @@ try {
     JSON.stringify({ wrap: paletteWrap, first: paletteFirst })
   );
   await page.keyboard.press("ArrowDown");
-  await page.waitForFunction(
+  await waitForUI(page,
     (firstId) => {
       const list = document.querySelector(".ui-command-list");
       const item = document.querySelector(".ui-command-item.is-active");
@@ -1418,7 +1430,7 @@ try {
   await page.click(".ui-command-input");
   await page.keyboard.type("core.cljs");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(
+  await waitForUI(page,
     () =>
       !document.querySelector(".ui-command") &&
       /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
@@ -1443,7 +1455,7 @@ try {
   await page.click(".ui-command-input");
   await page.keyboard.type("clear repl");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => !document.querySelector(".ui-command"), { timeout: 4000 });
+  await waitForUI(page,() => !document.querySelector(".ui-command"), { timeout: 4000 });
   const paletteClear = await page.evaluate(() => {
     const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
     return {
@@ -1462,7 +1474,7 @@ try {
   await page.click(".ui-command-input");
   await page.keyboard.type("help");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => !document.querySelector(".ui-command") && document.querySelector(".help"),
     { timeout: 4000 }
   );
@@ -1484,7 +1496,7 @@ try {
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
   await page.click("section.preview [aria-label='Hide preview']");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => {
       const el = document.querySelector("section.preview");
       return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
@@ -1517,7 +1529,7 @@ try {
   });
   await page.keyboard.type("(+ 20 22)");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => (document.querySelector(".repl-log")?.innerText ?? "").includes("42"),
     { timeout: 8000 }
   );
@@ -1527,7 +1539,7 @@ try {
   );
 
   await page.click(".pane-rail[aria-label='Show preview']");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => (document.querySelector("section.preview")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
   );
@@ -1553,7 +1565,7 @@ try {
     JSON.stringify(at900)
   );
   await page.click(".sidebar [aria-label='Hide files']");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => {
       const el = document.querySelector(".sidebar");
       return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
@@ -1573,7 +1585,7 @@ try {
     })
   );
   await page.click(".pane-rail[aria-label='Show files']");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100,
     { timeout: 4000 }
   );
@@ -1638,11 +1650,14 @@ try {
   await page.keyboard.up("Control");
   await page.keyboard.type("doomed");
   await page.click(".ui-dialog .ui-btn-primary");
-  await page.waitForFunction(
-    () => document.querySelector("#project-select")?.value === "doomed",
+  await waitForUI(page,
+    // The project name and tree render before open-project! loads/focuses
+    // the editor. Starting Rename earlier can send typing into that editor.
+    () => document.querySelector("#project-select")?.value === "doomed" &&
+      document.querySelector(".toast")?.textContent === "Created doomed",
     { timeout: 10000 }
   );
-  await page.waitForFunction(
+  await waitForUI(page,
     () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent.trim() === "greet.cljs"),
     { timeout: 15000 }
   );
@@ -1669,7 +1684,7 @@ try {
     await page.keyboard.up("Control");
     await page.keyboard.type("src/app/hello.cljs");
     await page.click(".ui-dialog .ui-btn-primary");
-    await page.waitForFunction(
+    await waitForUI(page,
       () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent.trim() === "hello.cljs"),
       { timeout: 8000 }
     );
@@ -1683,7 +1698,7 @@ try {
       const name = [...document.querySelectorAll(".tree-name")].find((el) => el.textContent.trim() === "core.cljs");
       name?.closest(".tree-item")?.click();
     });
-    await page.waitForFunction(
+    await waitForUI(page,
       () => /core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
       { timeout: 8000 }
     );
@@ -1709,7 +1724,7 @@ try {
     await page.mouse.click(deleteHit.x, deleteHit.y);
     await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
     await page.click(".ui-dialog .ui-btn-danger");
-    await page.waitForFunction(
+    await waitForUI(page,
       () => /still require/i.test(document.querySelector(".toast")?.textContent ?? ""),
       { timeout: 8000 }
     );
@@ -1724,10 +1739,15 @@ try {
   await page.click("button[aria-label='Delete project']");
   await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
   await page.click(".ui-dialog .ui-btn-danger");
-  await page.waitForFunction(
-    () =>
-      !document.querySelector(".ui-dialog") &&
-      document.querySelector("#project-select")?.value !== "doomed",
+  await waitForUI(page,
+    // Deletion briefly clears the project, then loads/focuses its replacement.
+    // Wait for completion before opening a picker that closes on focusout.
+    () => {
+      const project = document.querySelector("#project-select")?.value;
+      return !document.querySelector(".ui-dialog") &&
+        Boolean(project) && project !== "doomed" &&
+        document.querySelector(".toast")?.textContent === "Deleted doomed";
+    },
     { timeout: 15000 }
   );
   await page.click("#project-select");
@@ -1744,11 +1764,11 @@ try {
   check("another project is open after delete", Boolean(afterDelete.value) && afterDelete.value !== "doomed", afterDelete.value);
 
   await page.waitForSelector(".cm-content", { timeout: 10000 });
-  await page.waitForFunction(
+  await waitForUI(page,
     () => /\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
     { timeout: 10000 }
   );
-  await page.waitForFunction(
+  await waitForUI(page,
     () => {
       const head = document.querySelector("section.preview .pane-head");
       return head && !/loading|error/i.test(head.innerText);
@@ -1778,13 +1798,13 @@ try {
     );
   };
   try {
-    await page.waitForFunction(completionVisible, { timeout: 2500 });
+    await waitForUI(page,completionVisible, { timeout: 2500 });
   } catch {
     await page.keyboard.down("Control");
     await page.keyboard.press("Period");
     await page.keyboard.up("Control");
     try {
-      await page.waitForFunction(completionVisible, { timeout: 8000 });
+      await waitForUI(page,completionVisible, { timeout: 8000 });
     } catch (err) {
       const dump = await page.evaluate(() => {
         const tip = document.querySelector(".cm-tooltip-autocomplete");
@@ -1865,7 +1885,7 @@ try {
     });
     row?.querySelector(".tree-item")?.click();
   });
-  await page.waitForFunction(
+  await waitForUI(page,
     () => /app\/core\.cljs/.test(document.querySelector(".file-path")?.textContent ?? ""),
     { timeout: 8000 }
   );
@@ -1929,7 +1949,7 @@ try {
     if (hovered?.over) {
       await page.mouse.move(hovered.x, hovered.y);
       try {
-        await page.waitForFunction(() => {
+        await waitForUI(page,() => {
           const tip = document.querySelector(".cm-evalight-doc");
           return tip && /bump/i.test(tip.textContent) && tip.getBoundingClientRect().top > 0;
         }, { timeout: 5000 });
@@ -2123,7 +2143,7 @@ try {
   const filesVisible = await page.evaluate(() => (document.querySelector(".sidebar")?.offsetWidth ?? 0) > 100);
   if (filesVisible) {
     await page.click(".sidebar [aria-label='Hide files']");
-    await page.waitForFunction(
+    await waitForUI(page,
       () => {
         const el = document.querySelector(".sidebar");
         return !el || el.offsetWidth === 0 || getComputedStyle(el).display === "none";
@@ -2138,13 +2158,13 @@ try {
   await page.keyboard.up("Control");
   await page.keyboard.type("(+ 9 9)");
   await page.keyboard.press("Enter");
-  await page.waitForFunction(
+  await waitForUI(page,
     () => /\(\+\s*9\s*9\)/.test(document.querySelector(".repl-log")?.innerText ?? ""),
     { timeout: 8000 }
   );
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".pane-rail[aria-label='Show files'], .sidebar", { timeout: 20000 });
-  await page.waitForFunction(
+  await waitForUI(page,
     () => document.querySelector(".repl-log") && document.querySelector(".workspace"),
     { timeout: 20000 }
   );
@@ -2180,9 +2200,27 @@ try {
     afterReload.some((label) => label.includes("history-keep.cljs")),
     afterReload.join(" | ")
   );
+} catch (error) {
+  // Report state only for an uncaught failure, not an expected short probe.
+  if (page) {
+    console.error("Layout failure UI state:", await page.evaluate(() => ({
+      project: document.querySelector("#project-select")?.value,
+      file: document.querySelector(".file-path")?.textContent,
+      toast: document.querySelector(".toast")?.textContent,
+      dialog: document.querySelector(".ui-dialog")?.textContent,
+      pickerOpen: document.querySelector("#project-select")?.getAttribute("aria-expanded"),
+      focus: document.activeElement?.outerHTML?.slice(0, 400),
+    })).catch(() => null));
+  }
+  if (failures.length) console.error("Earlier failed checks:", failures);
+  throw error;
 } finally {
-  await browser.close();
-  await stop();
+  try {
+    await browser.close();
+  } finally {
+    await stop();
+    await rm(userDataDir, { recursive: true, force: true });
+  }
 }
 
 if (failures.length) {
