@@ -1,7 +1,7 @@
 /**
  * Filesystem HTTP API used by both bun run evalight and bun run local.
  */
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { link, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 export const SKIP = new Set([
@@ -42,24 +42,39 @@ async function readBody(req) {
 }
 
 export function createFsApi(fsRoot) {
-  function safe(rel) {
+  async function safe(rel) {
     const full = resolve(fsRoot, rel || ".");
-    const relToRoot = relative(fsRoot, full);
-    if (relToRoot.startsWith("..") || relToRoot.startsWith(`..${sep}`)) {
+    const relToRoot = relative(resolve(fsRoot), full);
+    if (relToRoot === ".." || relToRoot.startsWith(`..${sep}`)) {
       throw new Error("Path escapes the project root.");
     }
-    return full;
+    // Canonicalize the root (e.g. macOS /tmp), but reject symlinks below it.
+    // This also prevents directory cycles during recursive tree reads.
+    const root = await realpath(fsRoot);
+    let current = root;
+    for (const part of relToRoot.split(sep).filter(Boolean)) {
+      current = join(current, part);
+      try {
+        if ((await lstat(current)).isSymbolicLink()) {
+          throw new Error("Symbolic links are not supported in project paths.");
+        }
+      } catch (e) {
+        if (e.code !== "ENOENT") throw e;
+      }
+    }
+    return current;
   }
 
   async function listDir(rel) {
-    const dir = safe(rel);
+    const dir = await safe(rel);
     const names = await readdir(dir);
     const entries = [];
     for (const name of names) {
       if (SKIP.has(name)) continue;
       if (!rel && SKIP_ROOT.has(name)) continue;
       const childRel = rel ? `${rel}/${name}` : name;
-      const s = await stat(join(dir, name));
+      const s = await lstat(join(dir, name));
+      if (s.isSymbolicLink()) continue;
       entries.push({
         name,
         path: childRel.replaceAll("\\", "/"),
@@ -80,15 +95,15 @@ export function createFsApi(fsRoot) {
       }
       if (url.pathname.endsWith("/read") && req.method === "GET") {
         if (isBinaryPath(path)) {
-          const buf = await readFile(safe(path));
+          const buf = await readFile(await safe(path));
           return json({ path, content: buf.toString("base64"), encoding: "base64" });
         }
-        const content = await readFile(safe(path), "utf8");
+        const content = await readFile(await safe(path), "utf8");
         return json({ path, content });
       }
       if (url.pathname.endsWith("/exists") && req.method === "GET") {
         try {
-          await stat(safe(path));
+          await stat(await safe(path));
           return json({ exists: true });
         } catch {
           return json({ exists: false });
@@ -96,7 +111,7 @@ export function createFsApi(fsRoot) {
       }
       if (url.pathname.endsWith("/write") && req.method === "PUT") {
         const body = await readBody(req);
-        const target = safe(body.path);
+        const target = await safe(body.path);
         await mkdir(dirname(target), { recursive: true });
         if (body.encoding === "base64") {
           await writeFile(target, Buffer.from(body.content ?? "", "base64"));
@@ -107,17 +122,31 @@ export function createFsApi(fsRoot) {
       }
       if (url.pathname.endsWith("/mkdir") && req.method === "POST") {
         const body = await readBody(req);
-        await mkdir(safe(body.path), { recursive: true });
+        await mkdir(await safe(body.path), { recursive: true });
         return json({ path: body.path });
       }
       if (url.pathname.endsWith("/rename") && req.method === "POST") {
         const body = await readBody(req);
-        await mkdir(dirname(safe(body.to)), { recursive: true });
-        await rename(safe(body.from), safe(body.to));
+        const from = await safe(body.from);
+        const to = await safe(body.to);
+        try {
+          await lstat(to);
+          return error(409, "Destination already exists.");
+        } catch (e) {
+          if (e.code !== "ENOENT") throw e;
+        }
+        await mkdir(dirname(to), { recursive: true });
+        if ((await lstat(from)).isFile()) {
+          // link fails atomically if the destination appeared after the check.
+          await link(from, to);
+          await unlink(from);
+        } else {
+          await rename(from, to);
+        }
         return json({ to: body.to });
       }
       if (url.pathname.endsWith("/delete") && req.method === "DELETE") {
-        await rm(safe(path), { recursive: true, force: true });
+        await rm(await safe(path), { recursive: true, force: true });
         return json({ path });
       }
       return error(404, "Unknown filesystem endpoint");

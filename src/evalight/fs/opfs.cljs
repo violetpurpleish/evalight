@@ -84,8 +84,12 @@
   (-mkdir [_ path]
     (-> (get-dir root path true)
         (.then (fn [_] path))))
-  (-rename [_ from to]
-    (-> (get-file-handle root from false)
+  (-rename [this from to]
+    (-> (proto/exists? this to)
+        (.then (fn [exists]
+                 (when exists
+                   (throw (js/Error. (str to " already exists."))))
+                 (get-file-handle root from false)))
         (.then (fn [fh] (.getFile fh)))
         (.then (fn [file] (.arrayBuffer file)))
         (.then (fn [buf]

@@ -25,6 +25,7 @@
 (defonce !live-timer (atom nil))
 (defonce !frame-timer (atom nil))
 (defonce !notice-timer (atom nil))
+(defonce !save-queue (atom (p/ok nil)))
 
 (defn- schedule-native-frame!
   "GPUI preview is a snapshot, not an iframe. Eval already mutated the
@@ -169,10 +170,13 @@
                    names))))
     (p/ok [])))
 
+(declare save-current!)
+
 (defn open-file! [path]
   (if-not path
     (p/ok nil)
-    (-> (fs/read-file (now-fs) path)
+    (-> (save-current!)
+        (.then (fn [_] (fs/read-file (now-fs) path)))
         (.then (fn [content]
                  (swap! state/app assoc :active-file path :mobile-tab :editor)
                  (cond
@@ -191,7 +195,10 @@
 
                    :else
                    (do (swap! state/app dissoc :media)
-                       (editor/load-fresh! path content)
+                       (editor/load-fresh! path
+                                           (if (contains? (:dirty @state/app) path)
+                                             (or (editor/text-for path) content)
+                                             content))
                        (editor/focus!)
                        path)))))))
 
@@ -205,8 +212,6 @@
         (swap! state/app assoc-in [:preview :error]
                (or (get-in result [:error :message]) "Preview failed to load."))))
   result)
-
-(declare save-current!)
 
 (defn run-preview!
   ([] (run-preview! {:reset? true}))
@@ -246,28 +251,48 @@
                                (swap! state/app assoc-in [:preview :error] (.-message e)))))))
              (if (preview/compiled-runtime?) 1400 450)))))
 
+(defn- save-buffer! [project-fs path text reload?]
+  ;; Serialize writes so an older save cannot finish after a newer one.
+  (let [saved (-> @!save-queue
+                  (.catch (fn [_] nil))
+                  (.then (fn [_] (fs/write-file project-fs path text)))
+                  (.then (fn [_]
+                           (when (identical? project-fs @!fs)
+                             (when (= text (editor/text-for path))
+                               (swap! state/app update :dirty disj path))
+                             (when reload?
+                               (schedule-live-reload!)
+                               (schedule-native-frame! 450)))
+                           path)))]
+    (reset! !save-queue saved)
+    saved))
+
 (defn save-current!
   ([] (save-current! {:reload? true}))
   ([{:keys [reload?]}]
+   (when-let [t @!save-timer]
+     (js/clearTimeout t)
+     (reset! !save-timer nil))
    (let [path (editor/current-path)
          text (editor/current-text)]
-     (if (and path text (not (paths/binary-file? path)))
-       (-> (fs/write-file (now-fs) path text)
-           (.then (fn [_]
-                    (swap! state/app update :dirty disj path)
-                    (when reload?
-                      (schedule-live-reload!)
-                      (schedule-native-frame! 450))
-                    path)))
-       (p/ok nil)))))
+     (if (and path text (contains? (:dirty @state/app) path)
+              (not (paths/binary-file? path)))
+       (save-buffer! (now-fs) path text reload?)
+       @!save-queue))))
 
-(defn on-editor-change [_text]
+(defn on-editor-change [text]
   (when-let [path (editor/current-path)]
     (swap! state/app update :dirty conj path)
     (when-let [t @!save-timer]
       (js/clearTimeout t))
-    (reset! !save-timer
-            (js/setTimeout (fn [] (save-current!)) 320))))
+    (let [project-fs (now-fs)]
+      (reset! !save-timer
+              (js/setTimeout
+               (fn []
+                 (reset! !save-timer nil)
+                 (-> (save-buffer! project-fs path text true)
+                     (.catch (fn [e] (flash! (.-message e) :err)))))
+               320)))))
 
 (defn- repl-in [code]
   (state/repl-entry {:kind :in :text code}))
@@ -376,7 +401,8 @@
                (opfs/open ["evalight" "projects" name]))]
     (when (and prev (not= prev name))
       (prefs/save-repl!))
-    (-> fs-p
+    (-> (save-current! {:reload? false})
+        (.then (fn [_] fs-p))
         (.then (fn [project-fs]
                  (reset! !fs project-fs)
                  (editor/clear-buffers!)
@@ -452,7 +478,11 @@
                                        (str/replace "/" "."))]
                         (str "(ns " ns-name ")\n"))
                       "")]
-        (-> (fs/write-file (now-fs) path content)
+        (-> (fs/exists? (now-fs) path)
+            (.then (fn [exists]
+                     (when exists
+                       (throw (js/Error. (str path " already exists."))))
+                     (fs/write-file (now-fs) path content)))
             (.then (fn [_]
                      (swap! state/app assoc :dialog nil)
                      (swap! state/app update :expanded conj (paths/dirname path))
@@ -470,8 +500,10 @@
                    (refresh-tree!)))))))
 
 (defn delete-path! [path]
-  (-> (p/all [(cljs-sources)
-              (history/snapshot-path (now-fs) path (editor/buffer-texts))])
+  (-> (save-current! {:reload? false})
+      (.then (fn [_]
+               (p/all [(cljs-sources)
+                       (history/snapshot-path (now-fs) path (editor/buffer-texts))])))
       (.then (fn [pair]
                (let [files (aget pair 0)
                      snap (aget pair 1)
@@ -532,7 +564,8 @@
       :else
       (do
         (swap! state/app assoc :dialog nil)
-        (-> (fs/delete @!workspace (paths/join "projects" name))
+        (-> (save-current! {:reload? false})
+            (.then (fn [_] (fs/delete @!workspace (paths/join "projects" name))))
             (.then (fn [_]
                      (editor/clear-buffers!)
                      (swap! state/app assoc :active-file nil :dirty #{} :tree [] :project nil :history [] :media nil)
@@ -548,8 +581,13 @@
   (let [to (paths/normalize to)]
     (if (or (str/blank? to) (= from to))
       (p/ok (swap! state/app assoc :dialog nil))
-      (-> (p/all [(cljs-sources)
-                  (history/snapshot-path (now-fs) from (editor/buffer-texts))])
+      (-> (save-current! {:reload? false})
+          (.then (fn [_] (fs/exists? (now-fs) to)))
+          (.then (fn [exists]
+                   (when exists
+                     (throw (js/Error. (str to " already exists."))))
+                   (p/all [(cljs-sources)
+                           (history/snapshot-path (now-fs) from (editor/buffer-texts))])))
           (.then (fn [pair]
                    (let [files (aget pair 0)
                          snap (aget pair 1)]
