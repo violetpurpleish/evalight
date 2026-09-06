@@ -80,6 +80,7 @@ code, pre { font-family: var(--mono); }
 }
 
 .brand { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+.brand > svg { flex: none; }
 .brand svg { width: 1.7rem; height: 1.7rem; color: var(--gold); }
 .wordmark { font-family: var(--serif); font-size: 1.15rem; letter-spacing: 0.01em; }
 .tagline { margin: 0; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -186,6 +187,7 @@ code, pre { font-family: var(--mono); }
   border-top: 1px solid var(--line);
 }
 
+.project-context { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .project { flex: 0 1 auto; min-width: 0; max-width: 16rem; }
 .project:has(.project-local) { max-width: none; }
 .project-local {
@@ -279,6 +281,38 @@ code, pre { font-family: var(--mono); }
 }
 .icon-btn { padding: 0.38rem; }
 .icon-btn svg, .ghost svg, .primary svg { width: 1rem; height: 1rem; }
+/* Workshop toolbar: quiet tools, separated utilities, one primary action. */
+.actions { gap: 12px; flex: none; }
+.toolbar-group { display: flex; align-items: center; gap: 4px; }
+.toolbar-group + .toolbar-utilities { border-left: 1px solid var(--line); padding-left: 12px; }
+:is(.actions, .project-context) .icon-btn, .actions > .primary, .actions .add-ui-btn {
+  height: 34px;
+  border-radius: 7px;
+  white-space: nowrap;
+  justify-content: center;
+}
+:is(.actions, .project-context) .icon-btn { width: 34px; padding: 0; border-color: transparent; color: var(--muted); }
+.actions .add-ui-btn { border-color: transparent; font-size: 0.85rem; padding: 0 10px; }
+:is(.actions, .project-context) .icon-btn:hover, .actions .add-ui-btn:hover,
+:is(.actions, .project-context) .icon-btn[aria-expanded="true"] {
+  background: var(--panel-2);
+  border-color: var(--line);
+  color: var(--text);
+}
+:is(.actions, .project-context) button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.actions .run-btn { padding: 0 16px; font-size: 0.85rem; }
+.project-actions { display: flex; }
+.project-actions .ui-popover-panel { min-width: 210px; padding: 6px; }
+.project-action-heading { margin: 7px 10px 9px; color: var(--muted); font-size: 0.72rem; }
+.project-action-list > button {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: 0; border-radius: 5px; padding: 10px; background: transparent;
+  text-align: left; font-size: 0.85rem;
+}
+.project-action-list > button:hover, .project-action-list > button:focus-visible { background: var(--bg-raised); }
+.project-action-list svg { width: 16px; height: 16px; color: var(--muted); }
+.project-action-list .delete-project, .project-action-list .delete-project svg { color: #efa38b; }
+.project-action-divider { height: 1px; background: var(--line); margin: 5px; }
 .tree-tools .icon-btn { padding: 0.18rem; }
 .tree-tools .icon-btn svg { width: 0.85rem; height: 0.85rem; }
 .small { padding: 0.2rem 0.55rem; font-size: 0.78rem; }
@@ -333,9 +367,11 @@ code, pre { font-family: var(--mono); }
   background: var(--panel);
 }
 
+/* Saved pane widths are preferences: shrink them when the window gets
+   narrower so the preview header and its Live control remain on screen. */
 .sidebar,
 .preview {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 .main {
   flex: 1 1 0;
@@ -926,11 +962,40 @@ kbd {
   .tab-editor .main, .tab-repl .main { display: grid; grid-template-rows: 1fr; }
   .tab-repl .main { grid-template-rows: 1fr; }
   .mobile-tabs { display: flex; }
-  .actions .ghost span, .actions .primary { font-size: 0.82rem; }
+
   .top { flex-wrap: wrap; gap: 0.6rem; }
   .brand { flex: 1; }
-  .project { display: block; max-width: 48%; }
+  .project-context { max-width: 48%; }
+  .project { display: block; max-width: 100%; }
   .project-trigger { min-width: 7rem; }
-  .actions { width: 100%; justify-content: flex-end; gap: 0.35rem; }
-  .actions > .ghost:first-child { display: none; }
+  .actions { width: 100%; justify-content: space-between; gap: 8px; }
+  .toolbar-utilities { margin-left: auto; }
+  .toolbar-group + .toolbar-utilities { padding-left: 8px; }
+  .project-actions .ui-popover-panel { left: auto; right: 0; }
+  .actions .run-btn { padding: 0 12px; }
+  .history-pop .ui-popover-panel {
+    position: fixed; top: calc(100% + 8px); left: 12px; right: 12px;
+    min-width: 0; max-width: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .brand > svg { display: none; }
+  .brand { gap: 8px; }
+  .project-trigger { min-width: 0; }
+}
+
+.icon-tooltip {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  max-width: calc(100vw - 16px);
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+  font: 0.75rem/1.4 var(--sans);
+  pointer-events: none;
 }

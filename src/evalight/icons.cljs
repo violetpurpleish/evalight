@@ -69,12 +69,25 @@
        [:path {:d "M5 5h14v14H5V5Z"}]
        [:path {:d "M14 5v14"}]))
 
-(defn command []
+(defn search []
   (svg {}
-       [:path {:d "M4 8h16M4 16h16" :stroke-linecap "round"}]
-       [:path {:d "m8 5 3 7-3 7M16 5l-3 7 3 7" :stroke-linecap "round" :stroke-linejoin "round"}]))
+       [:circle {:cx 10.5 :cy 10.5 :r 6.5}]
+       [:path {:d "m15.5 15.5 4.5 4.5" :stroke-linecap "round"}]))
 
 (defn undo []
   (svg {}
        [:path {:d "M3 7v6h6" :stroke-linecap "round" :stroke-linejoin "round"}]
        [:path {:d "M3.5 13A9 9 0 1 0 7 6.2" :stroke-linecap "round"}]))
+
+(defn more []
+  (svg {}
+       [:circle {:cx 5 :cy 12 :r 1 :fill "currentColor"}]
+       [:circle {:cx 12 :cy 12 :r 1 :fill "currentColor"}]
+       [:circle {:cx 19 :cy 12 :r 1 :fill "currentColor"}]))
+
+(defn components []
+  (svg {}
+       [:rect {:x 3 :y 3 :width 7 :height 7 :rx 1}]
+       [:rect {:x 14 :y 3 :width 7 :height 7 :rx 1}]
+       [:rect {:x 3 :y 14 :width 7 :height 7 :rx 1}]
+       [:rect {:x 14 :y 14 :width 7 :height 7 :rx 1}]))

@@ -556,7 +556,7 @@ try {
       false,
       "exported Evalight should not offer Export ZIP: " + chrome.exportZip.join(", "),
     );
-    await page.click("button.icon-btn[title='Help']");
+    await page.click("button.icon-btn[aria-label='Help']");
     await page.waitForSelector(".help", { timeout: 3000 });
     const helpFit = await page.evaluate(() => {
       const panel = document.querySelector(".help");

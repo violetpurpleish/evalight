@@ -185,6 +185,57 @@ try {
   await page.waitForSelector("#project-select, .project-name", { timeout: 10000 });
   await new Promise((r) => setTimeout(r, 1500));
 
+  for (const width of [1440, 768, 390, 320]) {
+    await page.setViewport({ width, height: 900 });
+    const clippedTools = await page.$$eval(".top button", buttons =>
+      buttons.filter(button => {
+        const r = button.getBoundingClientRect();
+        return r.width > 0 && (r.left < 0 || r.right > innerWidth);
+      }).map(button => button.getAttribute("aria-label") || button.textContent)
+    );
+    check(`toolbar controls fit at ${width}px`, clippedTools.length === 0, clippedTools.join(", "));
+    if (width >= 768) {
+      const previewFits = await page.$eval(".preview", pane => {
+        const frame = pane.getBoundingClientRect();
+        const live = pane.querySelector(".live").getBoundingClientRect();
+        return frame.right <= innerWidth && live.right <= frame.right &&
+          live.left >= frame.left;
+      });
+      check(`preview and Live control fit at ${width}px`, previewFits);
+    }
+  }
+  await page.setViewport({ width: 1440, height: 900 });
+  check("Add UI is in the toolbar", Boolean(await page.$(".top .add-ui-btn")));
+  check("Add UI is absent from the file tools",
+    !(await page.$$eval(".tree-tools button", buttons => buttons.some(b => b.textContent === "UI"))));
+  await page.click("[aria-label='Project actions']");
+  await page.waitForSelector(".project-action-list");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".project-action-list", { hidden: true });
+  check("Escape returns focus to Project actions",
+    await page.$eval(".project-actions-trigger", button => document.activeElement === button));
+
+  await page.focus("[aria-label='Command palette']");
+  await waitForUI(page, () => {
+    const tip = document.querySelector("#workshop-icon-tooltip");
+    return tip?.matches(":popover-open") && tip.textContent === "Command palette (Ctrl+K)";
+  });
+  check("command palette uses a magnifying glass",
+    Boolean(await page.$("[aria-label='Command palette'] svg circle")));
+  await page.keyboard.press("Escape");
+  await waitForUI(page, () => !document.querySelector("#workshop-icon-tooltip")?.matches(":popover-open"));
+  await page.hover("[aria-label='History']");
+  await waitForUI(page, () => {
+    const tip = document.querySelector("#workshop-icon-tooltip");
+    return tip?.matches(":popover-open") && tip.textContent === "History";
+  });
+  check("icon tooltip fits the viewport", await page.$eval("#workshop-icon-tooltip", tip => {
+    const r = tip.getBoundingClientRect();
+    return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+  }));
+  await page.mouse.move(1, 1);
+  await waitForUI(page, () => !document.querySelector("#workshop-icon-tooltip")?.matches(":popover-open"));
+
   const meta = await page.evaluate(() => ({
     description: document.querySelector('meta[name="description"]')?.getAttribute("content") ?? "",
     ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute("content") ?? "",
@@ -450,11 +501,7 @@ try {
     );
   }
 
-  await page.evaluate(() => {
-    [...document.querySelectorAll(".tree-tools .tiny")]
-      .find((el) => el.textContent.trim() === "UI")
-      ?.click();
-  });
+  await page.click(".top button.add-ui-btn");
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
   const kitDialog = await page.evaluate(() => {
     const panel = document.querySelector(".ui-dialog");
@@ -524,11 +571,7 @@ try {
     { timeout: 6000 }
   );
 
-  await page.evaluate(() => {
-    [...document.querySelectorAll(".tree-tools .tiny")]
-      .find((el) => el.textContent.trim() === "UI")
-      ?.click();
-  });
+  await page.click(".top button.add-ui-btn");
   await page.waitForSelector(".ui-dialog .kit-list", { timeout: 4000 });
   const afterKitDelete = await page.evaluate(() => {
     const rows = [...document.querySelectorAll(".kit-list li")].map((li) => ({
@@ -670,7 +713,7 @@ try {
       text: badge.textContent.trim(),
       inBrand: brand.contains(badge),
       afterWordmark: brandKids.indexOf(wrap) === brandKids.length - 1,
-      beforeProject: kids.indexOf(brand) < kids.indexOf(projectEl),
+      beforeProject: kids.indexOf(brand) < kids.indexOf(projectEl.closest(".project-context")),
       red: r > 140 && r > g + 40 && r > b + 40,
       bg,
     };
@@ -718,7 +761,7 @@ try {
     JSON.stringify(betaClosed)
   );
 
-  const helpBtn = await page.$("button.icon-btn[title='Help']");
+  const helpBtn = await page.$("button.icon-btn[aria-label='Help']");
   assert.ok(helpBtn, "help button missing");
   await helpBtn.click();
   await page.waitForSelector(".help", { timeout: 3000 });
@@ -811,7 +854,7 @@ try {
   await page.click(".help-close");
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
-  await page.click("button.icon-btn[title='Help']");
+  await page.click("button.icon-btn[aria-label='Help']");
   await page.waitForSelector(".help", { timeout: 3000 });
   await page.keyboard.press("Escape");
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
@@ -1606,6 +1649,8 @@ try {
   await page.setViewport({ width: 1440, height: 900 });
 
   const currentProject = await page.$eval("#project-select", (el) => el.value);
+  await page.click("button[aria-label='Project actions']");
+  await page.waitForSelector("button[aria-label='Delete project']");
   check("delete project button is present", Boolean(await page.$("button[aria-label='Delete project']")));
   await page.click("button[aria-label='Delete project']");
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
@@ -1629,10 +1674,9 @@ try {
   const afterCancel = await page.$eval("#project-select", (el) => el.value);
   check("cancel keeps the current project", afterCancel === currentProject, afterCancel);
 
-  await page.evaluate(() => {
-    const btn = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "New project");
-    btn?.click();
-  });
+  await page.click("button[aria-label='Project actions']");
+  await page.waitForSelector(".project-action-list");
+  await page.click(".project-action-list button");
   await page.waitForSelector(".ui-dialog input[name=name]", { timeout: 4000 });
   const newProjField = await page.$eval(".ui-dialog input[name=name]", (el) => ({
     value: el.value,
@@ -1736,6 +1780,8 @@ try {
     );
   }
 
+  await page.click("button[aria-label='Project actions']");
+  await page.waitForSelector("button[aria-label='Delete project']");
   await page.click("button[aria-label='Delete project']");
   await page.waitForSelector(".ui-dialog .ui-btn-danger", { timeout: 4000 });
   await page.click(".ui-dialog .ui-btn-danger");
@@ -2073,8 +2119,10 @@ try {
 
   // Narrow preview: Help used to sit above the modal and steal Cancel.
   await page.setViewport({ width: 900, height: 800 });
-  await page.click("button.icon-btn[title='Help']");
+  await page.click("button.icon-btn[aria-label='Help']");
   await page.waitForSelector(".help", { timeout: 3000 });
+  await page.click("button[aria-label='Project actions']");
+  await page.waitForSelector("button[aria-label='Delete project']");
   await page.click("button[aria-label='Delete project']");
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
 
@@ -2134,6 +2182,8 @@ try {
   await page.mouse.click(helpClose.x, helpClose.y);
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
+  await page.click("button[aria-label='Project actions']");
+  await page.waitForSelector("button[aria-label='Delete project']");
   await page.click("button[aria-label='Delete project']");
   await page.waitForSelector(".ui-dialog", { timeout: 4000 });
   await page.click(".ui-dialog .ui-btn-ghost");

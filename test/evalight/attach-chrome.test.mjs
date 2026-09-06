@@ -313,7 +313,7 @@ try {
     "attached Evalight should not offer Export ZIP: " + chrome.exportZip.join(", "),
   );
 
-  await page.click("button.icon-btn[title='Help']");
+  await page.click("button.icon-btn[aria-label='Help']");
   await page.waitForSelector(".help", { timeout: 3000 });
   const help = await page.$eval(".help", (el) => el.innerText);
   assert.match(help, /will not start or stop the compiler/);

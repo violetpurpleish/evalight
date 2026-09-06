@@ -207,19 +207,24 @@ try {
         { timeout: 20000 },
       );
       await page.waitForFunction(
-        () => [...document.querySelectorAll("nav.actions button")]
+        () => document.querySelector(".toast")?.textContent === "Created lamp",
+        { timeout: 20000 },
+      );
+      await page.click("[aria-label='Project actions']");
+      await page.waitForFunction(
+        () => [...document.querySelectorAll(".project-action-list button")]
           .some((b) => /Export ZIP/.test(b.textContent)),
         { timeout: 8000 },
       );
 
       const clicked = await page.evaluate(() => {
-        const btn = [...document.querySelectorAll("nav.actions button")]
+        const btn = [...document.querySelectorAll(".project-action-list button")]
           .find((b) => /Export ZIP/.test(b.textContent));
         if (!btn) return false;
         btn.click();
         return true;
       });
-      assert.equal(clicked, true, "Export ZIP was not in the toolbar");
+      assert.equal(clicked, true, "Export ZIP was not in the project actions");
 
       const packing = await until(
         async () => {

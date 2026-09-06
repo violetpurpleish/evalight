@@ -858,7 +858,7 @@
       (.then (fn [_] (flash! "Cleared history")))))
 
 (defn set-dialog! [dialog]
-  (swap! state/app assoc :dialog dialog :pick nil :history-open? false :project-picker-open? false))
+  (swap! state/app assoc :dialog dialog :pick nil :history-open? false :project-picker-open? false :project-actions-open? false))
 
 (defn close-dialog! []
   (swap! state/app assoc :dialog nil))
@@ -1094,7 +1094,12 @@
       :repl-expr-keydown (when event (repl-expr-keydown! event))
       :clear-repl (clear-repl!)
       :run (catch-ui (run-preview! {:reset? true}))
-      :export (catch-ui (export-zip!))
+      :export (do (swap! state/app assoc :project-actions-open? false)
+                  (catch-ui (export-zip!)))
+      :toggle-project-actions (swap! state/app
+                                     (fn [s] (assoc s :project-actions-open? (not (:project-actions-open? s))
+                                                     :project-picker-open? false :history-open? false)))
+      :close-project-actions (swap! state/app assoc :project-actions-open? false)
       :toggle-project-picker (catch-ui (toggle-project-picker!))
       :close-project-picker (close-project-picker!)
       :project-query (swap! state/app assoc :project-query (.-value (.-target event)))

@@ -12,6 +12,7 @@
             [evalight.history :as history]
             [ui.breadcrumbs :as ui-crumbs]
             [ui.button :as btn]
+            [ui.core :as ui-core]
             [ui.command :as ui-command]
             [ui.dialog :as ui-dialog]
             [ui.input :as ui-input]
@@ -107,7 +108,7 @@
     [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running image."]
     (when (contains? #{:sci :compiled} (or (:runtime state) :sci))
-      [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the Files pane puts a control back if you deleted it. Restore writes the original kit file over one you edited."])
+      [:p.muted "src/ui is a small Replicant kit copied into the project. Add UI in the toolbar puts a control back if you deleted it. Restore writes the original kit file over one you edited."])
     [:p.muted "Deletes, renames, and kit restores are listed under History in the toolbar so you can put them back. Code edits still use Ctrl-Z in the editor."]
     (if (= :local (:mode state))
       (cond
@@ -443,6 +444,40 @@
                         :on {:click [:clear-history]}}
              "Clear history")])])]))
 
+(defn- project-actions [s]
+  [:div.project-actions
+   {:on {:keydown (fn [wrapped]
+                    (let [e (ui-core/dom-event wrapped)]
+                      (when (= "Escape" (.-key e))
+                        (.preventDefault e)
+                        (.stopPropagation e)
+                        (swap! state/app assoc :project-actions-open? false)
+                        (some-> (.querySelector (.-currentTarget e) ".project-actions-trigger") .focus))))
+         :focusout (fn [wrapped]
+                     (let [e (ui-core/dom-event wrapped)]
+                       (when (and (.-relatedTarget e)
+                                  (not (.contains (.-currentTarget e) (.-relatedTarget e))))
+                         (swap! state/app assoc :project-actions-open? false))))}}
+   (popover/popover
+    {:open? (:project-actions-open? s) :align :start :on-close [:close-project-actions]}
+    [:button.icon-btn.project-actions-trigger
+     {:type "button" :aria-label "Project actions" :title "Project actions"
+      :aria-haspopup "dialog" :aria-expanded (boolean (:project-actions-open? s))
+      :on {:click [:toggle-project-actions]}}
+     (icons/more)]
+    [:div.project-action-list
+     {:replicant/on-mount (fn [{:keys [replicant/node]}]
+                            (some-> (.querySelector node "button") .focus))}
+     [:p.project-action-heading "Project"]
+     [:button {:type "button" :on {:click [:new-project-dialog]}}
+      (icons/plus) "New project"]
+     [:button {:type "button" :on {:click [:export]}}
+      (icons/download) "Export ZIP"]
+     [:div.project-action-divider]
+     [:button.delete-project
+      {:type "button" :aria-label "Delete project" :on {:click [:delete-project-dialog]}}
+      (icons/trash) "Delete project"]])])
+
 (defn header [state]
   [:header.top
    [:div.brand
@@ -454,8 +489,9 @@
         "Local files"
         "Browser workshop")]]
     (beta-badge state)]
-   [:div.project
-    (if (= :local (:mode state))
+   [:div.project-context
+    [:div.project
+     (if (= :local (:mode state))
       [:div.project-local
        [:span.project-name (:project state)]
        (when-let [tag (case (:runtime state)
@@ -465,26 +501,27 @@
                         nil)]
          [:span.runtime-tag tag])]
       (project-picker/view state))]
-   [:nav.actions
     (when (= :browser (:mode state))
-      [:button.ghost {:on {:click [:new-project-dialog]}} "New project"])
-    (when (= :browser (:mode state))
-      [:button.icon-btn.delete-project
-       {:on {:click [:delete-project-dialog]}
-        :title "Delete project"
-        :aria-label "Delete project"}
-       (icons/trash)])
-    (when (= :browser (:mode state))
-      [:button.ghost {:on {:click [:export]}} (icons/download) "Export ZIP"])
-    [:button.primary {:on {:click [:run]}} (icons/play) "Run"]
-    (history-panel state)
-    [:button.icon-btn
-     {:on {:click [:pick-open {:via :palette}]}
-      :title "Command palette (Ctrl+K)"
-      :aria-label "Command palette"}
-     (icons/command)]
-    [:button.icon-btn {:on {:click [:toggle-help]} :title "Help"}
-     (icons/help)]]])
+      (project-actions state))]
+   [:nav.actions {:aria-label "Workshop tools"}
+    (when (preview/iframe-runtime?)
+      [:div.toolbar-group
+       [:button.ghost.add-ui-btn
+        {:type "button" :on {:click [:add-ui-dialog]} :title "Add UI components"}
+        (icons/components) "Add UI"]])
+    [:div.toolbar-group.toolbar-utilities
+     (history-panel state)
+     [:button.icon-btn
+      {:type "button" :on {:click [:pick-open {:via :palette}]}
+       :title "Command palette (Ctrl+K)"
+       :aria-label "Command palette"}
+      (icons/search)]
+     [:button.icon-btn
+      {:type "button" :on {:click [:toggle-help]} :title "Help" :aria-label "Help"}
+      (icons/help)]]
+    [:button.primary.run-btn
+     {:type "button" :on {:click [:run]} :title "Run project"}
+     (icons/play) "Run"]]])
 
 (defn sidebar [state]
   (let [w (or (get-in state [:layout :files-width]) 220)]
@@ -496,8 +533,6 @@
       [[:div.tree-tools
         [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
         [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]
-        (when (preview/iframe-runtime?)
-          [:button.tiny {:on {:click [:add-ui-dialog]}} "UI"])
         [:button.icon-btn.pane-hide
          {:on {:click [:toggle-files]}
           :title "Hide files"
