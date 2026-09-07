@@ -88,8 +88,8 @@
 (defn readme [project-name]
   (str "# " project-name "\n\n"
        "A ClojureScript project created in Evalight.\n\n"
-       "The starter is a widget gallery. Try the controls in Preview and expand Usage\n"
-       "for snippets. `src/app/gallery.cljs` contains the live examples;\n"
+       "The starter is a widget gallery. Try the controls in Preview and use the editor\n"
+       "to explore them. `src/app/gallery.cljs` contains the live examples;\n"
        "`src/app/core.cljs` demonstrates the counter, popover, and rename dialog.\n\n"
        "Evalight is already in this folder. The rest is a normal project\n"
        "directory: source, shadow-cljs, a README. Keep using this workshop,\n"
