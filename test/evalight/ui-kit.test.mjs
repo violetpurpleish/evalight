@@ -24,6 +24,12 @@ let browser;
 try {
   browser = await puppeteer.launch({ executablePath: chrome, headless: true, args: ["--no-sandbox"] });
   const page = await browser.newPage();
+  const waitForFunction = page.waitForFunction.bind(page);
+  page.waitForFunction = async (predicate, ...args) => {
+    try { return await waitForFunction(predicate, ...args); }
+    catch (error) { throw new Error(`UI condition failed: ${predicate}`, {cause: error}); }
+  };
+
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
   await page.setViewport({ width: 1280, height: 900 });
@@ -41,11 +47,90 @@ try {
   await page.waitForSelector('.help', {hidden: true});
   const galleryFrame = page.frames().find(f => f.url().includes('preview.html'));
   await galleryFrame.waitForSelector('.gallery', {timeout: 20000});
-  assert.equal(await galleryFrame.$$eval('.example', nodes => nodes.length), 11);
+  assert.equal(await galleryFrame.$$eval('.example', nodes => nodes.length), 13);
+  await galleryFrame.focus('.ui-tree [role=treeitem]');
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await galleryFrame.evaluate(() => document.activeElement.textContent), 'src');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await galleryFrame.evaluate(() => document.activeElement.textContent), 'core.cljs');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await galleryFrame.evaluate(() => document.activeElement.textContent), 'gallery.cljs');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await galleryFrame.evaluate(() => document.activeElement.textContent), 'src');
+  await page.keyboard.press('ArrowLeft');
+  await galleryFrame.waitForFunction(() => document.querySelectorAll('.ui-tree [role=treeitem]').length === 1);
+  await page.keyboard.press('ArrowRight');
+  await galleryFrame.waitForFunction(() => document.activeElement.textContent === 'core.cljs');
   await galleryFrame.$$eval('button', nodes => nodes.find(n => n.textContent === 'Search commands').click());
   await galleryFrame.waitForSelector('.ui-command');
   await page.keyboard.press('Escape');
   await galleryFrame.waitForSelector('.ui-command', {hidden: true});
+  // The starter contains only the counter and gallery; theme follows the system
+  // until code explicitly selects a mode.
+  const appFiles = await page.evaluate(async () => {
+    let dir = await navigator.storage.getDirectory();
+    for (const part of ['evalight', 'projects', 'lamp', 'src', 'app']) dir = await dir.getDirectoryHandle(part);
+    const names = []; for await (const [name] of dir.entries()) names.push(name);
+    return names.sort();
+  });
+  assert.deepEqual(appFiles, ['core.cljs', 'gallery.cljs']);
+  await galleryFrame.click('.counter-example button');
+  await galleryFrame.waitForFunction(() => document.querySelector('.count').textContent === '1');
+  for (const value of ['dark', 'light']) {
+    await page.emulateMediaFeatures([{name: 'prefers-color-scheme', value}]);
+    await galleryFrame.waitForFunction(value => getComputedStyle(document.documentElement).colorScheme === value, {}, value);
+  }
+  const evalCode = async code => {
+    await page.$eval('textarea[name=expr]', (el, code) => { el.value = code; el.dispatchEvent(new Event('input', {bubbles:true})); }, code);
+    await page.focus('textarea[name=expr]');
+    await page.keyboard.press('Enter');
+  };
+  await evalCode('(set-theme! :dark)');
+  await galleryFrame.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  assert.equal(await galleryFrame.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
+  await evalCode('(set-theme! :system)');
+  await galleryFrame.waitForFunction(() => document.documentElement.dataset.theme === 'system');
+
+  // Editor chrome uses the workshop theme and its own toolbar control.
+  assert.ok(await page.$('[aria-label="New file"] svg'));
+  assert.ok(await page.$('[aria-label="New folder"] svg'));
+  await page.click('.editor-tool');
+  await page.waitForFunction(() => document.querySelector('.editor-tool').getAttribute('aria-pressed') === 'true');
+  await page.click('.editor-tool');
+  await page.focus('.cm-content');
+  const modifier = await page.evaluate(() => /Mac/.test(navigator.platform)) ? 'Meta' : 'Control';
+  await page.keyboard.down(modifier); await page.keyboard.press('f'); await page.keyboard.up(modifier);
+  await page.waitForSelector('.cm-search');
+  const searchColors = await page.$eval('.cm-search', el => ({
+    panel: getComputedStyle(el).backgroundColor,
+    field: getComputedStyle(el.querySelector('input')).backgroundColor,
+  }));
+  assert.notEqual(searchColors.panel, 'rgb(255, 255, 255)');
+  assert.notEqual(searchColors.field, 'rgb(255, 255, 255)');
+  await page.keyboard.press('Escape');
+
+  const defnBox = await page.$$eval('.cm-content span', spans => {
+    const el = spans.find(el => el.textContent === 'defn');
+    const r = el.getBoundingClientRect(); return {x:r.x + r.width / 2, y:r.y + r.height / 2};
+  });
+  await page.mouse.move(defnBox.x, defnBox.y);
+  await page.waitForSelector('.cm-evalight-doc pre');
+  assert.match(await page.$eval('.cm-evalight-doc pre', el => el.textContent), /Same as/);
+  await page.mouse.move(1,1);
+  for (const width of [320, 390]) {
+    await page.setViewport({width, height: 740});
+    for (const [trigger, panel] of [['.beta-badge', '.beta-pop .ui-popover-panel'], ['[aria-label="Help"]', '.help-popover-panel']]) {
+      await page.click(trigger);
+      await page.waitForSelector(panel);
+      await page.waitForFunction(selector => {
+        const r = document.querySelector(selector).getBoundingClientRect();
+        return r.left >= 10 && r.right <= innerWidth - 10 && r.top >= 10 && r.bottom <= innerHeight - 10;
+      }, {}, panel);
+      await page.click('.wordmark');
+      await page.waitForSelector(panel, {hidden:true});
+    }
+  }
+  await page.setViewport({width:1280, height:900});
   for (const [selector, pane, delta, resetWidth] of [
     ['.splitter-files', '.sidebar', 60, 220],
     ['.splitter-preview', 'section.preview', -60, 360],
@@ -162,6 +247,39 @@ try {
   await notify();
   await page.mouse.move(1, 1);
   await frame.waitForSelector(".ui-toast", { hidden: true, timeout: 5000 });
+
+  // Removing a kit file updates the facade without leaving a stale import.
+  await page.evaluate(async () => {
+    let dir = await navigator.storage.getDirectory();
+    for (const part of ['evalight','projects','lamp','src','app']) dir = await dir.getDirectoryHandle(part);
+    const out = await (await dir.getFileHandle('gallery.cljs')).createWritable();
+    await out.write('(ns app.gallery)'); await out.close();
+  });
+  await page.reload();
+  await page.waitForSelector('.tree-row');
+  await page.$$eval('.tree-row', rows => rows.find(row => row.querySelector('.tree-name')?.textContent === 'tree.cljs').querySelector('[aria-label="Delete"]').click());
+  await page.waitForSelector('.ui-dialog .ui-btn-danger');
+  await page.click('.ui-dialog .ui-btn-danger');
+  const facadeHasTree = async () => {
+    let dir = await navigator.storage.getDirectory();
+    for (const part of ['evalight','projects','lamp','src']) dir = await dir.getDirectoryHandle(part);
+    return (await (await (await (await dir.getDirectoryHandle('ui')).getFileHandle('api.cljs')).getFile()).text()).includes('[ui.tree');
+  };
+  await page.waitForFunction(async () => {
+    let dir = await navigator.storage.getDirectory();
+    for (const part of ['evalight','projects','lamp','src']) dir = await dir.getDirectoryHandle(part);
+    return !(await (await (await (await dir.getDirectoryHandle('ui')).getFileHandle('api.cljs')).getFile()).text()).includes('[ui.tree');
+  });
+  assert.equal(await page.evaluate(facadeHasTree), false);
+  await page.click('.add-ui-btn');
+  await page.waitForSelector('.kit-list');
+  await page.$$eval('.kit-list li', rows => rows.find(row => row.querySelector('.kit-title')?.textContent === 'Tree').querySelector('button').click());
+  await page.waitForFunction(async () => {
+    let dir = await navigator.storage.getDirectory();
+    for (const part of ['evalight','projects','lamp','src']) dir = await dir.getDirectoryHandle(part);
+    return (await (await (await (await dir.getDirectoryHandle('ui')).getFileHandle('api.cljs')).getFile()).text()).includes('[ui.tree');
+  });
+  assert.equal(await page.evaluate(facadeHasTree), true);
 
   assert.deepEqual(errors, []);
   console.log("ui-kit: SCI tooltip, dropdown, tabs, checkbox, switch, disclosure, accordion, and toast passed");

@@ -7,25 +7,12 @@
             [ui.popover :as popover]))
 
 (defonce !clock (atom nil))
-(defonce !position (atom nil))
 
 (defn- mount-panel [{:keys [replicant/node]}]
-  (let [position (fn []
-                   (let [trigger (.getBoundingClientRect (.getElementById js/document "project-select"))
-                         width (min 360 (- (.-innerWidth js/window) 24))
-                         top (+ (.-bottom trigger) 8)]
-                     (set! (.. node -style -left) (str (max 12 (min (.-left trigger) (- (.-innerWidth js/window) width 12))) "px"))
-                     (set! (.. node -style -top) (str top "px"))
-                     (set! (.. node -style -maxHeight) (str "calc(100dvh - " (+ top 12) "px)"))))]
-    (position)
-    (reset! !position position)
-    (.addEventListener js/window "resize" position))
   (some-> (.querySelector node "input") .focus)
   (reset! !clock (js/setInterval #(swap! state/app assoc :project-clock (.now js/Date)) 30000)))
 
 (defn- unmount-panel [_]
-  (when-let [position @!position] (.removeEventListener js/window "resize" position))
-  (reset! !position nil)
   (when-let [timer @!clock] (js/clearInterval timer))
   (reset! !clock nil))
 

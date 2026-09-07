@@ -236,7 +236,7 @@ code, pre { font-family: var(--mono); }
 .project-menu-heading > span { color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
 .project-search { position: relative; margin: 0 12px; }
 .project-search > svg { position: absolute; left: 11px; top: 11px; width: 16px; height: 16px; color: var(--muted); pointer-events: none; }
-.project-search input { width: 100%; min-width: 0; padding: 10px 12px 10px 34px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 7px; font-size: 0.85rem; outline: none; }
+.project-search input { width: 100%; min-width: 0; padding: 10px 12px 10px 34px; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; font-size: 0.85rem; outline: none; }
 .project-search input:focus { border-color: var(--gold-dim); }
 .project-sort-label { padding: 16px 18px 8px; color: var(--muted); font-size: 0.73rem; }
 .project-options { list-style: none; padding: 0 6px 6px; margin: 0; overflow-y: auto; min-height: 0; max-height: 340px; overscroll-behavior: contain; }
@@ -309,7 +309,7 @@ code, pre { font-family: var(--mono); }
   border: 0; border-radius: 5px; padding: 10px; background: transparent;
   text-align: left; font-size: 0.85rem;
 }
-.project-action-list > button:hover, .project-action-list > button:focus-visible { background: var(--bg-raised); }
+.project-action-list > button:hover, .project-action-list > button:focus-visible { background: var(--panel); }
 .project-action-list svg { width: 16px; height: 16px; color: var(--muted); }
 .project-action-list .delete-project, .project-action-list .delete-project svg { color: #efa38b; }
 .project-action-divider { height: 1px; background: var(--line); margin: 5px; }
@@ -487,62 +487,14 @@ code, pre { font-family: var(--mono); }
   overflow: visible;
 }
 .tree-tools { display: flex; gap: 0.25rem; }
-
-.tree { overflow: auto; padding: 0.4rem 0.35rem 1rem 0.2rem; }
-.tree-children {
-  margin-left: 0.72rem;
-  padding-left: 0.72rem;
-  border-left: 1px solid var(--line);
-}
-.tree-row {
-  display: flex;
-  align-items: center;
-  position: relative;
-  min-width: 0;
-}
-.tree-item {
-  flex: 1;
-  min-width: 0;
-  background: none;
-  border: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.22rem 0.3rem;
+.tree-tools .sidebar-add {
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0.25rem;
   border-radius: 6px;
-  text-align: left;
 }
-.tree-item svg { width: 0.95rem; height: 0.95rem; color: var(--muted); flex: none; }
-.tree-item.is-active { background: rgba(228, 179, 76, 0.12); color: var(--gold); }
-.tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.twisty {
-  display: inline-block;
-  width: 0.75rem;
-  flex: none;
-  font-size: 0.7rem;
-  line-height: 1;
-  text-align: center;
-  transition: transform 120ms ease;
-}
-.twisty.is-open { transform: rotate(90deg); }
-.tree-leaf { visibility: hidden; }
-.tree-ops {
-  position: absolute;
-  right: 0.2rem;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 0.1rem;
-  opacity: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--panel) 32%);
-  padding-left: 0.65rem;
-}
-.tree-row:hover .tree-ops,
-.tree-row:focus-within .tree-ops {
-  opacity: 1;
-  pointer-events: auto;
-}
+.tree-tools .sidebar-add svg { width: 0.95rem; height: 0.95rem; }
+
 .dot {
   width: 0.4rem; height: 0.4rem; border-radius: 99px;
   background: var(--gold); display: inline-block;
@@ -551,6 +503,47 @@ code, pre { font-family: var(--mono); }
 .editor-host, .empty-editor, .media-host { flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
 .editor-host .cm-editor { height: 100%; min-width: 0; }
 .editor-host .cm-scroller { padding-bottom: 2.5rem; }
+.editor-tool[aria-pressed="true"] {
+  color: var(--gold);
+  background: rgba(228, 179, 76, 0.1);
+  border-color: var(--gold-dim);
+}
+.cm-panel.cm-search {
+  color-scheme: dark;
+  padding: 0.45rem 0.65rem;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: var(--sans);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+}
+.cm-editor .cm-search input {
+  min-height: 1.65rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 0.2rem 0.4rem;
+  outline: none;
+}
+.cm-editor .cm-search input:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 2px rgba(228, 179, 76, 0.14); }
+.cm-editor .cm-search button {
+  background-image: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.2rem 0.4rem;
+}
+.cm-editor .cm-search button:hover, .cm-editor .cm-search button:focus-visible {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--text);
+}
+.cm-search label, .cm-search .cm-button { color: var(--muted); }
+.cm-searchMatch { background: rgba(228, 179, 76, 0.28); outline: 1px solid rgba(228, 179, 76, 0.5); }
+.cm-searchMatch-selected { background: var(--gold); color: var(--ink); }
 .media-host {
   overflow: auto;
   display: flex;
@@ -975,3 +968,34 @@ kbd {
 .help-popover-panel { padding: 0; border: 0; background: transparent; box-shadow: none; }
 .help-popover-panel .help { position: relative; top: auto; right: auto; max-height: calc(100dvh - 6rem); }
 .help-head { padding-right: 0; }
+
+/* Popover positioning and viewport bounds are shared by ui.popover. */
+.beta-pop .ui-popover-panel { min-width: min(16rem, calc(100vw - 24px)); max-width: min(20rem, calc(100vw - 24px)); }
+.help-popover-panel { width: min(24rem, calc(100vw - 24px)); max-width: calc(100vw - 24px); }
+.help-popover-panel .help { width: 100%; max-height: inherit; box-sizing: border-box; }
+
+.help-shortcuts {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.help-shortcuts h3 { margin: 0 0 .85rem; color: var(--text); font-size: .84rem; font-weight: 650; }
+.help-shortcuts .shortcuts { margin: 0; }
+.help-shortcuts .shortcuts li { align-items: flex-start; margin: .8rem 0 0; font-size: .8rem; line-height: 1.5; }
+.help-shortcuts .shortcuts li:first-child { margin-top: 0; }
+.help-shortcuts .keys { flex: 0 0 5.6rem; padding-top: 1px; }
+@media (max-width: 380px) {
+  .help-shortcuts { padding: .8rem; }
+  .help-shortcuts .shortcuts li { flex-direction: column; gap: .3rem; }
+  .help-shortcuts .keys { flex-basis: auto; }
+}
+
+/* Keep utility labels while the desktop toolbar has room for them. */
+.toolbar-label { display: none; }
+@media (min-width: 1000px) {
+  .actions .toolbar-tool { width: auto; padding: 0 10px; color: var(--text); font-size: .85rem; }
+  .toolbar-label { display: inline; }
+}
+.sidebar-add svg { width: 18px; height: 18px; }

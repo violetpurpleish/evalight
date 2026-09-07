@@ -141,11 +141,30 @@
   (when-not (:attached @state/app)
     (schedule-live-reload!)))
 
+(defn- sync-ui-facade! [dest tree]
+  (let [paths (set (map :path (fs/flatten-files tree)))
+        path kit/facade-path]
+    (if (or (not (contains? paths path))
+            (contains? (:dirty @state/app) path))
+      (p/ok nil)
+      (-> (fs/read-file dest path)
+          (.then (fn [old]
+                   (let [source (kit/facade-source paths)]
+                     (when (and (str/starts-with? old kit/facade-header) (not= source old))
+                       (.then (fs/write-file dest path source)
+                              (fn [_]
+                                (if (= path (editor/current-path))
+                                  (editor/load-fresh! path source)
+                                  (editor/drop-path! path))))))))))))
+
 (defn refresh-tree! []
-  (-> (fs/read-tree (now-fs) "")
-      (.then (fn [tree]
-               (swap! state/app assoc :tree tree)
-               tree))))
+  (let [dest (now-fs)]
+    (-> (fs/read-tree dest "")
+        (.then (fn [tree]
+                 (.then (sync-ui-facade! dest tree)
+                        (fn [_]
+                          (swap! state/app assoc :tree tree)
+                          tree)))))))
 
 (defn refresh-projects! []
   (if-let [ws @!workspace]
@@ -550,9 +569,11 @@
                                   distinct
                                   vec)
                      leftover (filterv (fn [f]
-                                         (some (fn [ns-sym]
+                                         (and (not (and (= kit/facade-path (:path f))
+                                                        (str/starts-with? (:source f) kit/facade-header)))
+                                              (some (fn [ns-sym]
                                                  (seq (ns-graph/requiring [f] ns-sym)))
-                                               missing))
+                                               missing)))
                                        kept)]
                  (.then (fs/delete (now-fs) path)
                         (fn [_]
@@ -719,6 +740,12 @@
     (if-not (and item (seq files))
       (p/ok (flash! "Unknown control." :err))
       (-> (write-kit-files! fs files)
+          (.then (fn [acc]
+                   (.then (fs/exists? fs kit/facade-path)
+                          (fn [exists]
+                            (if exists acc
+                              (.then (fs/write-file fs kit/facade-path kit/facade-header)
+                                     (fn [_] acc)))))))
           (.then (fn [acc]
                    (.then (ensure-ui-css-listed! fs)
                           (fn [_] acc))))

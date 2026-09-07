@@ -1,0 +1,84 @@
+/* Set app.core/theme to :system, :light, or :dark. */
+:root {
+  color-scheme: light;
+  --page: #f8fafc;
+  --surface: #ffffff;
+  --text: #172033;
+  --muted: #627086;
+  --line: #e2e8f0;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --danger: #dc2626;
+  --overlay: rgb(15 23 42 / 35%);
+  --shadow: 0 12px 36px rgb(15 23 42 / 12%);
+  --ui-fg: var(--text);
+  --ui-bg: var(--surface);
+  --ui-muted: var(--muted);
+  --ui-line: var(--line);
+  --ui-accent: var(--accent);
+  --ui-accent-fg: var(--accent-fg);
+  --ui-danger: var(--danger);
+  --ui-danger-fg: #ffffff;
+  --ui-overlay: var(--overlay);
+  --ui-shadow: var(--shadow);
+  --ui-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-serif: var(--ui-font);
+  --ui-radius: 8px;
+  --ui-radius-full: 8px;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #10141d;
+  --surface: #191f2b;
+  --text: #eef2f8;
+  --muted: #a2aec2;
+  --line: #30394b;
+  --accent: #a5b4fc;
+  --accent-fg: #141a38;
+  --danger: #f87171;
+  --overlay: rgb(0 0 0 / 60%);
+  --shadow: 0 12px 36px rgb(0 0 0 / 30%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    color-scheme: dark;
+    --page: #10141d;
+    --surface: #191f2b;
+    --text: #eef2f8;
+    --muted: #a2aec2;
+    --line: #30394b;
+    --accent: #a5b4fc;
+    --accent-fg: #141a38;
+    --danger: #f87171;
+    --overlay: rgb(0 0 0 / 60%);
+    --shadow: 0 12px 36px rgb(0 0 0 / 30%);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--page); color: var(--text); font: 15px/1.55 var(--ui-font); }
+button, input, select, textarea { font: inherit; }
+.app { max-width: 960px; margin: 0 auto; padding: clamp(24px, 5vw, 64px) clamp(20px, 4vw, 48px); }
+.app-header { margin-bottom: 32px; }
+h1 { font-size: clamp(26px, 5vw, 36px); line-height: 1.2; letter-spacing: -.035em; margin: 0 0 12px; font-weight: 700; }
+h2 { margin: 0 0 8px; font-size: 16px; line-height: 1.4; font-weight: 650; letter-spacing: -.01em; }
+p { margin: 0; }
+.lede, .counter-example p { color: var(--muted); }
+.counter-example { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; }
+.count { min-width: 1.5em; font-variant-numeric: tabular-nums; padding-right: 10px; border-right: 1px solid currentColor; }
+.gallery { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 40px; }
+.example { min-width: 0; padding: 28px 0; border-bottom: 1px solid var(--line); }
+.example h2 { margin-bottom: 18px; }
+.example-preview { display: grid; gap: 16px; }
+.example-preview > p { color: var(--muted); font-size: 14px; }
+.gallery-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.example .ui-input, .example .ui-select { width: 100%; }
+.example .ui-tab-panel { padding: 16px 0 0; color: var(--muted); }
+.example .ui-split { min-height: 100px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.example .ui-split-pane { padding: 16px; font-size: 14px; }
+.gallery > .ui-toast { position: fixed; bottom: 20px; right: 20px; max-width: calc(100vw - 40px); z-index: 100; }
+.ui-dialog { width: min(420px, calc(100vw - 32px)); }
+@media (min-width: 760px) { .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .counter-example { padding: 18px; } }
+
+.example-preview > .ui-btn { justify-self: start; }

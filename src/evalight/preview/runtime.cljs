@@ -1,6 +1,7 @@
 (ns evalight.preview.runtime
   (:require [cljs.pprint :as pprint]
             [clojure.string :as str]
+            [evalight.intel :as intel]
             [evalight.ns-graph :as ns-graph]
             [replicant.dom :as r]
             [sci.core :as sci]))
@@ -94,6 +95,16 @@
          aliases)
         (map (fn [x] {:name (str (ns-name x)) :kind \"ns\"}) nss)))})")
 
+(defn- enrich-intel-item [ctx item]
+  (if (and (seq (:doc item)) (seq (:arglists item)))
+    item
+    (try
+      (if-let [v (sci/resolve ctx (symbol (:name item)))]
+        (intel/enrich-live-item item (meta v))
+        item)
+      (catch :default _
+        item))))
+
 (defn- collect-intel [ctx ns-name]
   (try
     (when (and ns-name (sci/eval-string* ctx (str "(find-ns '" ns-name ")")))
@@ -101,7 +112,7 @@
     (let [data (sci/eval-string* ctx intel-form)]
       {:ok true
        :ns (or (:ns data) (str ns-name))
-       :items (vec (:items data))})
+       :items (mapv #(enrich-intel-item ctx %) (:items data))})
     (catch :default e
       {:ok false
        :ns (str ns-name)

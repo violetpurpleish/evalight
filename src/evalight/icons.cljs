@@ -21,9 +21,21 @@
        [:path {:d "M8 4h6l4 4v12H8V4Z"}]
        [:path {:d "M14 4v4h4"}]))
 
+(defn file-plus []
+  (svg {}
+       [:path {:d "M6 3h6l4 4v4"}]
+       [:path {:d "M12 3v4h4"}]
+       [:path {:d "M6 3v18h7"}]
+       [:path {:d "M17 14v7M13.5 17.5h7" :stroke-linecap "round"}]))
+
 (defn folder []
   (svg {}
        [:path {:d "M4 7h6l2 2h8v10H4V7Z"}]))
+
+(defn folder-plus []
+  (svg {}
+       [:path {:d "M3 19V5h6l2 3h10v11H3Z" :stroke-linejoin "round"}]
+       [:path {:d "M12 11v5M9.5 13.5h5" :stroke-linecap "round"}]))
 
 (defn plus []
   (svg {}
@@ -73,6 +85,12 @@
   (svg {}
        [:circle {:cx 10.5 :cy 10.5 :r 6.5}]
        [:path {:d "m15.5 15.5 4.5 4.5" :stroke-linecap "round"}]))
+
+(defn wrap []
+  (svg {}
+       [:path {:d "M4 6h16M4 11h11a3 3 0 1 1 0 6H9" :stroke-linecap "round"}]
+       [:path {:d "m12 14-3 3 3 3" :stroke-linecap "round" :stroke-linejoin "round"}]
+       [:path {:d "M4 20h2" :stroke-linecap "round"}]))
 
 (defn undo []
   (svg {}

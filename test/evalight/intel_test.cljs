@@ -7,7 +7,7 @@
 
 (deftest def-docs-reads-lamp-bump
   (let [docs (ns-graph/def-docs (template/core-cljs "lamp"))]
-    (is (re-find #"lamp counter" (get docs 'bump)))))
+    (is (re-find #"counter" (get docs 'bump)))))
 
 (deftest parse-ns-aliases
   (is (= {'greet 'app.greet 'r 'replicant.dom}
@@ -17,7 +17,7 @@
 (deftest source-index-completes-project-vars
   (intel/set-live! [] "app.core")
   (intel/index-sources!
-   [{:path "src/app/core.cljs" :source (template/core-cljs "lamp")}
+   [{:path "src/app/core.cljs" :source "(ns app.core (:require [app.greet :as greet])) (defn bump [] 1)"}
     {:path "src/app/greet.cljs" :source (template/greet-cljs)}]
    "app.core")
   (is (some #(= "bump" (:name %)) (intel/candidates "bum")))
@@ -80,3 +80,15 @@
     (is (re-find #"lamp counter"
                  (or (:doc (meta (get (sci/eval-string* ctx "(ns-interns 'app.core)") 'bump)))
                      "")))))
+
+(deftest sci-built-in-metadata-restores-docstring
+  (let [ctx (sci/init {})
+        _ (sci/eval-string* ctx "(ns app.core)")
+        metadata (meta (sci/resolve ctx 'defn))
+        item (intel/enrich-live-item
+              {:name "defn" :kind "core"
+               :arglists "([name doc-string? attr-map? [params*] prepost-map? body])"}
+              metadata)]
+    (is (re-find #"Same as" (:doc item)))
+    (is (= "([name doc-string? attr-map? [params*] prepost-map? body])"
+           (:arglists item)))))

@@ -135,8 +135,10 @@
   top: calc(100% + 0.4rem);
   left: 0;
   z-index: 19;
-  min-width: 14rem;
-  max-width: 22rem;
+  min-width: min(14rem, calc(100vw - 24px));
+  max-width: min(22rem, calc(100vw - 24px));
+  box-sizing: border-box;
+  overflow-y: auto;
   background: var(--ui-bg);
   color: var(--ui-fg);
   border: 1px solid var(--ui-line);
@@ -389,3 +391,73 @@
 @media (prefers-reduced-motion: reduce) { .ui-switch input::before { transition: none; } }
 
 .ui-dropdown-heading { padding: .4rem .6rem; font-size: .72rem; color: var(--ui-muted); text-transform: uppercase; letter-spacing: .08em; }
+
+/* Shared controlled tree */
+.ui-tree {
+  overflow: auto;
+  padding: 0.4rem 0.35rem 1rem 0.2rem;
+  color: var(--ui-fg);
+}
+.ui-tree .tree-children {
+  margin-left: 0.72rem;
+  padding-left: 0.72rem;
+  border-left: 1px solid var(--ui-line);
+}
+.ui-tree .tree-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
+.ui-tree .tree-item {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.3rem;
+  border-radius: 6px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ui-tree .tree-item:hover,
+.ui-tree .tree-item:focus-visible { background: color-mix(in srgb, var(--ui-accent) 10%, transparent); }
+.ui-tree .tree-item:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+.ui-tree .tree-item svg { width: 0.95rem; height: 0.95rem; color: var(--ui-muted); flex: none; }
+.ui-tree .tree-item .tree-chevron { width: .7rem; height: .7rem; color: var(--ui-muted); }
+.ui-tree .tree-item.is-active { background: color-mix(in srgb, var(--ui-accent) 15%, transparent); color: var(--ui-accent); }
+.ui-tree .tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ui-tree .twisty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: none;
+  line-height: 1;
+  text-align: center;
+  transition: transform 120ms ease;
+}
+.ui-tree .twisty.is-open { transform: rotate(90deg); }
+.ui-tree .tree-leaf { visibility: hidden; }
+.ui-tree .tree-ops {
+  position: absolute;
+  right: 0.2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 0.1rem;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--ui-bg) 32%);
+  padding-left: 0.65rem;
+}
+.ui-tree .tree-row:hover .tree-ops,
+.ui-tree .tree-row:focus-within .tree-ops {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) { .ui-tree .twisty { transition: none; } }

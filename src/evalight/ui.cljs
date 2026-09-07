@@ -21,7 +21,7 @@
             [ui.split :as split]
             [ui.switch :as switch]
             [ui.toast :as toast]
-            [ui.disclosure :as disclosure]))
+            [ui.tree :as tree]))
 
 (defn- dirty? [state path]
   (contains? (:dirty state) path))
@@ -38,50 +38,37 @@
 (defn- preview-mount [{:keys [replicant/node]}]
   (preview/attach! node actions/on-preview-event))
 
-(defn- file-row [state {:keys [path name]}]
-  [:div.tree-row
-   [:button.tree-item
-    {:on {:click [:open-file path]}
-     :class (when (= path (:active-file state)) "is-active")}
-    [:span.twisty.tree-leaf {:aria-hidden "true"}]
-    (icons/file)
-    [:span.tree-name name]
-    (when (dirty? state path)
-      [:span.dot {:title "Unsaved changes"}])]
-   [:div.tree-ops
-    [:button.tiny {:on {:click [:rename-dialog path]} :title "Rename" :aria-label "Rename"}
-     (icons/pencil)]
-    [:button.tiny {:on {:click [:delete-dialog path]} :title "Delete" :aria-label "Delete"}
-     (icons/trash)]]])
+(defn- tree-icon [node]
+  (if (= :dir (:type node))
+    (icons/folder)
+    (icons/file)))
 
-(defn- dir-row [state {:keys [path name children]}]
-  (let [open? (contains? (:expanded state) path)]
-    [:div.tree-dir
-     [:div.tree-row
-      [:button.tree-item {:on {:click [:toggle-dir path]}}
-       [:span.twisty {:class (when open? "is-open")} "▸"]
-       (icons/folder)
-       [:span.tree-name name]]
-      [:div.tree-ops
+(defn- tree-trailing [state node]
+  (when (and (= :file (:type node))
+             (dirty? state (:path node)))
+    [:span.dot {:title "Unsaved changes"}]))
+
+(defn- tree-actions [node]
+  (let [path (:path node)]
+    (if (= :dir (:type node))
+      [:button.tiny {:on {:click [:delete-dialog path]} :title "Delete" :aria-label "Delete"}
+       (icons/trash)]
+      [[:button.tiny {:on {:click [:rename-dialog path]} :title "Rename" :aria-label "Rename"}
+        (icons/pencil)]
        [:button.tiny {:on {:click [:delete-dialog path]} :title "Delete" :aria-label "Delete"}
-        (icons/trash)]]]
-     (when open?
-       [:div.tree-children
-        (for [child children]
-          [:div {:replicant/key (:path child)}
-           (if (= :dir (:type child))
-             (dir-row state child)
-             (file-row state child))])])]))
+        (icons/trash)]])))
 
 (defn file-tree [state]
-  [:div.tree
-   (if (seq (:tree state))
-     (for [node (:tree state)]
-       [:div {:replicant/key (:path node)}
-        (if (= :dir (:type node))
-          (dir-row state node)
-          (file-row state node))])
-     [:p.muted.empty-tree "This project has no files yet."])])
+  (tree/tree
+   {:nodes (:tree state)
+    :expanded (:expanded state)
+    :selected (:active-file state)
+    :on-toggle [:toggle-dir]
+    :on-select [:open-file]
+    :render-icon tree-icon
+    :render-trailing #(tree-trailing state %)
+    :render-actions tree-actions
+    :empty "This project has no files yet."}))
 
 (defn- shortcut [keys label]
   [:li
@@ -97,13 +84,14 @@
           :gpui "Evalight is editing a clj-gpui app. Ctrl-Enter talks to the JVM nREPL. The native window is the running program."
           :clj "Evalight is editing JVM Clojure. Ctrl-Enter talks to nREPL. There is no preview pane: this project has no window to show."
           "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler.")]
-    (disclosure/disclosure {:title "Keyboard shortcuts" :open? true}
+    [:section.help-shortcuts {:aria-labelledby "help-shortcuts-title"}
+     [:h3#help-shortcuts-title "Keyboard shortcuts"]
      [:ul.shortcuts
      (shortcut ["Tab"] "Indent this line, or accept a completion when the list is showing")
      (shortcut ["Shift" "Tab"] "Dedent. Parinfer moves the parentheses.")
      (shortcut ["Enter"] "New line in the editor. Evaluate in the REPL.")
      (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")
-     (shortcut ["Ctrl" "K"] "Command palette")])
+     (shortcut ["Ctrl" "K"] "Command palette")]]
     [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running image."]
     (when (contains? #{:sci :compiled} (or (:runtime state) :sci))
@@ -358,7 +346,16 @@
      (pane-head
       [(editor-crumbs state)]
       [(when (and path (dirty? state path))
-         [:span.pill "saving"])])
+         [:span.pill "saving"])
+       (when path
+         [:button.icon-btn.editor-tool
+          {:type "button"
+           :class (when (:word-wrap? state) "is-active")
+           :aria-pressed (boolean (:word-wrap? state))
+           :title (if (:word-wrap? state) "Disable word wrap" "Enable word wrap")
+           :aria-label (if (:word-wrap? state) "Disable word wrap" "Enable word wrap")
+           :on {:click [:toggle-word-wrap]}}
+          (icons/wrap)])])
      (cond
        (nil? path)
        [:div.empty-editor
@@ -405,7 +402,7 @@
         n (count entries)]
     [:div.history-pop
      (popover/popover {:open? open? :align :end :on-close [:close-history]}
-       [:button.icon-btn.history-btn
+       [:button.icon-btn.toolbar-tool.history-btn
         {:type "button"
          :aria-expanded open?
          :aria-haspopup "dialog"
@@ -413,6 +410,7 @@
          :aria-label "History"
          :on {:click [:toggle-history]}}
         (icons/undo)
+        [:span.toolbar-label "History"]
         (when (pos? n)
           [:span.history-count (if (> n 9) "9+" (str n))])]
        [:div.history-copy
@@ -487,18 +485,18 @@
         (icons/components) "Add UI"]])
     [:div.toolbar-group.toolbar-utilities
      (history-panel state)
-     [:button.icon-btn
+     [:button.icon-btn.toolbar-tool
       {:type "button" :on {:click [:pick-open {:via :palette}]}
        :title "Command palette (Ctrl+K)"
        :aria-label "Command palette"}
-      (icons/search)]
+      (icons/search) [:span.toolbar-label "Commands"]]
      (popover/popover
       {:open? (:help? state) :align :end :on-close [:close-help]
        :panel-attrs {:class "help-popover-panel" :aria-label "Help"}}
-      [:button.icon-btn
+      [:button.icon-btn.toolbar-tool
        {:type "button" :on {:click [:toggle-help]} :title "Help" :aria-label "Help"
         :aria-expanded (boolean (:help? state))}
-       (icons/help)]
+       (icons/help) [:span.toolbar-label "Help"]]
       (help-panel state))]
 
     [:button.primary.run-btn
@@ -513,8 +511,14 @@
      (pane-head
       [[:span "Files"]]
       [[:div.tree-tools
-        [:button.tiny {:on {:click [:new-file-dialog]}} "File"]
-        [:button.tiny {:on {:click [:new-folder-dialog]}} "Folder"]
+        [:button.icon-btn.sidebar-add
+         {:type "button" :on {:click [:new-file-dialog]}
+          :title "New file" :aria-label "New file"}
+         (icons/file-plus)]
+        [:button.icon-btn.sidebar-add
+         {:type "button" :on {:click [:new-folder-dialog]}
+          :title "New folder" :aria-label "New folder"}
+         (icons/folder-plus)]
         [:button.icon-btn.pane-hide
          {:on {:click [:toggle-files]}
           :title "Hide files"

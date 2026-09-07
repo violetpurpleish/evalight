@@ -37,13 +37,12 @@
     (is (re-find #"\(declare view bump\)" out))
     (is (= :lit (sci/eval-string* (sci/init {}) out)))))
 
-(deftest lamp-template-declares-forward-refs
+(deftest starter-declares-forward-refs
   (let [src (template/core-cljs "lamp")
         out (ns-graph/with-forward-refs src)]
-    (is (= '[store view render bump toggle-about open-rename close-rename save-title retitle init]
-           (ns-graph/top-level-defs src)))
-    (is (re-find #"\(declare render bump toggle-about open-rename close-rename save-title retitle\)" src))
-    (is (re-find #"\(declare store view render bump toggle-about open-rename close-rename save-title retitle init\)" out))))
+    (is (= '[theme set-theme! store view render bump init] (ns-graph/top-level-defs src)))
+    (is (re-find #"\(declare render bump\)" src))
+    (is (re-find #"\(declare theme set-theme! store view render bump init\)" out))))
 
 (deftest load-order-puts-dependencies-first
   (let [files [{:path "src/app/core.cljs"

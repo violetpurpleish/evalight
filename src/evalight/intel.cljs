@@ -73,6 +73,16 @@
     (assoc it :arglists a)
     (dissoc it :arglists)))
 
+(defn enrich-live-item
+  "Restore metadata fields from a resolved SCI Var when the live listing
+  only supplied the callable's arglists."
+  [it metadata]
+  (cond-> it
+    (and (not (seq (:doc it))) (seq (:doc metadata)))
+    (assoc :doc (:doc metadata))
+    (and (not (seq (:arglists it))) (seq (:arglists metadata)))
+    (assoc :arglists (pr-str (:arglists metadata)))))
+
 (defn set-live!
   ([items] (set-live! items nil))
   ([items ns-name]

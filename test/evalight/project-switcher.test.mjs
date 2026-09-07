@@ -90,7 +90,7 @@ try {
   assert.deepEqual(await readMeta("lamp"), beforeOpen, "Opening a project must not change edit time");
 
   // Creating a file is a project edit; opening it afterward isn't another edit.
-  await page.evaluate(() => [...document.querySelectorAll(".tree-tools button")].find(el => el.textContent === "File").click());
+  await page.click('.tree-tools button[aria-label="New file"]');
   await page.waitForSelector(".ui-dialog input");
   await page.$eval(".ui-dialog input", el => { el.value = "edited.txt"; el.closest("form").requestSubmit(); });
   await page.waitForFunction(() => document.querySelector(".file-path")?.textContent.includes("edited.txt"));

@@ -84,7 +84,7 @@ try {
   await open("notes-a.txt");
   assert.match(await page.$eval(".cm-content", el => el.textContent), /saved before switch/);
 
-  await page.evaluate(() => [...document.querySelectorAll(".tree-tools button")].find(el => el.textContent === "File").click());
+  await page.click('.tree-tools button[aria-label="New file"]');
   await submitPath("notes-b.txt");
   await page.waitForFunction(() => document.body.textContent.includes("notes-b.txt already exists."));
   assert.equal(await read("notes-b.txt"), "original B");

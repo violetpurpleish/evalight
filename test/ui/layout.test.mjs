@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import puppeteer from "puppeteer-core";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const UI_ROOT = join(ROOT, "public");
 const PORT = Number(process.env.UI_TEST_PORT || 0);
+const legacyLampCore = await readFile(join(ROOT, "test/evalight/fixtures/lamp-core.cljs"), "utf8");
 
 function chromePath() {
   const candidates = [
@@ -63,6 +64,26 @@ async function startServer() {
     url: `http://127.0.0.1:${server.port}`,
     stop: async () => server.stop(true),
   };
+}
+
+async function seedLegacyProject(page, projectName, core) {
+  await page.evaluate(async ({ projectName, core }) => {
+    const root = await navigator.storage.getDirectory();
+    const evalight = await root.getDirectoryHandle("evalight");
+    const projects = await evalight.getDirectoryHandle("projects");
+    const project = await projects.getDirectoryHandle(projectName);
+    const src = await project.getDirectoryHandle("src");
+    const app = await src.getDirectoryHandle("app");
+    const write = async (dir, name, text) => {
+      const file = await dir.getFileHandle(name, { create: true });
+      const writable = await file.createWritable();
+      await writable.write(text);
+      await writable.close();
+    };
+    await write(app, "core.cljs", core);
+    await write(app, "greet.cljs", `(ns app.greet)\n\n(defn greet [name] (str "Hello, " name "."))\n`);
+    await write(app, "stats.cljs", `(ns app.stats)\n\n(defonce !tally (atom 0))\n\n(defn tally [] @!tally)\n(defn record! [] (swap! !tally inc) @!tally)\n`);
+  }, { projectName, core });
 }
 
 function paletteActiveHit(page) {
@@ -181,6 +202,12 @@ try {
     await page.keyboard.up(isMac ? "Meta" : "Control");
   };
 
+  await page.waitForSelector(".tree-row", { timeout: 20000 });
+  await page.waitForSelector("#project-select, .project-name", { timeout: 10000 });
+  // The starter lamp is now the Component gallery. Keep this layout suite's
+  // namespace/refactor checks on the deliberately richer legacy fixture.
+  await seedLegacyProject(page, "lamp", legacyLampCore);
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector(".tree-row", { timeout: 20000 });
   await page.waitForSelector("#project-select, .project-name", { timeout: 10000 });
   await new Promise((r) => setTimeout(r, 1500));
@@ -520,8 +547,7 @@ try {
   }
 
   const toolAlign = await page.evaluate(() => {
-    const btn = [...document.querySelectorAll(".tree-tools .tiny")]
-      .find((el) => el.textContent.trim() === "File");
+    const btn = document.querySelector(".tree-tools [aria-label='New file']");
     if (!btn) return { missing: true };
     const br = btn.getBoundingClientRect();
     const range = document.createRange();
@@ -535,7 +561,7 @@ try {
   });
   check("File tool button is present", !toolAlign.missing);
   if (!toolAlign.missing) {
-    check("File tool has no leading icon", !toolAlign.hasSvg);
+    check("File tool has an icon", toolAlign.hasSvg);
     check(
       "File label is centered in its pill",
       Math.abs(toolAlign.dx) <= 1.5 && Math.abs(toolAlign.dy) <= 1.5,
@@ -975,8 +1001,8 @@ try {
     );
 
     await page.evaluate(() => {
-      [...document.querySelectorAll(".tree-tools .tiny")]
-        .find((el) => el.textContent.trim() === "File")
+      [...document.querySelectorAll(".tree-tools [aria-label='New file']")]
+        .find(Boolean)
         ?.click();
     });
     await page.waitForSelector(".ui-dialog input[name=path]", { timeout: 4000 });
@@ -1119,8 +1145,8 @@ try {
     await page.waitForSelector(".history-pop .ui-popover-panel", { hidden: true, timeout: 3000 });
 
     await page.evaluate(() => {
-      [...document.querySelectorAll(".tree-tools .tiny")]
-        .find((el) => el.textContent.trim() === "File")
+      [...document.querySelectorAll(".tree-tools [aria-label='New file']")]
+        .find(Boolean)
         ?.click();
     });
     await page.waitForSelector(".ui-dialog input[name=path]", { timeout: 4000 });
@@ -1167,6 +1193,11 @@ try {
     },
     { timeout: 20000 }
   );
+
+  // Ignore startup/evaluation output so the multiline draft assertion has a
+  // stable empty baseline.
+  await page.click("section.repl .pane-head button");
+  await waitForUI(page, () => document.querySelectorAll(".repl-line").length === 0, { timeout: 3000 });
 
   const emptyPrompt = await replPromptMetrics(page);
   check("REPL prompt is in the page", !emptyPrompt.missing, JSON.stringify(emptyPrompt));
@@ -1753,6 +1784,10 @@ try {
       document.querySelector(".toast")?.textContent === "Created doomed",
     { timeout: 10000 }
   );
+  await seedLegacyProject(page, "doomed", legacyLampCore);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForSelector(".tree-row", { timeout: 20000 });
+  await page.waitForSelector("#project-select, .project-name", { timeout: 10000 });
   await waitForUI(page,
     () => [...document.querySelectorAll(".tree-name")].some((el) => el.textContent.trim() === "greet.cljs"),
     { timeout: 15000 }

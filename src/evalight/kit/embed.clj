@@ -5,7 +5,8 @@
             [shadow.resource :as resource]))
 
 (def paths
-  ["src/ui/core.cljs"
+  ["src/ui/api.cljs"
+   "src/ui/core.cljs"
    "src/ui/button.cljs"
    "src/ui/input.cljs"
    "src/ui/field.cljs"
@@ -22,6 +23,7 @@
    "src/ui/checkbox.cljs"
    "src/ui/switch.cljs"
    "src/ui/disclosure.cljs"
+   "src/ui/tree.cljs"
    "public/css/ui.css"])
 
 (defmacro files
@@ -32,3 +34,9 @@
 
 (defmacro gallery-source []
   (resource/slurp-resource &env "evalight/templates/gallery.cljs"))
+
+(defmacro starter-source []
+  (resource/slurp-resource &env "evalight/templates/core.cljs"))
+
+(defmacro starter-css []
+  (resource/slurp-resource &env "evalight/templates/style.css"))
