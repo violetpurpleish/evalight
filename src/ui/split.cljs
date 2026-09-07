@@ -14,7 +14,7 @@
                    (let [p (if column?
                               (/ (- (.-clientY e2) (.-top rect)) (max 1 (.-height rect)))
                               (/ (- (.-clientX e2) (.-left rect)) (max 1 (.-width rect))))
-                         pct (* 100 (min 80 (max 20 p)))]
+                         pct (* 100 (min 0.8 (max 0.2 p)))]
                      (when on-ratio (on-ratio pct))))
             up (atom nil)]
         (reset! up (fn [_]
@@ -34,9 +34,9 @@
   (let [column? (= direction :column)]
     [:div.ui-split
      {:class (if column? "is-col" "is-row")}
-     [:div.ui-split-pane {:style {:flex-basis (str (or ratio 50) "%")}} a]
+     [:div.ui-split-pane {:style {:flex-grow ratio}} a]
      [:div.ui-split-handle
       {:role "separator"
        :aria-orientation (if column? "horizontal" "vertical")
        :on {:pointerdown (fn [e] (drag! e ratio on-ratio column?))}}]
-     [:div.ui-split-pane b]]))
+     [:div.ui-split-pane {:style {:flex-grow (- 100 ratio)}} b]]))

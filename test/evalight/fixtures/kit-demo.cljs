@@ -1,6 +1,7 @@
 (ns app.core
   (:require [replicant.dom :as r]
             [ui.button :as button]
+            [ui.split :as split]
             [ui.tooltip :as tooltip]
             [ui.dropdown :as dropdown]
             [ui.tabs :as tabs]
@@ -43,6 +44,12 @@
        {:items [{:id :a :title "Section A" :content "Content A"}
                 {:id :b :title "Section B" :content "Content B"}]
         :value (:sections s) :on-change #(set-value! :sections %)})
+      [:div#row-split
+       (split/split {:ratio (or (:row s) 50) :on-ratio #(set-value! :row %)}
+         [:p "Left"] [:p "Right"])]
+      [:div#column-split
+       (split/split {:direction :column :ratio (or (:column s) 50) :on-ratio #(set-value! :column %)}
+         [:p "Top"] [:p "Bottom"])]
       (button/button {:on {:click #(set-value! :notice (str (random-uuid)))}} "Notify")
       (when-let [id (:notice s)]
         (toast/toast {:id id :text "Saved changes" :duration 1500

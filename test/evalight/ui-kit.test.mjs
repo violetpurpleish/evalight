@@ -105,6 +105,32 @@ try {
     return !ds[0].open && ds[1].open;
   });
 
+  for (const [id, vertical] of [["row-split", false], ["column-split", true]]) {
+    // Scroll the real iframe content into view before reading screen coordinates.
+    await frame.$eval(`#${id}`, el => el.scrollIntoView({block: "center"}));
+    const split = await frame.$(`#${id} .ui-split`);
+    const handle = await frame.$(`#${id} .ui-split-handle`);
+    const bounds = await split.boundingBox();
+    const ratio = () => frame.$eval(`#${id} .ui-split`, (el, vertical) => {
+      const panes = el.querySelectorAll('.ui-split-pane');
+      const sizes = [...panes].map(p => vertical ? p.getBoundingClientRect().height : p.getBoundingClientRect().width);
+      return sizes[0] / (sizes[0] + sizes[1]);
+    }, vertical);
+    assert.ok(Math.abs(await ratio() - 0.5) < 0.02, `${id}: initial divider must be centered`);
+    for (const target of [0.35, 0.65, 0.05, 0.95]) {
+      const hb = await handle.boundingBox();
+      await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(
+        vertical ? hb.x + hb.width / 2 : bounds.x + bounds.width * target,
+        vertical ? bounds.y + bounds.height * target : hb.y + hb.height / 2,
+        {steps: 5});
+      await page.mouse.up();
+      const expected = Math.min(0.8, Math.max(0.2, target));
+      assert.ok(Math.abs(await ratio() - expected) < 0.025, `${id}: drag to ${target} should produce ${expected}, got ${await ratio()}`);
+    }
+  }
+
   const notify = () => frame.$$eval("button", buttons => buttons.find(b => b.textContent === "Notify").click());
   await notify();
   await frame.waitForSelector(".ui-toast");
