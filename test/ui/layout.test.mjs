@@ -1262,12 +1262,21 @@ try {
   check("preview pane can hide preview", paneCount.hidePreview);
   check("toolbar does not hide the sidebars", !paneCount.hideInToolbar);
 
+  check("both workspace dividers use the shared split handle",
+    await page.$$(".stage > .splitter.ui-split-handle").then(nodes => nodes.length === 2));
   const filesBefore = await page.$eval(".sidebar", (el) => el.getBoundingClientRect().width);
   const filesSplit = await page.$(".splitter-files");
   const filesBox = await filesSplit.boundingBox();
   check("files splitter has a hit area", Boolean(filesBox) && filesBox.width > 0);
   if (filesBox) {
     await page.mouse.move(filesBox.x + filesBox.width / 2, filesBox.y + 80);
+    const dividerHover = await page.$eval('.splitter-files', el => ({
+      background: getComputedStyle(el).backgroundColor,
+      lineWidth: getComputedStyle(el, '::before').width,
+    }));
+    check('workspace divider keeps its thin hover indicator',
+      dividerHover.background === 'rgba(0, 0, 0, 0)' && dividerHover.lineWidth === '2px',
+      JSON.stringify(dividerHover));
     await page.mouse.down();
     await page.mouse.move(filesBox.x + filesBox.width / 2 + 90, filesBox.y + 80, { steps: 12 });
     await page.mouse.up();
@@ -1297,6 +1306,14 @@ try {
       `before=${previewBefore.toFixed(1)} after=${previewAfter.toFixed(1)}`
     );
   }
+
+  check("releasing a divider ends dragging",
+    await page.$(".stage.is-dragging") === null);
+  await page.click(".splitter-files", {count: 2});
+  await page.click(".splitter-preview", {count: 2});
+  await waitForUI(page, () =>
+    Math.abs(document.querySelector('.sidebar').getBoundingClientRect().width - 220) < 1 &&
+    Math.abs(document.querySelector('section.preview').getBoundingClientRect().width - 360) < 1);
 
   await page.click(".sidebar [aria-label='Hide files']");
   await waitForUI(page,

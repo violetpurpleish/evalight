@@ -886,7 +886,6 @@
 (def ^:private preview-max 640)
 (def ^:private main-min 240)
 
-(defonce !drag (atom nil))
 
 (defn toggle-files! []
   (swap! state/app update-in [:layout :files-open?] not))
@@ -921,57 +920,15 @@
       (set! (.-width style) px)
       (set! (.-flexBasis style) px))))
 
-(defn- commit-drag-width! []
-  (when-let [{:keys [pane current-w]} @!drag]
-    (when current-w
-      (let [k (if (= pane :files) :files-width :preview-width)]
-        (apply-pane-el-width! pane current-w)
-        (swap! state/app assoc-in [:layout k] current-w)))))
-
-(defn pane-resize-move! [event]
-  (when-let [{:keys [pane id start-x start-w]} @!drag]
-    (when (or (nil? id) (= id (.-pointerId event)))
-      (.preventDefault event)
-      (let [dx (- (.-clientX event) start-x)
-            w (clamp-pane pane (if (= pane :files) (+ start-w dx) (- start-w dx)))]
-        (swap! !drag assoc :current-w w)
-        (apply-pane-el-width! pane w)))))
-
-(defn pane-resize-end! [event]
-  (when @!drag
-    (when (and event (.-pointerId event))
-      (try
-        (let [el (or (.-currentTarget event) (.-target event))]
-          (when (and el (.hasPointerCapture el (.-pointerId event)))
-            (.releasePointerCapture el (.-pointerId event))))
-        (catch :default _ nil)))
-    (commit-drag-width!)
-    (reset! !drag nil)
-    (swap! state/app assoc-in [:layout :dragging?] false)
-    (.removeEventListener js/window "pointermove" pane-resize-move!)
-    (.removeEventListener js/window "pointerup" pane-resize-end!)
-    (.removeEventListener js/window "pointercancel" pane-resize-end!)))
-
-(defn start-pane-resize! [pane event]
-  (when event
-    (.preventDefault event)
-    (when-let [el (.-currentTarget event)]
-      (try
-        (.setPointerCapture el (.-pointerId event))
-        (catch :default _ nil)))
-    (let [k (if (= pane :files) :files-width :preview-width)]
-      (reset! !drag {:pane pane
-                     :id (.-pointerId event)
-                     :start-x (.-clientX event)
-                     :start-w (get-in @state/app [:layout k])
-                     :current-w (get-in @state/app [:layout k])}))
-    (swap! state/app assoc-in [:layout :dragging?] true)
-    (.removeEventListener js/window "pointermove" pane-resize-move!)
-    (.removeEventListener js/window "pointerup" pane-resize-end!)
-    (.removeEventListener js/window "pointercancel" pane-resize-end!)
-    (.addEventListener js/window "pointermove" pane-resize-move!)
-    (.addEventListener js/window "pointerup" pane-resize-end!)
-    (.addEventListener js/window "pointercancel" pane-resize-end!)))
+(defn pane-resize-props [pane]
+  {:value (get-in @state/app [:layout (if (= pane :files) :files-width :preview-width)])
+   :reverse? (= pane :preview)
+   :clamp #(clamp-pane pane %)
+   :on-input #(apply-pane-el-width! pane %)
+   :on-change (fn [width]
+                (swap! state/app assoc-in
+                       [:layout (if (= pane :files) :files-width :preview-width)] width))
+   :on-dragging #(swap! state/app assoc-in [:layout :dragging?] %)})
 
 (defn reset-pane-width! [pane]
   (swap! state/app assoc-in [:layout (if (= pane :files) :files-width :preview-width)]
@@ -1072,10 +1029,6 @@
       :toggle-files (toggle-files!)
       :toggle-preview-pane (toggle-preview-pane!)
       :toggle-word-wrap (toggle-word-wrap!)
-      :resize-files (when event (start-pane-resize! :files event))
-      :resize-preview (when event (start-pane-resize! :preview event))
-      :pane-resize-move (when event (pane-resize-move! event))
-      :pane-resize-end (pane-resize-end! event)
       :reset-files-width (reset-pane-width! :files)
       :reset-preview-width (reset-pane-width! :preview)
       :mobile-tab (set-mobile-tab! (first args))

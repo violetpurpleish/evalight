@@ -392,22 +392,11 @@ code, pre { font-family: var(--mono); }
   user-select: none;
   background: transparent;
 }
-.splitter::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-  background: var(--line);
-}
 .splitter::after {
   content: "";
   position: absolute;
   inset: 0 -0.35rem;
 }
-.splitter:hover::before,
 .stage.is-dragging .splitter::before {
   width: 2px;
   background: var(--gold);

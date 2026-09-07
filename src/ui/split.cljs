@@ -1,30 +1,62 @@
 (ns ui.split
   (:require [ui.core :as ui]))
 
-(defn- drag! [ev _start-ratio on-ratio column?]
-  (let [e (ui/dom-event ev)
-        handle (or (and e (.-currentTarget e))
-                   (when-let [t (and e (.-target e))]
-                     (.closest t ".ui-split-handle")))
-        root (when handle (.-parentElement handle))
-        rect (when root (.getBoundingClientRect root))]
-    (when (and e rect)
-      (let [move (fn [e2]
-                   (.preventDefault e2)
-                   (let [p (if column?
-                              (/ (- (.-clientY e2) (.-top rect)) (max 1 (.-height rect)))
-                              (/ (- (.-clientX e2) (.-left rect)) (max 1 (.-width rect))))
-                         pct (* 100 (min 0.8 (max 0.2 p)))]
-                     (when on-ratio (on-ratio pct))))
-            up (atom nil)]
-        (reset! up (fn [_]
-                     (.removeEventListener js/window "pointermove" move)
-                     (.removeEventListener js/window "pointerup" @up)
-                     (.removeEventListener js/window "pointercancel" @up)))
-        (.preventDefault e)
-        (.addEventListener js/window "pointermove" move)
-        (.addEventListener js/window "pointerup" @up)
-        (.addEventListener js/window "pointercancel" @up)))))
+(defn- start-drag! [props event]
+  (let [e (ui/dom-event event)
+        node (.-currentTarget e)
+        win (.. node -ownerDocument -defaultView)
+        {:keys [value direction reverse? scale clamp on-input on-change on-dragging]} props
+        column? (= direction :column)
+        coordinate (fn [ev] (if column? (.-clientY ev) (.-clientX ev)))
+        start (coordinate e)
+        factor (if scale (scale node) 1)
+        pointer-id (.-pointerId e)
+        current (atom value)
+        cleanup (atom nil)
+        move (fn [ev]
+               (when (= pointer-id (.-pointerId ev))
+                 (.preventDefault ev)
+                 (let [v (+ value (* (if reverse? -1 1) factor (- (coordinate ev) start)))
+                       v (if clamp (clamp v) v)]
+                   (reset! current v)
+                   (when on-input (on-input v)))))
+        finish (fn [ev]
+                 (when (or (nil? ev) (= pointer-id (.-pointerId ev)))
+                   (when-let [f @cleanup] (f))
+                   (when on-change (on-change @current))
+                   (when on-dragging (on-dragging false))))]
+    (when (= 0 (.-button e))
+      (when-let [previous (aget node "__uiSplitCleanup")] (previous))
+      (reset! cleanup
+              (fn []
+                (.removeEventListener win "pointermove" move)
+                (.removeEventListener win "pointerup" finish)
+                (.removeEventListener win "pointercancel" finish)
+                (when (.hasPointerCapture node pointer-id)
+                  (.releasePointerCapture node pointer-id))
+                (aset node "__uiSplitCleanup" nil)))
+      (aset node "__uiSplitCleanup" #(finish nil))
+      (.setPointerCapture node pointer-id)
+      (.addEventListener win "pointermove" move)
+      (.addEventListener win "pointerup" finish)
+      (.addEventListener win "pointercancel" finish)
+      (when on-dragging (on-dragging true)))))
+
+(defn handle
+  "Shared divider for custom pane layouts. :value is the initial size;
+  :on-input receives sizes during dragging, :on-change commits on release.
+  Optional :clamp, :reverse?, :direction, :scale (units per pixel from node),
+  and :on-dragging (boolean). Callbacks are functions. Other props style the
+  separator or add events such as :dblclick."
+  [{:keys [direction] :as props}]
+  [:div
+   (ui/attrs
+    {:class "ui-split-handle" :role "separator"
+     :aria-orientation (if (= direction :column) "horizontal" "vertical")
+     :replicant/on-unmount (fn [{:keys [replicant/node]}]
+                             (when-let [cleanup (aget node "__uiSplitCleanup")] (cleanup)))}
+    (assoc props :on (assoc (:on props) :pointerdown #(start-drag! props %)))
+    [:value :direction :reverse? :scale :clamp :on-input :on-change :on-dragging])])
 
 (defn split
   "Two panes and a drag handle. :direction is :row (default) or :column.
@@ -35,8 +67,10 @@
     [:div.ui-split
      {:class (if column? "is-col" "is-row")}
      [:div.ui-split-pane {:style {:flex-grow ratio}} a]
-     [:div.ui-split-handle
-      {:role "separator"
-       :aria-orientation (if column? "horizontal" "vertical")
-       :on {:pointerdown (fn [e] (drag! e ratio on-ratio column?))}}]
+     (handle {:value ratio :direction direction :on-input on-ratio
+              :clamp #(min 80 (max 20 %))
+              :scale (fn [node]
+                       (let [root (.-parentElement node)]
+                         (/ 100 (max 1 (- (if column? (.-clientHeight root) (.-clientWidth root))
+                                          (if column? (.-offsetHeight node) (.-offsetWidth node)))))))})
      [:div.ui-split-pane {:style {:flex-grow (- 100 ratio)}} b]]))

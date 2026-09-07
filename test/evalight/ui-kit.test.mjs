@@ -46,6 +46,18 @@ try {
   await galleryFrame.waitForSelector('.ui-command');
   await page.keyboard.press('Escape');
   await galleryFrame.waitForSelector('.ui-command', {hidden: true});
+  for (const [selector, pane, delta, resetWidth] of [
+    ['.splitter-files', '.sidebar', 60, 220],
+    ['.splitter-preview', 'section.preview', -60, 360],
+  ]) {
+    const box = await (await page.$(selector)).boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + 30);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + delta, box.y + 30, {steps: 5});
+    await page.mouse.up();
+    await page.click(selector, {count: 2});
+    await page.waitForFunction((pane, width) => Math.abs(document.querySelector(pane).getBoundingClientRect().width - width) < 1, {}, pane, resetWidth);
+  }
   const source = await Bun.file(join(ROOT, "test/evalight/fixtures/kit-demo.cljs")).text();
   await page.evaluate(async source => {
     let dir = await navigator.storage.getDirectory();
@@ -120,6 +132,12 @@ try {
     for (const target of [0.35, 0.65, 0.05, 0.95]) {
       const hb = await handle.boundingBox();
       await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+      const appearance = await handle.evaluate((el, vertical) => ({
+        background: getComputedStyle(el).backgroundColor,
+        thickness: getComputedStyle(el, '::before')[vertical ? 'height' : 'width'],
+      }), vertical);
+      assert.equal(appearance.background, 'rgba(0, 0, 0, 0)');
+      assert.equal(appearance.thickness, '2px', `${id}: hover line stays slim`);
       await page.mouse.down();
       await page.mouse.move(
         vertical ? hb.x + hb.width / 2 : bounds.x + bounds.width * target,

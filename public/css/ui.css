@@ -160,15 +160,41 @@
   flex: 1 1 0;
 }
 .ui-split-handle {
+  touch-action: none;
+  user-select: none;
   flex: 0 0 6px;
-  background: var(--ui-line);
+  background: transparent;
   cursor: col-resize;
   position: relative;
 }
-.ui-split.is-col .ui-split-handle { cursor: row-resize; }
-.ui-split-handle:hover,
-.ui-split-handle:focus {
+.ui-split-handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--ui-line);
+}
+.ui-split-handle:hover::before,
+.ui-split-handle:focus::before {
+  width: 2px;
   background: var(--ui-accent);
+}
+.ui-split-handle[aria-orientation="horizontal"] { cursor: row-resize; }
+.ui-split-handle[aria-orientation="horizontal"]::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  bottom: auto;
+  width: auto;
+  height: 1px;
+  transform: translateY(-50%);
+}
+.ui-split-handle[aria-orientation="horizontal"]:hover::before,
+.ui-split-handle[aria-orientation="horizontal"]:focus::before {
+  height: 2px;
 }
 
 .ui-crumbs {

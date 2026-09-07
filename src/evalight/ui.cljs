@@ -18,6 +18,7 @@
             [ui.popover :as popover]
             [ui.dropdown :as dropdown]
             [ui.tabs :as tabs]
+            [ui.split :as split]
             [ui.switch :as switch]
             [ui.toast :as toast]
             [ui.disclosure :as disclosure]))
@@ -557,15 +558,14 @@
 
 (defn- splitter [pane]
   (let [files? (= pane :files)]
-    [:div.splitter
-     {:replicant/key (if files? "split-files" "split-preview")
-      :class (if files? "splitter-files" "splitter-preview")
-      :role "separator"
-      :aria-orientation "vertical"
-      :aria-label (if files? "Resize files" "Resize preview")
-      :title "Drag to resize. Double-click resets the width."
-      :on {:pointerdown (if files? [:resize-files] [:resize-preview])
-           :dblclick (if files? [:reset-files-width] [:reset-preview-width])}}]))
+    (split/handle
+     (merge (actions/pane-resize-props pane)
+            {:replicant/key (if files? "split-files" "split-preview")
+             :class ["splitter" (if files? "splitter-files" "splitter-preview")]
+             :aria-label (if files? "Resize files" "Resize preview")
+             :title "Drag to resize. Double-click resets the width."
+             :on {:dblclick (if files? [:reset-files-width] [:reset-preview-width])}}))))
+
 
 (defn workspace [state]
   (let [{:keys [files-open? preview-open? dragging?]} (:layout state)
