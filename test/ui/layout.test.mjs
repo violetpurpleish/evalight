@@ -624,6 +624,15 @@ try {
   });
   check("deleted Split shows Add", afterKitDelete.Split === "Add", JSON.stringify(afterKitDelete));
   check("Button stays Restore after Split is gone", afterKitDelete.Button === "Restore", JSON.stringify(afterKitDelete));
+  // The gallery uses Split, so restore it before later preview checks.
+  await page.evaluate(() => {
+    [...document.querySelectorAll('.kit-list li')]
+      .find(li => li.querySelector('.kit-title')?.textContent === 'Split')
+      .querySelector('.ui-btn').click();
+  });
+  await waitForUI(page, () => [...document.querySelectorAll('.tree-name')]
+    .some(el => el.textContent === 'split.cljs'));
+
   await page.evaluate(() => {
     [...document.querySelectorAll(".ui-dialog .ui-btn")]
       .find((b) => b.textContent.trim() === "Done")
@@ -808,24 +817,8 @@ try {
   await helpBtn.click();
   await page.waitForSelector(".help", { timeout: 3000 });
 
-  const help = await page.evaluate(() => {
-    const panel = document.querySelector(".help");
-    const close = panel?.querySelector(".help-close, [aria-label='Close help'], [title='Close']");
-    const pr = panel.getBoundingClientRect();
-    const cr = close.getBoundingClientRect();
-    return {
-      panel: pr.toJSON(),
-      close: cr.toJSON(),
-      fromRight: pr.right - cr.right,
-      fromTop: cr.top - pr.top,
-    };
-  });
-  check(
-    "help close sits in the top-right of the popover",
-    help.fromRight >= 4 && help.fromRight <= 20 && help.fromTop >= 4 && help.fromTop <= 20,
-    `fromRight=${help.fromRight.toFixed(1)} fromTop=${help.fromTop.toFixed(1)}`
-  );
-  check("help close is inside the popover", within(help.close, help.panel));
+  check("Help uses the shared popover without a close button",
+    await page.$(".ui-popover-panel .help") !== null && await page.$(".help-close") === null);
 
   const helpCopy = await page.evaluate(() => {
     const items = [...document.querySelectorAll(".help .shortcuts li")].map((li) => ({
@@ -893,7 +886,7 @@ try {
   );
   await page.setViewport({ width: 1440, height: 900 });
 
-  await page.click(".help-close");
+  await page.click(".brand");
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
   await page.click("button.icon-btn[aria-label='Help']");
@@ -1577,7 +1570,7 @@ try {
     !paletteHelp.command && !paletteHelp.hitCommand && paletteHelp.help,
     JSON.stringify(paletteHelp)
   );
-  await page.click(".help-close");
+  await page.click(".brand");
   await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
   await page.click("section.preview [aria-label='Hide preview']");
@@ -2178,7 +2171,7 @@ try {
     const hit = document.elementFromPoint(x, y);
     return {
       overlayZ: Number(getComputedStyle(overlay).zIndex),
-      helpZ: Number(getComputedStyle(help).zIndex),
+      helpOpen: Boolean(help),
       x,
       y,
       hitDialog: Boolean(hit?.closest(".ui-dialog")),
@@ -2187,12 +2180,12 @@ try {
     };
   });
   check(
-    "modal stacks above help",
-    stacking.overlayZ > stacking.helpZ,
+    "Project actions dismiss Help before opening a modal",
+    !stacking.helpOpen,
     JSON.stringify(stacking)
   );
   check(
-    "Cancel is the hit target while Help is open",
+    "Cancel is the hit target after Help closes",
     stacking.hitDialog && !stacking.hitHelp,
     JSON.stringify(stacking)
   );
@@ -2203,26 +2196,10 @@ try {
     dialog: Boolean(document.querySelector(".ui-dialog")),
   }));
   check(
-    "Cancel closes the project dialog, not Help",
-    afterProjectCancel.help && !afterProjectCancel.dialog,
+    "Cancel leaves both panels closed",
+    !afterProjectCancel.help && !afterProjectCancel.dialog,
     JSON.stringify(afterProjectCancel)
   );
-
-  const helpClose = await page.evaluate(() => {
-    const close = document.querySelector(".help-close");
-    const r = close.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
-    const hit = document.elementFromPoint(x, y);
-    return {
-      x,
-      y,
-      hitHelp: Boolean(hit?.closest(".help")),
-    };
-  });
-  check("Help close is clickable after the dialog", helpClose.hitHelp, JSON.stringify(helpClose));
-  await page.mouse.click(helpClose.x, helpClose.y);
-  await page.waitForSelector(".help", { hidden: true, timeout: 3000 });
 
   await page.click("button[aria-label='Project actions']");
   await page.waitForSelector("button[aria-label='Delete project']");

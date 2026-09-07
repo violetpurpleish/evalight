@@ -15,6 +15,13 @@
    "src/ui/split.cljs"
    "src/ui/breadcrumbs.cljs"
    "src/ui/command.cljs"
+   "src/ui/tooltip.cljs"
+   "src/ui/dropdown.cljs"
+   "src/ui/tabs.cljs"
+   "src/ui/toast.cljs"
+   "src/ui/checkbox.cljs"
+   "src/ui/switch.cljs"
+   "src/ui/disclosure.cljs"
    "public/css/ui.css"])
 
 (defmacro files
@@ -22,3 +29,6 @@
   (into {}
         (for [p paths]
           [p (resource/slurp-resource &env (str/replace p #"^(src/|public/css/)" ""))])))
+
+(defmacro gallery-source []
+  (resource/slurp-resource &env "evalight/templates/gallery.cljs"))

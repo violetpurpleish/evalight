@@ -54,7 +54,21 @@
     :title "Command"
     :path "src/ui/command.cljs"
     :needs ["input"]
-    :blurb "A filtered list. Overlay for a command palette, panel for a menu."}])
+    :blurb "A filtered list. Overlay for a command palette, panel for a menu."}
+   {:id "tooltip" :title "Tooltip" :path "src/ui/tooltip.cljs"
+    :needs ["core"] :blurb "Hover and keyboard labels, positioned within the viewport."}
+   {:id "dropdown" :title "Dropdown menu" :path "src/ui/dropdown.cljs"
+    :needs ["popover"] :blurb "Keyboard menu with disabled items, separators, and danger actions."}
+   {:id "tabs" :title "Tabs" :path "src/ui/tabs.cljs"
+    :needs ["core"] :blurb "Accessible tab lists with persistent panels."}
+   {:id "toast" :title "Toast" :path "src/ui/toast.cljs"
+    :needs ["core"] :blurb "Timed notices with pause, dismiss, and optional actions."}
+   {:id "checkbox" :title "Checkbox" :path "src/ui/checkbox.cljs"
+    :needs ["core"] :blurb "Native checkbox with a clickable label and boolean value."}
+   {:id "switch" :title "Switch" :path "src/ui/switch.cljs"
+    :needs ["checkbox"] :blurb "Accessible on/off switch backed by a native input."}
+   {:id "disclosure" :title "Disclosure" :path "src/ui/disclosure.cljs"
+    :needs ["core"] :blurb "Native expandable sections and controlled accordions."}])
 
 (def ^:private internals
   {"core" {:id "core" :path "src/ui/core.cljs" :needs []}

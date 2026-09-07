@@ -25,7 +25,6 @@
 (defonce !save-timer (atom nil))
 (defonce !live-timer (atom nil))
 (defonce !frame-timer (atom nil))
-(defonce !notice-timer (atom nil))
 (defonce !save-queue (atom (p/ok nil)))
 
 (defn- schedule-native-frame!
@@ -88,12 +87,7 @@
 
 (defn- flash!
   ([text] (flash! text :ok))
-  ([text kind]
-   (state/notice! text kind)
-   (when-let [t @!notice-timer]
-     (js/clearTimeout t))
-   (reset! !notice-timer
-           (js/setTimeout #(swap! state/app assoc :notice nil) 2800))))
+  ([text kind] (state/notice! text kind)))
 
 (defn- cljs-file? [path]
   (boolean (re-find #"\.(cljs|cljc)$" (or path ""))))
@@ -1056,6 +1050,8 @@
       :add-ui (catch-ui (add-ui-component! (first args)))
       :restore-ui (catch-ui (restore-ui-component! (first args)))
       :close-dialog (close-dialog!)
+      :dismiss-notice (when (= (first args) (get-in @state/app [:notice :id]))
+                        (swap! state/app assoc :notice nil))
       :pick-open (do (close-history!) (commands/open! (first args)))
       :pick-close (commands/close!)
       :pick-query (when event
@@ -1064,6 +1060,7 @@
       :crumb-open (commands/open! {:via :crumb :anchor (first args)})
       :crumb-pick (catch-ui (crumb-pick! (first args)))
       :toggle-help (toggle-help!)
+      :close-help (swap! state/app assoc :help? false)
       :toggle-beta (toggle-beta!)
       :close-beta (close-beta!)
       :toggle-history (toggle-history!)

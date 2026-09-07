@@ -115,6 +115,8 @@ async function writeLamp(dir) {
       `        :asset-path "/js"\n` +
       `        :modules {:main {:init-fn app.core/init}}}}}\n`,
   );
+  await writeFile(join(dir, "src/app/gallery.cljs"),
+    await readFile(join(REPO, "src/evalight/templates/gallery.cljs"), "utf8"));
   await writeFile(join(dir, "src/app/greet.cljs"),
     `(ns app.greet)\n(defn greet [name] (str "Hello, " name "."))\n`);
   await writeFile(
@@ -318,7 +320,7 @@ try {
   const help = await page.$eval(".help", (el) => el.innerText);
   assert.match(help, /will not start or stop the compiler/);
   assert.doesNotMatch(help, /experimental/);
-  await page.click(".help-close");
+  await page.click(".brand");
 
   await browser.close();
   browser = null;

@@ -817,12 +817,6 @@ code, pre { font-family: var(--mono); }
 }
 .help-head { display: flex; align-items: flex-start; gap: 0.75rem; padding-right: 2rem; flex: 0 0 auto; }
 .help h2 { font-family: var(--serif); margin: 0; font-size: 1.2rem; flex: 1; min-width: 0; }
-.help-close {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  z-index: 1;
-}
 .help-body {
   min-height: 0;
   overflow: auto;
@@ -904,7 +898,7 @@ kbd {
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
   z-index: 410;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .toast.err { border-color: var(--ember); color: #ffd1c2; }
 
@@ -985,19 +979,10 @@ kbd {
   .project-trigger { min-width: 0; }
 }
 
-.icon-tooltip {
-  position: fixed;
-  inset: auto;
-  margin: 0;
-  max-width: calc(100vw - 16px);
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-2);
-  color: var(--text);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
-  font: 0.75rem/1.4 var(--sans);
-  pointer-events: none;
-}
+
 
 .project-menu-content { display: contents; }
+
+.help-popover-panel { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.help-popover-panel .help { position: relative; top: auto; right: auto; max-height: calc(100dvh - 6rem); }
+.help-head { padding-right: 0; }

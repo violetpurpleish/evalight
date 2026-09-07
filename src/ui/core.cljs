@@ -118,3 +118,9 @@
    (fn [{:keys [replicant/node]}]
      (when-let [cleanup (aget node "__uiDismissCleanup")]
        (cleanup)))})
+
+(defn wrapped
+  "Wrap a function handler so composed actions receive Replicant dispatch."
+  [handler]
+  {:replicant.event/handler handler
+   :replicant.event/wrap-handler? true})

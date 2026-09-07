@@ -15,7 +15,12 @@
             [ui.command :as ui-command]
             [ui.dialog :as ui-dialog]
             [ui.input :as ui-input]
-            [ui.popover :as popover]))
+            [ui.popover :as popover]
+            [ui.dropdown :as dropdown]
+            [ui.tabs :as tabs]
+            [ui.switch :as switch]
+            [ui.toast :as toast]
+            [ui.disclosure :as disclosure]))
 
 (defn- dirty? [state path]
   (contains? (:dirty state) path))
@@ -85,25 +90,19 @@
 
 (defn help-panel [state]
   [:aside.help {:replicant/key :help-panel}
-   [:header.help-head
-    [:h2 "Living with the program"]
-    [:button.icon-btn.help-close
-     {:type "button"
-      :on {:click [:toggle-help]}
-      :title "Close"
-      :aria-label "Close help"}
-     (icons/close)]]
+   [:header.help-head [:h2 "Living with the program"]]
    [:div.help-body
     [:p (case (:runtime state)
           :gpui "Evalight is editing a clj-gpui app. Ctrl-Enter talks to the JVM nREPL. The native window is the running program."
           :clj "Evalight is editing JVM Clojure. Ctrl-Enter talks to nREPL. There is no preview pane: this project has no window to show."
           "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler.")]
-    [:ul.shortcuts
+    (disclosure/disclosure {:title "Keyboard shortcuts" :open? true}
+     [:ul.shortcuts
      (shortcut ["Tab"] "Indent this line, or accept a completion when the list is showing")
      (shortcut ["Shift" "Tab"] "Dedent. Parinfer moves the parentheses.")
      (shortcut ["Enter"] "New line in the editor. Evaluate in the REPL.")
      (shortcut ["Ctrl" "Enter"] "Evaluate the form at the cursor")
-     (shortcut ["Ctrl" "K"] "Command palette")]
+     (shortcut ["Ctrl" "K"] "Command palette")])
     [:p.muted "In the REPL, Shift-Enter inserts a new line. Indent is what you edit; parentheses follow."]
     [:p.muted "Hover a symbol in the editor for its docstring. Completions appear as you type, from the running image."]
     (when (contains? #{:sci :compiled} (or (:runtime state) :sci))
@@ -315,20 +314,15 @@
        (when (:error preview)
          [:span.preview-error {:title (:error preview)} "error"])]
       (when-not gpui?
-        [[:label.live
-          {:class (when live-off? "is-disabled")
+        [(switch/switch
+          {:class "live" :label "Live"
            :title (cond
-                    attached?
-                    "shadow-cljs autoload reloads this app. Evalight Live stays off while attached."
-                    compiled?
-                    "Reload Preview after you save. Off keeps this page until you reload it."
-                    :else
-                    "Reload the SCI preview as you type.")}
-          [:input {:type "checkbox"
-                   :checked (boolean (:live? preview))
-                   :disabled live-off?
-                   :on {:change [:toggle-live]}}]
-          "Live"]]))
+                    attached? "shadow-cljs autoload reloads this app. Evalight Live stays off while attached."
+                    compiled? "Reload Preview after you save. Off keeps this page until you reload it."
+                    :else "Reload the SCI preview as you type.")
+           :checked? (boolean (:live? preview)) :disabled live-off?
+           :on-change [:toggle-live]})]))
+
      (if gpui?
        (native-preview-body state)
        [:div.preview-frame
@@ -445,25 +439,19 @@
 
 (defn- project-actions [s]
   [:div.project-actions
-   (popover/popover
-    {:open? (:project-actions-open? s) :align :start :on-close [:close-project-actions]}
+   (dropdown/dropdown
+    {:open? (:project-actions-open? s) :align :start :on-close [:close-project-actions]
+     :label "Project actions" :heading "Project" :menu-class "project-action-list"
+     :items [{:id :new :label "New project" :icon (icons/plus) :on-select [:new-project-dialog]}
+             {:id :export :label "Export ZIP" :icon (icons/download) :on-select [:export]}
+             {:separator? true}
+             {:id :delete :label "Delete project" :icon (icons/trash) :danger? true
+              :on-select [:delete-project-dialog]}]}
     [:button.icon-btn.project-actions-trigger
      {:type "button" :aria-label "Project actions" :title "Project actions"
-      :aria-haspopup "dialog" :aria-expanded (boolean (:project-actions-open? s))
+      :aria-haspopup "menu" :aria-expanded (boolean (:project-actions-open? s))
       :on {:click [:toggle-project-actions]}}
-     (icons/more)]
-    [:div.project-action-list
-     {:replicant/on-mount (fn [{:keys [replicant/node]}]
-                            (some-> (.querySelector node "button") .focus))}
-     [:p.project-action-heading "Project"]
-     [:button {:type "button" :on {:click [:new-project-dialog]}}
-      (icons/plus) "New project"]
-     [:button {:type "button" :on {:click [:export]}}
-      (icons/download) "Export ZIP"]
-     [:div.project-action-divider]
-     [:button.delete-project
-      {:type "button" :aria-label "Delete project" :on {:click [:delete-project-dialog]}}
-      (icons/trash) "Delete project"]])])
+     (icons/more)])])
 
 (defn header [state]
   [:header.top
@@ -503,9 +491,15 @@
        :title "Command palette (Ctrl+K)"
        :aria-label "Command palette"}
       (icons/search)]
-     [:button.icon-btn
-      {:type "button" :on {:click [:toggle-help]} :title "Help" :aria-label "Help"}
-      (icons/help)]]
+     (popover/popover
+      {:open? (:help? state) :align :end :on-close [:close-help]
+       :panel-attrs {:class "help-popover-panel" :aria-label "Help"}}
+      [:button.icon-btn
+       {:type "button" :on {:click [:toggle-help]} :title "Help" :aria-label "Help"
+        :aria-expanded (boolean (:help? state))}
+       (icons/help)]
+      (help-panel state))]
+
     [:button.primary.run-btn
      {:type "button" :on {:click [:run]} :title "Run project"}
      (icons/play) "Run"]]])
@@ -531,11 +525,9 @@
   (let [tabs (cond-> [[:files "Files"] [:editor "Edit"]]
                (preview/preview-pane?) (conj [:preview "Preview"])
                true (conj [:repl "REPL"]))]
-    [:nav.mobile-tabs
-     (for [[tab label] tabs]
-       [:button {:class (when (= tab (:mobile-tab state)) "is-active")
-                 :on {:click [:mobile-tab tab]}}
-        label])]))
+    (tabs/tab-list {:class "mobile-tabs" :label "Workspace"
+                    :items (mapv (fn [[id label]] {:id id :label label}) tabs)
+                    :value (:mobile-tab state) :on-change [:mobile-tab]})))
 
 (defn loading-screen []
   [:div.boot
@@ -549,8 +541,10 @@
 
 (defn notice [{:keys [notice]}]
   (when notice
-    [:div.toast {:class (name (:kind notice))}
-     (:text notice)]))
+    (toast/toast {:id (:id notice) :text (:text notice)
+                  :kind (if (= :err (:kind notice)) :error :success)
+                  :class ["toast" (name (:kind notice))] :duration 2800
+                  :on-dismiss [:dismiss-notice (:id notice)]})))
 
 (defn- pane-rail [side]
   (let [files? (= side :files)]
@@ -595,7 +589,7 @@
           (preview-pane state)
           (when-not preview-open? (pane-rail :preview))]))
       (mobile-tabs state)]
-     (when (:help? state) (help-panel state))
+
      (when (= :palette (:via (:pick state)))
        (ui-command/command
         {:open? true

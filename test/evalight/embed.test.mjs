@@ -141,6 +141,8 @@ async function writeLamp(dir) {
     join(dir, "shadow-cljs.edn"),
     `{:source-paths ["src"]\n :dependencies [[no.cjohansen/replicant "2026.07.1"]]\n :dev-http {3456 "public"}\n :node-modules {:managed-by :bun}\n :builds\n {:app {:target :browser\n        :output-dir "public/js"\n        :asset-path "/js"\n        :modules {:main {:init-fn app.core/init}}}}}\n`,
   );
+  await writeFile(join(dir, "src/app/gallery.cljs"),
+    await readFile(join(REPO, "src/evalight/templates/gallery.cljs"), "utf8"));
   await writeFile(join(dir, "src/app/greet.cljs"),
     `(ns app.greet)\n(defn greet [name] (str "Hello, " name "."))\n`);
   await writeFile(
@@ -569,7 +571,7 @@ try {
       };
     });
     assert.equal(helpFit.clipped, false, JSON.stringify(helpFit));
-    await page.click(".help-close");
+    await page.click(".brand");
     console.log("embed.test.mjs ok", dump);
   } finally {
     await browser.close();

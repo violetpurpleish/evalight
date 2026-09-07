@@ -111,6 +111,8 @@ async function writeLamp(dir) {
       `        :asset-path "/js"\n` +
       `        :modules {:main {:init-fn app.core/init}}}}}\n`,
   );
+  await writeFile(join(dir, "src/app/gallery.cljs"),
+    await readFile(join(REPO, "src/evalight/templates/gallery.cljs"), "utf8"));
   await writeFile(join(dir, "src/app/greet.cljs"),
     `(ns app.greet)\n(defn greet [name] (str "Hello, " name "."))\n`);
   await writeFile(

@@ -1,6 +1,7 @@
 (ns app.core
   (:require [app.greet :as greet]
             [app.stats :as stats]
+            [app.gallery :as gallery]
             [replicant.dom :as r]
             [ui.button :as btn]
             [ui.core :as ui]
@@ -19,7 +20,7 @@
                  "Evaluate (stats/record!) — that lives in app.stats."
                  "The controls live in src/ui. Change them, or delete a file you don't want."]}))
 
-(declare bump toggle-about open-rename close-rename save-title retitle)
+(declare render bump toggle-about open-rename close-rename save-title retitle)
 
 (defn view [{:keys [title count notes about? rename?]}]
   [:div.app
@@ -49,6 +50,7 @@
       (dialog/actions
         (btn/button {:type "button" :on {:click (fn [_e] (close-rename))}} "Cancel")
         (btn/button {:variant :primary :type "button" :on {:click (fn [e] (save-title e))}} "Save"))])
+   (gallery/view render)
    [:ul.notes
     (for [n notes]
       [:li n])]])

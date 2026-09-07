@@ -1,6 +1,7 @@
 (ns evalight.template
   (:require [clojure.string :as str]
-            [evalight.kit :as kit]))
+            [evalight.kit :as kit])
+  (:require-macros [evalight.kit.embed :refer [gallery-source]]))
 
 (defn gpui-evalight-edn
   "evalight.edn for a clj-gpui app. Copy into that project's template."
@@ -87,6 +88,9 @@
 (defn readme [project-name]
   (str "# " project-name "\n\n"
        "A ClojureScript project created in Evalight.\n\n"
+       "The starter is a widget gallery. Try the controls in Preview and expand Usage\n"
+       "for snippets. `src/app/gallery.cljs` contains the live examples;\n"
+       "`src/app/core.cljs` demonstrates the counter, popover, and rename dialog.\n\n"
        "Evalight is already in this folder. The rest is a normal project\n"
        "directory: source, shadow-cljs, a README. Keep using this workshop,\n"
        "or open the files in any other editor.\n\n"
@@ -254,6 +258,7 @@
        "  color: var(--muted);\n"
        "}\n"
        ".about-copy { margin: 0; color: var(--muted); line-height: 1.45; font-size: 0.9rem; }\n"
+       ".gallery { margin-top: 2rem; } .example { border-top: 1px solid var(--line); padding: 1.4rem 0; } .example h2 { font-size: 1.1rem; } .example-preview { display: grid; gap: .8rem; margin-bottom: 1rem; } .gallery-row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; } .example pre { overflow: auto; max-width: 100%; font-size: .75rem; line-height: 1.6; } .example .ui-split { min-height: 6rem; } .gallery > .ui-toast { position: fixed; bottom: 1rem; right: 1rem; max-width: calc(100vw - 2rem); z-index: 100; }\n"
        "code { font-family: \"IBM Plex Mono\", ui-monospace, monospace; font-size: 0.92em; color: var(--ink); }\n"))
 
 (defn greet-cljs []
@@ -280,6 +285,7 @@
   (str "(ns app.core\n"
        "  (:require [app.greet :as greet]\n"
        "            [app.stats :as stats]\n"
+       "            [app.gallery :as gallery]\n"
        "            [replicant.dom :as r]\n"
        "            [ui.button :as btn]\n"
        "            [ui.core :as ui]\n"
@@ -296,7 +302,7 @@
        "                 \"Evaluate (bump) in the REPL to touch the live app.\"\n"
        "                 \"Evaluate (stats/record!) — that lives in app.stats.\"\n"
        "                 \"The controls live in src/ui. Change them, or delete a file you don't want.\"]}))\n\n"
-       "(declare bump toggle-about open-rename close-rename save-title retitle)\n\n"
+       "(declare render bump toggle-about open-rename close-rename save-title retitle)\n\n"
        "(defn view [{:keys [title count notes about? rename?]}]\n"
        "  [:div.app\n"
        "   [:p.eyebrow \"Live ClojureScript\"]\n"
@@ -325,6 +331,7 @@
        "      (dialog/actions\n"
        "        (btn/button {:type \"button\" :on {:click (fn [_e] (close-rename))}} \"Cancel\")\n"
        "        (btn/button {:variant :primary :type \"button\" :on {:click (fn [e] (save-title e))}} \"Save\"))])\n"
+       "   (gallery/view render)\n"
        "   [:ul.notes\n"
        "    (for [n notes]\n"
        "      [:li n])]])\n\n"
@@ -394,6 +401,7 @@
       "README.md" (readme name)
       "public/index.html" (public-html name)
       "public/style.css" (public-css)
+      "src/app/gallery.cljs" (gallery-source)
       "src/app/greet.cljs" (greet-cljs)
       "src/app/stats.cljs" (stats-cljs)
       "src/app/core.cljs" (core-cljs name)})))
