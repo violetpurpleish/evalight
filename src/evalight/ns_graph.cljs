@@ -163,35 +163,159 @@
   (when (re-find #"\.(cljs?|cljc)$" (or path ""))
     (let [no-ext (str/replace path #"\.(cljs?|cljc)$" "")
           trimmed (str/replace no-ext #"^src/" "")]
-      (symbol (str/replace trimmed "/" ".")))))
+      (symbol (-> trimmed
+                  (str/replace "/" ".")
+                  (str/replace "_" "-"))))))
 
-(defn- re-quote [s]
-  (str/replace (str s) #"([.*+?^${}()|\[\]\\])" (fn [[_ ch]] (str "\\" ch))))
+(defn- token-boundary? [c]
+  (or (nil? c)
+      (boolean (re-matches #"[\s,()\[\]{}\";@^`~\\]" c))))
 
-(defn rewrite-ns-sym
-  "Replace namespace symbol `from` with `to` inside the first (ns ...) form."
-  [source from to]
-  (let [from (str from)
-        to (str to)]
-    (if (or (str/blank? from) (str/blank? to) (= from to))
+(defn- token-end [source start]
+  (loop [i start]
+    (if (or (>= i (count source)) (token-boundary? (nth source i)))
+      i
+      (recur (inc i)))))
+
+(defn- literal-end
+  "Skip a string or regex body, including escaped quote characters."
+  [source start]
+  (loop [i (inc start) escaped? false]
+    (if (>= i (count source))
+      i
+      (let [c (nth source i)]
+        (cond
+          escaped? (recur (inc i) false)
+          (= c \\) (recur (inc i) true)
+          (= c \") (inc i)
+          :else (recur (inc i) false))))))
+
+(defn- source-tokens [source]
+  (loop [i 0 tokens []]
+    (if (>= i (count source))
+      tokens
+      (let [c (nth source i)
+            [end kind] (cond
+                         (= c \;)
+                         [(loop [end (inc i)]
+                            (if (or (>= end (count source))
+                                    (#{\newline \return} (nth source end)))
+                              end (recur (inc end)))) :skip]
+
+                         (= c \") [(literal-end source i) :literal]
+                         (= c \\) [(token-end source (min (+ i 2) (count source))) :literal]
+                         (#{\( \[ \{} c) [(inc i) :open]
+                         (#{\) \] \}} c) [(inc i) :close]
+                         (#{\' \@ \^ \` \~ \#} c)
+                         [(cond
+                            (str/starts-with? (subs source i) "#?@") (+ i 3)
+                            (and (< (inc i) (count source))
+                                 (#{"#'" "#_" "#?" "#^" "~@"}
+                                  (subs source i (+ i 2)))) (+ i 2)
+                            (and (= c \#) (< (inc i) (count source))
+                                 (not (token-boundary? (nth source (inc i)))))
+                            (token-end source (inc i))
+                            :else (inc i)) :prefix]
+                         (token-boundary? c) [(inc i) :skip]
+                         :else [(token-end source i) (if (= c \:) :keyword :symbol)])]
+        (recur end (cond-> tokens
+                     (not= kind :skip)
+                     (conj {:kind kind :text (subs source i end) :start i :end end})))))))
+
+(declare token-form)
+
+(defn- token-forms [tokens start]
+  (loop [i start nodes []]
+    (if (or (>= i (count tokens)) (= :close (:kind (nth tokens i))))
+      [nodes i]
+      (let [[node end] (token-form tokens i)]
+        (recur end (conj nodes node))))))
+
+(defn- token-form [tokens i]
+  (let [{:keys [kind text] :as token} (nth tokens i)]
+    (case kind
+      :open (let [[children end] (token-forms tokens (inc i))]
+              [(assoc token :children children) (min (inc end) (count tokens))])
+      :prefix (loop [left (if (#{"^" "#^"} text) 2 1) end (inc i) children []]
+                (if (or (zero? left) (>= end (count tokens)))
+                  [(assoc token :children children) end]
+                  (let [[child next] (token-form tokens end)]
+                    (recur (dec left) next (conj children child)))))
+      [token (inc i)])))
+
+(defn- unmeta [node]
+  (if (and (= :prefix (:kind node)) (#{"^" "#^"} (:text node)))
+    (recur (last (:children node)))
+    node))
+
+(defn- namespace-token-context [forms]
+  (let [ns-form (some (fn [node]
+                        (when (and (= "(" (:text node))
+                                   (= "ns" (:text (unmeta (first (:children node))))))
+                          node)) forms)
+        declaration (unmeta (second (:children ns-form)))
+        specs (mapcat (fn [clause]
+                        (when (and (= "(" (:text clause))
+                                   (#{":require" ":require-macros"}
+                                    (:text (first (:children clause)))))
+                          (rest (:children clause))))
+                      (drop 2 (:children ns-form)))
+        lib-name (fn [spec] (unmeta (if (= "[" (:text spec))
+                                      (first (:children spec)) spec)))
+        aliases (mapcat (fn [spec]
+                          (keep (fn [[option value]]
+                                  (when (#{":as" ":as-alias"} (:text option))
+                                    (:text value)))
+                                (partition 2 (rest (:children spec))))) specs)]
+    {:bare-starts (set (keep :start (cons declaration (map lib-name specs))))
+     :aliases (set aliases)}))
+
+(defn- rewrite-symbol-tokens
+  "Rewrite source token positions without reprinting forms or touching literals."
+  [source mapping config?]
+  (let [mapping (into {}
+                      (keep (fn [[from to]]
+                              (let [from (str from) to (str to)]
+                                (when (and (not (str/blank? from))
+                                           (not (str/blank? to)) (not= from to))
+                                  [from to])))) mapping)]
+    (if (or (empty? mapping) (not (string? source)))
       source
-      (if-let [end (ns-form-end source)]
-        (let [pat (re-pattern (str "(?<![A-Za-z0-9*+!?_\\-])"
-                                   (re-quote from)
-                                   "(?![A-Za-z0-9*+!?_\\-.])"))]
-          (str (str/replace (subs source 0 end) pat to)
-               (subs source end)))
-        source))))
+      (let [tokens (source-tokens source)
+            [forms] (token-forms tokens 0)
+            {:keys [bare-starts aliases]} (when-not config? (namespace-token-context forms))
+            edits (keep (fn [{:keys [kind text start end]}]
+                          (when (= :symbol kind)
+                            (let [slash (str/index-of text "/")
+                                  qualifier (when slash (subs text 0 slash))
+                                  replacement (or (when (or config? (contains? bare-starts start))
+                                                    (get mapping text))
+                                                  (when (and slash (not (contains? aliases qualifier)))
+                                                    (when-let [to (get mapping qualifier)]
+                                                      (str to (subs text slash)))))]
+                              (when replacement [start end replacement])))) tokens)]
+        (loop [remaining edits cursor 0 pieces []]
+          (if-let [[start end replacement] (first remaining)]
+            (recur (next remaining) end
+                   (conj pieces (subs source cursor start) replacement))
+            (str/join (conj pieces (subs source cursor)))))))))
 
 (defn rewrite-ns-syms
-  "Apply from→to namespace replacements, longest name first."
+  "Update namespace declarations, requires, and namespace-qualified symbols.
+  Bare local names, aliases, comments, and literal data stay unchanged."
   [source mapping]
-  (reduce (fn [s [from to]]
-            (rewrite-ns-sym s from to))
-          source
-          (->> mapping
-               (remove (fn [[from to]] (= (str from) (str to))))
-               (sort-by (fn [[from]] (- (count (str from))))))))
+  (rewrite-symbol-tokens source mapping false))
+
+(defn rewrite-ns-sym
+  "Update a namespace and references to its vars, preserving source formatting."
+  [source from to]
+  (rewrite-ns-syms source {from to}))
+
+(defn rewrite-config-ns-syms
+  "Update namespace symbols and qualified entry points in EDN configuration.
+  Strings, keywords, comments, and symbols from other namespaces are unchanged."
+  [source mapping]
+  (rewrite-symbol-tokens source mapping true))
 
 (defn ns-name-of
   "Declared ns, or the path guess, or nil."

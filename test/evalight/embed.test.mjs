@@ -454,9 +454,10 @@ try {
     assert.ok(labels.some((t) => /bump/i.test(t)));
     await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
-    await page.keyboard.down("Control");
+    const undoModifier = await page.evaluate(() => /Mac/.test(navigator.platform)) ? "Meta" : "Control";
+    await page.keyboard.down(undoModifier);
     await page.keyboard.press("z");
-    await page.keyboard.up("Control");
+    await page.keyboard.up(undoModifier);
     await page.evaluate(() => {
       const s = document.querySelector(".editor .cm-scroller")
         || document.querySelector(".cm-scroller");
@@ -506,16 +507,16 @@ try {
       "typed QQQ did not appear",
     );
     assert.ok(!typed.startsWith("QQQ"), "QQQ should not land at the start of the file");
-    await page.keyboard.down("Control");
+    await page.keyboard.down(undoModifier);
     await page.keyboard.press("z");
-    await page.keyboard.up("Control");
+    await page.keyboard.up(undoModifier);
     await until(
       async () => {
         const t = await page.$eval(".cm-content", (el) => el.innerText);
         return t.includes("QQQ") ? null : true;
       },
       3000,
-      "Ctrl-Z did not undo QQQ",
+      "Undo shortcut did not undo QQQ",
     );
 
     const liveOn = await page.$(".live input[type=checkbox]");

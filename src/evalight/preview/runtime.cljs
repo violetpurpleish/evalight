@@ -99,7 +99,7 @@
   (if (and (seq (:doc item)) (seq (:arglists item)))
     item
     (try
-      (if-let [v (sci/resolve ctx (symbol (:name item)))]
+      (if-let [v (sci/resolve ctx (symbol (:ns item) (name (symbol (:name item)))))]
         (intel/enrich-live-item item (meta v))
         item)
       (catch :default _
@@ -107,9 +107,12 @@
 
 (defn- collect-intel [ctx ns-name]
   (try
-    (when (and ns-name (sci/eval-string* ctx (str "(find-ns '" ns-name ")")))
-      (sci/eval-string* ctx (str "(in-ns '" ns-name ")")))
-    (let [data (sci/eval-string* ctx intel-form)]
+    ;; SCI restores *ns* after each eval-string* call. Select the namespace
+    ;; in the same evaluation that reads its vars, aliases, and metadata.
+    (let [code (str (when ns-name
+                      (str "(when (find-ns '" ns-name ") (in-ns '" ns-name "))\n"))
+                    intel-form)
+          data (sci/eval-string* ctx code)]
       {:ok true
        :ns (or (:ns data) (str ns-name))
        :items (mapv #(enrich-intel-item ctx %) (:items data))})
@@ -167,7 +170,7 @@
 
       :evalight/eval
       (let [ctx (ensure-ctx)
-            ns-sym @!main
+            ns-sym (or (:ns data) @!main)
             code (if ns-sym
                    (str "(in-ns '" ns-sym ")\n" (:code data))
                    (:code data))

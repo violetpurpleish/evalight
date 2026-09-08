@@ -6,6 +6,7 @@
   (:require [clojure.string :as str]
             [evalight.bytes :as bytes]
             [evalight.fs :as fs]
+            [evalight.ns-graph :as ns-graph]
             [evalight.paths :as paths]
             [evalight.promise :as p]))
 
@@ -142,18 +143,26 @@
     (tree-ops (:dirs entry) (:files entry))
 
     :rename
-    ;; Prefer a pre-rename snapshot so undoing also reverts ns/require
-    ;; rewrites that happened on other files. Older entries only stored
-    ;; the two paths and fall back to a filesystem rename.
-    (if (seq (:files entry))
-      (into [{:op :delete :path (:to entry)}]
-            (tree-ops (:dirs entry) (:files entry)))
-      [{:op :rename :from (:to entry) :to (:from entry)}])
+    ;; Reverse the move, never replace current work with the old snapshot.
+    ;; The action layer also reverses namespace references on current sources.
+    [{:op :rename :from (:to entry) :to (:from entry)}]
 
     :overwrite
     [{:op :write :path (:path entry) :content (or (:content entry) "")}]
 
     []))
+
+(defn reverse-rename-mapping
+  "Recover the inverse namespace mapping, including from older saved entries.
+  Snapshots describe the original rename; they must not overwrite later edits."
+  [{:keys [from to files]}]
+  (into []
+        (keep (fn [[path source]]
+                (when (string? source)
+                  (when-let [[old next] (ns-graph/conventional-move
+                                        path source (paths/remap-under path from to))]
+                    [next old]))))
+        files))
 
 (defn- overlay [path disk overlays]
   (if (contains? overlays path)

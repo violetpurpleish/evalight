@@ -172,7 +172,7 @@ try {
     const lamp = await projects.getDirectoryHandle("lamp");
     const src = await lamp.getDirectoryHandle("src");
     const app = await src.getDirectoryHandle("app");
-    const fh = await app.getFileHandle("greet.cljs");
+    const fh = await app.getFileHandle("gallery.cljs");
     const text = await (await fh.getFile()).text();
     const w = await fh.createWritable();
     await w.write(text + pad);
@@ -196,17 +196,17 @@ try {
     "active-file click jumped scroll " + JSON.stringify(stillCore),
   );
 
-  await openTreeFile(page, "greet.cljs");
-  const greetOpen = await waitScroll(
+  await openTreeFile(page, "gallery.cljs");
+  const galleryOpen = await waitScroll(
     page,
-    (info) => info.path.includes("greet.cljs") && info.top <= 16,
-    "first open of greet.cljs should start at the top",
+    (info) => info.path.includes("gallery.cljs") && info.top <= 16,
+    "first open of gallery.cljs should start at the top",
   );
-  assert.ok(greetOpen.max > 120, "padded greet.cljs should scroll, got " + JSON.stringify(greetOpen));
-  assert.ok(greetOpen.top <= 16, "new file should be at top, got " + JSON.stringify(greetOpen));
+  assert.ok(galleryOpen.max > 120, "padded gallery.cljs should scroll, got " + JSON.stringify(galleryOpen));
+  assert.ok(galleryOpen.top <= 16, "new file should be at top, got " + JSON.stringify(galleryOpen));
 
-  const greetPos = Math.min(360, greetOpen.max - 40);
-  await setScrollTop(page, greetPos);
+  const galleryPos = Math.min(360, galleryOpen.max - 40);
+  await setScrollTop(page, galleryPos);
 
   await openTreeFile(page, "core.cljs");
   const coreBack = await waitScroll(
@@ -219,15 +219,15 @@ try {
     "core.cljs scroll was not restored " + JSON.stringify({ corePos, coreBack }),
   );
 
-  await openTreeFile(page, "greet.cljs");
-  const greetBack = await waitScroll(
+  await openTreeFile(page, "gallery.cljs");
+  const galleryBack = await waitScroll(
     page,
-    (info) => info.path.includes("greet.cljs") && Math.abs(info.top - greetPos) <= 24,
-    "returning to greet.cljs should restore its scroll",
+    (info) => info.path.includes("gallery.cljs") && Math.abs(info.top - galleryPos) <= 24,
+    "returning to gallery.cljs should restore its scroll",
   );
   assert.ok(
-    Math.abs(greetBack.top - greetPos) <= 24,
-    "greet.cljs scroll was not restored " + JSON.stringify({ greetPos, greetBack }),
+    Math.abs(galleryBack.top - galleryPos) <= 24,
+    "gallery.cljs scroll was not restored " + JSON.stringify({ galleryPos, galleryBack }),
   );
 
   console.log("editor scroll chrome: new files start at top, opened files restore");

@@ -87,18 +87,23 @@
   (is (= [{:op :rename :from "b" :to "a"}]
          (history/restore-ops {:kind :rename :from "a" :to "b"}))))
 
-(deftest restore-ops-rename-with-snapshot-deletes-then-restores
+(deftest restore-ops-rename-with-snapshot-preserves-current-files
   (let [ops (history/restore-ops {:kind :rename
                                   :from "src/a.cljs"
                                   :to "src/b.cljs"
                                   :files {"src/a.cljs" "(ns a)"
                                           "src/app/core.cljs" "(ns app.core (:require [a]))"}
-                                  :dirs []})
-        kinds (mapv :op ops)]
-    (is (= :delete (first kinds)))
-    (is (= "src/b.cljs" (:path (first ops))))
-    (is (some #(and (= :write (:op %)) (= "src/a.cljs" (:path %))) ops))
-    (is (some #(and (= :write (:op %)) (= "src/app/core.cljs" (:path %))) ops))))
+                                  :dirs []})]
+    (is (= [{:op :rename :from "src/b.cljs" :to "src/a.cljs"}] ops))))
+
+(deftest reverse-rename-mapping-uses-legacy-snapshot-without-restoring-it
+  (let [entry {:kind :rename :from "src/a.cljs" :to "src/b.cljs"
+               :files {"src/a.cljs" "(ns a)\n(def x 1)"
+                       "src/app/core.cljs" "(ns app.core (:require [a]))"}}
+        restored (first (history/parse (history/stringify [entry])))]
+    (is (= [['b 'a]] (history/reverse-rename-mapping entry)))
+    (is (= [['b 'a]] (history/reverse-rename-mapping restored))))
+  (is (= [] (history/reverse-rename-mapping {:from "a.txt" :to "b.txt"}))))
 
 (deftest restore-ops-overwrite-writes-previous-text
   (is (= [{:op :write :path "src/ui/button.cljs" :content "(ns old)"}]

@@ -105,6 +105,23 @@
      []
      files)))
 
+(def ^:private namespace-configs #{"evalight.edn" "shadow-cljs.edn"})
+
+(defn- rename-sources []
+  (-> (cljs-sources)
+      (.then (fn [sources]
+               (p/reduce-p
+                (fn [acc path]
+                  (.then (fs/exists? (now-fs) path)
+                         (fn [exists]
+                           (if-not exists
+                             acc
+                             (.then (fs/read-file (now-fs) path)
+                                    (fn [source]
+                                      (conj acc {:path path :source (or (editor/text-for path) source)})))))))
+                sources
+                (sort namespace-configs))))))
+
 (defn- write-sources! [files]
   (p/reduce-p
    (fn [_ {:keys [path source]}]
@@ -115,6 +132,15 @@
               nil)))
    nil
    files))
+
+(defn- remap-runtime-names! [mapping]
+  (swap! state/app
+         (fn [s]
+           (cond-> s
+             (get-in s [:repl :ns])
+             (update-in [:repl :ns] ns-graph/rewrite-config-ns-syms mapping)
+             (:app-var s)
+             (update :app-var #(ns-graph/rewrite-config-ns-syms (str %) mapping))))))
 
 (defn- ns-label [file]
   (str (or (ns-graph/ns-name-of file) (:path file))))
@@ -349,27 +375,32 @@
 (defn- repl-err [text]
   (state/repl-entry {:kind :err :text text}))
 
-(defn eval-code! [code _origin]
-  (let [code (str/trim (or code ""))]
-    (if (seq code)
-      (do (repl-in code)
-          (-> (preview/eval-code code)
-              (.then (fn [result]
-                       (when (seq (:stdout result))
-                         (repl-out (:stdout result)))
-                       (if (:ok result)
-                         (do (repl-out (or (:value result) "nil"))
-                             (preview/refresh-intel!)
-                             (schedule-native-frame! 0))
-                         (repl-err (or (get-in result [:error :message])
-                                       "Evaluation failed.")))))
-              (.catch (fn [e]
-                        (repl-err (or (.-message e) (str e)))))))
-      (p/ok nil))))
+(defn eval-code!
+  ([code origin] (eval-code! code origin nil))
+  ([code _origin ns-name]
+   (let [code (str/trim (or code ""))]
+     (if (seq code)
+       (do (repl-in code)
+           (-> (preview/eval-code code ns-name)
+               (.then (fn [result]
+                        (when (seq (:stdout result))
+                          (repl-out (:stdout result)))
+                        (if (:ok result)
+                          (do (repl-out (or (:value result) "nil"))
+                              (preview/refresh-intel!)
+                              (schedule-native-frame! 0))
+                          (repl-err (or (get-in result [:error :message])
+                                        "Evaluation failed.")))))
+               (.catch (fn [e]
+                         (repl-err (or (.-message e) (str e)))))))
+       (p/ok nil)))))
 
 (defn on-editor-eval [code origin]
-  (-> (save-current! {:reload? false})
-      (.then (fn [_] (eval-code! code origin)))))
+  ;; Capture the source namespace before saving: the active tab can change
+  ;; while the asynchronous save is in flight.
+  (let [ns-name (some-> (editor/current-text) ns-graph/parse-ns :name str)]
+    (-> (save-current! {:reload? false})
+        (.then (fn [_] (eval-code! code origin ns-name))))))
 
 (defn on-preview-event [data]
   (let [typ (keyword (:type data))]
@@ -633,7 +664,9 @@
                        (seed-lamp!))))
             (.then (fn [_] (flash! (str "Deleted " name)))))))))
 
-(defn rename-path! [from to]
+(defn rename-path!
+  ([from to] (rename-path! from to {}))
+  ([from to {:keys [record? mapping] :or {record? true}}]
   (let [to (paths/normalize to)]
     (if (or (str/blank? to) (= from to))
       (p/ok (swap! state/app assoc :dialog nil))
@@ -642,7 +675,7 @@
           (.then (fn [exists]
                    (when exists
                      (throw (js/Error. (str to " already exists."))))
-                   (p/all [(cljs-sources)
+                   (p/all [(rename-sources)
                            (history/snapshot-path (now-fs) from (editor/buffer-texts))])))
           (.then (fn [pair]
                    (let [files (aget pair 0)
@@ -658,12 +691,16 @@
                                                   (assoc f :path (paths/remap-under (:path f) from to)
                                                          :from-path (:path f)))
                                                 files)
-                                    mapping (into []
+                                    mapping (or mapping (into []
                                                   (keep (fn [{:keys [from-path path source]}]
                                                           (ns-graph/conventional-move from-path source path)))
-                                                  moved)
+                                                  moved))
                                     rewritten (mapv (fn [f]
-                                                      (assoc f :source (ns-graph/rewrite-ns-syms (:source f) mapping)))
+                                                      (assoc f :source
+                                                             ((if (namespace-configs (:path f))
+                                                                ns-graph/rewrite-config-ns-syms
+                                                                ns-graph/rewrite-ns-syms)
+                                                              (:source f) mapping)))
                                                     moved)
                                     changed (filterv (fn [f]
                                                        (let [old (first (filter #(= (:path %) (:path f)) moved))]
@@ -682,7 +719,8 @@
                                                                   (update snap :files merge extra)))]
                                 (.then (write-sources! changed)
                                        (fn [_]
-                                         (record-entry! entry)
+                                         (remap-runtime-names! mapping)
+                                         (when record? (record-entry! entry))
                                          (.then (refresh-tree!)
                                                 (fn [_]
                                                   (reload-after-files!)
@@ -700,7 +738,7 @@
                                                     (seq others)
                                                     (flash! (str "Updated " (format-ns-names others)
                                                                  " after the rename."))
-                                                    :else nil)))))))))))))))
+                                                    :else nil))))))))))))))))
 
 (defn toggle-expanded! [path]
   (swap! state/app update :expanded
@@ -810,23 +848,9 @@
 (defn- after-restore! [entry]
   (case (:kind entry)
     :rename
-    (do (if (seq (:files entry))
-          (do (editor/drop-tree! (:to entry))
-              (doseq [[path content] (:files entry)]
-                (when-not (paths/starts-with-path? path (or (:from entry) ""))
-                  (editor/set-doc! path content)))
-              (when-let [active (:active-file @state/app)]
-                (when (paths/starts-with-path? active (:to entry))
-                  (let [restored (if (= active (:to entry))
-                                   (:from entry)
-                                   (paths/remap-under active (:to entry) (:from entry)))]
-                    (swap! state/app assoc :active-file restored)
-                    (open-file! restored)))))
-          (do (editor/rename-path! (:to entry) (:from entry))
-              (when (= (:to entry) (:active-file @state/app))
-                (swap! state/app assoc :active-file (:from entry)))))
-        (when-let [parent (paths/dirname (:from entry))]
-          (swap! state/app update :expanded conj parent)))
+    ;; rename-path! already moved the live buffers and rewrote current sources.
+    (when-let [parent (paths/dirname (:from entry))]
+      (swap! state/app update :expanded conj parent))
 
     :overwrite
     (let [path (:path entry)
@@ -856,16 +880,21 @@
   (let [entry (some #(when (= id (:id %)) %) (:history @state/app))]
     (if-not entry
       (p/ok (flash! "That history entry is gone." :err))
-      (-> (restore-blocked? entry)
+      (-> (save-current! {:reload? false})
+          (.then (fn [_] (restore-blocked? entry)))
           (.then (fn [blocked]
                    (if blocked
                      (flash! (str "Cannot undo. "
                                   (or (:path entry) (:from entry))
                                   " is in the way.")
                              :err)
-                     (-> (p/reduce-p (fn [_ op] (apply-restore-op! op))
-                                     nil
-                                     (history/restore-ops entry))
+                     (-> (if (= :rename (:kind entry))
+                           (rename-path! (:to entry) (:from entry)
+                                         {:record? false
+                                          :mapping (history/reverse-rename-mapping entry)})
+                           (p/reduce-p (fn [_ op] (apply-restore-op! op))
+                                       nil
+                                       (history/restore-ops entry)))
                          (.then (fn [_] (after-restore! entry)))))))))))
 
 (defn undo-last! []

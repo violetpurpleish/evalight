@@ -11,11 +11,23 @@ import {
   collectDistributed,
   licenseAllowed,
   loadAllowlist,
+  runtimeVersionsFromClasspath,
 } from "../../scripts/licenses.mjs";
 import { fallbackManifest, packEvalight } from "../../scripts/evalight-pack.mjs";
 
 const root = join(import.meta.dir, "../..");
 const allow = new Set(loadAllowlist(root).allowed);
+
+assert.deepEqual(runtimeVersionsFromClasspath(`
+{:dependencies [[org.clojure/clojurescript "1.11.60"]]
+ :files ["/maven/org/clojure/clojurescript/1.11.132/clojurescript-1.11.132.jar"
+         "/maven/org/clojure/google-closure-library/0.0-20230227-c7c0a541/google-closure-library-0.0-20230227-c7c0a541.jar"]}
+`), {
+  "org.clojure/clojurescript": "1.11.132",
+  "org.clojure/google-closure-library": "0.0-20230227-c7c0a541",
+}, "license versions come from resolved jars, including Shadow's Closure override");
+assert.deepEqual(runtimeVersionsFromClasspath("{:files []}"), {},
+  "missing classpath artifacts are not guessed from unrelated installed versions");
 
 assert.equal(licenseAllowed("MIT", allow), true);
 assert.equal(licenseAllowed("EPL-2.0", allow), true);

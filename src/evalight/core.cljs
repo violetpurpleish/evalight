@@ -24,8 +24,16 @@
                             :text (fn [button]
                                     (when (.querySelector button "svg")
                                       (let [copy (.cloneNode button true)]
-                                        (doseq [node (array-seq (.querySelectorAll copy "svg, .history-count"))]
-                                          (.remove node))
+                                        ;; Inspect the attached elements: clone textContent
+                                        ;; includes labels hidden by responsive CSS.
+                                        (doseq [[node clone] (map vector
+                                                                 (array-seq (.querySelectorAll button "*"))
+                                                                 (array-seq (.querySelectorAll copy "*")))]
+                                          (let [style (.getComputedStyle js/window node)]
+                                            (when (or (.matches node "svg, .history-count")
+                                                      (= "none" (.-display style))
+                                                      (= "hidden" (.-visibility style)))
+                                              (.remove clone))))
                                         (when (str/blank? (.-textContent copy))
                                           (.-title button)))))}))
     (r/set-dispatch! actions/handle)

@@ -49,7 +49,12 @@ try {
     const ws = await root.getDirectoryHandle("evalight");
     const projects = await ws.getDirectoryHandle("projects");
     const project = await projects.getDirectoryHandle("lamp");
-    try { return await (await (await project.getFileHandle(name)).getFile()).text(); }
+    try {
+      const parts = name.split('/');
+      let dir = project;
+      for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
+      return await (await (await dir.getFileHandle(parts.at(-1))).getFile()).text();
+    }
     catch (e) { if (e.name === "NotFoundError") return null; throw e; }
   }, name);
   const rowAction = async (name, selector = ".tree-item") => {
@@ -74,6 +79,16 @@ try {
   const submitPath = async (path) => {
     await page.waitForSelector(".ui-dialog input");
     await page.$eval(".ui-dialog input", (el, path) => { el.value = path; el.closest("form").requestSubmit(); }, path);
+  };
+  const undoRename = async () => {
+    await page.click('[aria-label="History"]');
+    await page.waitForSelector('.history-item');
+    await page.evaluate(() => {
+      const row = [...document.querySelectorAll('.history-item')].find(el => el.querySelector('.history-label')?.textContent.startsWith('Renamed'));
+      [...row.querySelectorAll('button')].find(el => el.textContent.trim() === 'Undo').click();
+    });
+    await page.waitForFunction(() => ![...document.querySelectorAll('.history-label')].some(el => el.textContent.startsWith('Renamed')));
+    await page.click('[aria-label="History"]');
   };
 
   await open("notes-a.txt");
@@ -104,6 +119,28 @@ try {
   await new Promise(resolve => setTimeout(resolve, 450));
   assert.equal(await read("notes-a.txt"), null, "pending autosave must not recreate renamed file");
   assert.equal(await read("notes-renamed.txt"), "original A saved before switch before rename");
+  await append(" after rename");
+  await undoRename(); // Undo before autosave; it must preserve the current buffer.
+  await open('notes-a.txt');
+  assert.equal(await read('notes-a.txt'), 'original A saved before switch before rename after rename');
+  assert.equal(await read('notes-renamed.txt'), null);
+  assert.match(await page.$eval('.cm-content', el => el.textContent), /after rename/);
+
+  // Saved history must behave the same after reloading the workshop.
+  await rowAction('notes-a.txt', '[aria-label="Rename"]');
+  await submitPath('notes-renamed.txt');
+  await page.waitForFunction(() => document.querySelector('.file-path')?.textContent.includes('notes-renamed.txt'));
+  await append(' saved later');
+  await open('notes-b.txt');
+  await page.reload();
+  await page.waitForSelector('.cm-content');
+  await undoRename();
+  assert.equal(await read('notes-a.txt'), 'original A saved before switch before rename after rename saved later');
+  assert.equal(await read('notes-renamed.txt'), null);
+  await open('notes-a.txt');
+  await rowAction('notes-a.txt', '[aria-label="Rename"]');
+  await submitPath('notes-renamed.txt');
+  await page.waitForFunction(() => document.querySelector('.file-path')?.textContent.includes('notes-renamed.txt'));
   await append(" before delete");
   await rowAction("notes-renamed.txt", '[aria-label="Delete"]');
   await page.waitForSelector(".ui-dialog");
@@ -111,7 +148,47 @@ try {
   await page.waitForFunction(() => ![...document.querySelectorAll(".tree-name")].some(el => el.textContent === "notes-renamed.txt"));
   await new Promise(resolve => setTimeout(resolve, 450));
   assert.equal(await read("notes-renamed.txt"), null, "pending autosave must not recreate deleted file");
-  console.log("file-safety: rapid switch, create/rename collisions, and pending-save rename/delete passed");
+  // Entry-point renames update config, fully qualified consumers, and their undo.
+  await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    const ws = await root.getDirectoryHandle('evalight');
+    const project = await (await ws.getDirectoryHandle('projects')).getDirectoryHandle('lamp');
+    const app = await (await project.getDirectoryHandle('src')).getDirectoryHandle('app');
+    const file = await app.getFileHandle('consumer.cljs', {create:true});
+    const writer = await file.createWritable();
+    await writer.write('(ns app.consumer (:require [app.core]))\n(defn consume [] (app.core/bump))\n');
+    await writer.close();
+  });
+  await page.reload();
+  await page.waitForSelector('.cm-content');
+  await rowAction('core.cljs', '[aria-label="Rename"]');
+  await submitPath('src/app/main.cljs');
+  await page.waitForFunction(() => document.querySelector('.file-path')?.textContent.includes('main.cljs'));
+  // Wait for rewrite completion, not just the early active-file update.
+  await page.waitForFunction(() => document.querySelector('.toast')?.textContent.includes('app.core is now app.main'));
+  assert.match(await read('evalight.edn'), /:main app\.main/);
+  assert.match(await read('shadow-cljs.edn'), /:init-fn app\.main\/init/);
+  assert.match(await read('src/app/consumer.cljs'), /\(app\.main\/bump\)/);
+  await open('consumer.cljs');
+  await append('\n;; later consumer edit\n');
+  await open('main.cljs');
+  await append('\n;; later main edit\n');
+  // Undo latest rename only (the deleted text file has an older rename entry).
+  await page.click('[aria-label="History"]');
+  await page.waitForSelector('.history-item');
+  await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.history-item')].find(el => el.querySelector('.history-label')?.textContent.includes('src/app/main.cljs'));
+    [...row.querySelectorAll('button')].find(el => el.textContent.trim() === 'Undo').click();
+  });
+  await page.waitForFunction(() => document.querySelector('.file-path')?.textContent.includes('core.cljs'));
+  await page.waitForFunction(() => document.querySelector('.toast')?.textContent.includes('Restored src/app/core.cljs'));
+  assert.match(await read('evalight.edn'), /:main app\.core/);
+  assert.match(await read('shadow-cljs.edn'), /:init-fn app\.core\/init/);
+  assert.match(await read('src/app/consumer.cljs'), /\(app\.core\/bump\)/);
+  assert.match(await read('src/app/consumer.cljs'), /later consumer edit/);
+  assert.match(await read('src/app/core.cljs'), /later main edit/);
+  assert.equal(await read('src/app/main.cljs'), null);
+  console.log("file-safety: collisions, saves, rename/delete, undo preservation, and namespace/config rewrites passed");
 } finally {
   await browser?.close();
   server.stop(true);

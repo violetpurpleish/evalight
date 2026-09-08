@@ -369,42 +369,6 @@ function jarLicenseText(jar) {
   return unzipEntry(jar, prefer);
 }
 
-function parseEdnDeps(root) {
-  const edn = readFileSync(join(root, "deps.edn"), "utf8");
-  const deps = {};
-  for (const m of edn.matchAll(/([a-z0-9_.-]+\/[a-z0-9_.-]+)\s+\{:mvn\/version\s+"([^"]+)"\}/g)) {
-    deps[m[1]] = m[2];
-  }
-  return deps;
-}
-
-function pomCompileDeps(coord, version) {
-  const pom = join(mavenDir(coord, version), `${coord.split("/")[1]}-${version}.pom`);
-  if (!existsSync(pom)) return [];
-  const text = readFileSync(pom, "utf8");
-  const out = [];
-  const re = /<dependency>[\s\S]*?<\/dependency>/g;
-  let m;
-  while ((m = re.exec(text))) {
-    const block = m[0];
-    if (/<scope>\s*(test|provided)\s*<\/scope>/.test(block)) continue;
-    const g = (block.match(/<groupId>([^<]+)<\/groupId>/) || [])[1];
-    const a = (block.match(/<artifactId>([^<]+)<\/artifactId>/) || [])[1];
-    const v = (block.match(/<version>([^<]+)<\/version>/) || [])[1];
-    if (g && a && v) out.push({ coord: `${g}/${a}`, version: v });
-  }
-  return out;
-}
-
-function installedMavenVersion(coord) {
-  const [group, artifact] = coord.split("/");
-  const dir = join(mavenRepo(), ...group.split("."), artifact);
-  if (!existsSync(dir)) return null;
-  const versions = readdirSync(dir).filter((v) => existsSync(join(dir, v, `${artifact}-${v}.jar`)) || existsSync(join(dir, v, `${artifact}-${v}.pom`)));
-  versions.sort();
-  return versions.at(-1) || null;
-}
-
 const CLOJURE_RUNTIME = [
   "no.cjohansen/replicant",
   "org.babashka/sci",
@@ -414,27 +378,31 @@ const CLOJURE_RUNTIME = [
   "org.clojure/google-closure-library",
 ];
 
+// Read the jars Shadow actually resolved, not the newest-looking directory in
+// the shared Maven cache (lexical ordering even puts 1.11.60 after 1.11.132).
+export function runtimeVersionsFromClasspath(classpath) {
+  const files = classpath.match(/:files\s+\[([^\]]*)\]/)?.[1] || "";
+  const versions = {};
+  for (const match of files.matchAll(/"(?:[^"\\]|\\.)*"/g)) {
+    const file = JSON.parse(match[0]).replaceAll("\\", "/");
+    for (const coord of CLOJURE_RUNTIME) {
+      const [group, artifact] = coord.split("/");
+      const prefix = `/${group.replaceAll(".", "/")}/${artifact}/`;
+      const start = file.lastIndexOf(prefix);
+      if (start < 0) continue;
+      const [version, jar] = file.slice(start + prefix.length).split("/");
+      if (jar === `${artifact}-${version}.jar`) versions[coord] = version;
+    }
+  }
+  return versions;
+}
+
 function collectClojure(root) {
-  const deps = parseEdnDeps(root);
-  const versions = { ...deps };
-  if (deps["org.babashka/sci"]) {
-    for (const d of pomCompileDeps("org.babashka/sci", deps["org.babashka/sci"])) {
-      if (CLOJURE_RUNTIME.includes(d.coord)) versions[d.coord] = d.version;
-    }
+  const classpath = join(root, ".shadow-cljs/classpath.edn");
+  if (!existsSync(classpath)) {
+    throw new Error("Missing resolved Shadow classpath. Run a shadow-cljs compile before collecting licenses.");
   }
-  if (!versions["org.clojure/clojurescript"]) {
-    const v = installedMavenVersion("org.clojure/clojurescript");
-    if (v) versions["org.clojure/clojurescript"] = v;
-  }
-  if (versions["org.clojure/clojurescript"]) {
-    for (const d of pomCompileDeps("org.clojure/clojurescript", versions["org.clojure/clojurescript"])) {
-      if (d.coord === "org.clojure/google-closure-library") versions[d.coord] = d.version;
-    }
-  }
-  if (!versions["org.clojure/google-closure-library"]) {
-    const v = installedMavenVersion("org.clojure/google-closure-library");
-    if (v) versions["org.clojure/google-closure-library"] = v;
-  }
+  const versions = runtimeVersionsFromClasspath(readFileSync(classpath, "utf8"));
 
   const pkgs = [];
   for (const coord of CLOJURE_RUNTIME) {

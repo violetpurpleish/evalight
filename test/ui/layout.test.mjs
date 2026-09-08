@@ -243,6 +243,15 @@ try {
     await page.$eval(".project-actions-trigger", button => document.activeElement === button));
 
   await page.focus("[aria-label='Command palette']");
+  check("labeled desktop tools do not duplicate their label in a tooltip",
+    await page.$eval("#workshop-icon-tooltip", tip => !tip.matches(":popover-open")));
+  await page.setViewport({ width: 768, height: 900 });
+  // Resize dismisses tooltips. Wait for the browser to deliver that event
+  // before focusing the now icon-only control.
+  await page.evaluate(() => new Promise(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.$eval("[aria-label='Command palette']", button => button.blur());
+  await page.focus("[aria-label='Command palette']");
   await waitForUI(page, () => {
     const tip = document.querySelector("#workshop-icon-tooltip");
     return tip?.matches(":popover-open") && tip.textContent === "Command palette (Ctrl+K)";
@@ -262,6 +271,7 @@ try {
   }));
   await page.mouse.move(1, 1);
   await waitForUI(page, () => !document.querySelector("#workshop-icon-tooltip")?.matches(":popover-open"));
+  await page.setViewport({ width: 1440, height: 900 });
 
   // Every workshop popover uses the kit component and the same outside-click
   // behavior. An outside toolbar action must still receive its original click.

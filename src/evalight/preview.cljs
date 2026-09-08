@@ -277,13 +277,16 @@
           (compiled-runtime?) "app.core"
           :else "user"))))
 
-(defn eval-code [code]
-  (if (nrepl-runtime?)
-    (runtime-json "/api/runtime/eval" {:code code :ns (eval-ns)})
-    (let [id (next-id)
-          p (wait-for id)]
-      (send {:type "evalight/eval" :id id :code code})
-      p)))
+(defn eval-code
+  ([code] (eval-code code nil))
+  ([code ns-name]
+   (if (nrepl-runtime?)
+     (runtime-json "/api/runtime/eval" {:code code :ns (or ns-name (eval-ns))})
+     (let [id (next-id)
+           p (wait-for id)]
+       (send (cond-> {:type "evalight/eval" :id id :code code}
+               ns-name (assoc :ns ns-name)))
+       p))))
 
 (defn fetch-frame!
   "Ask local Evalight for a PNG of the GPUI window, if the image provides one."

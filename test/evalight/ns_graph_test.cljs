@@ -107,3 +107,76 @@
              "src/app/greet.cljs"
              "(ns weird.custom)\n"
              "src/app/hello.cljs"))))
+
+(deftest rewrite-namespace-references-preserves-literals-and-boundaries
+  (let [source (str "; (ns app.greet) and app.greet/answer stay in the comment\n"
+                    "(ns app.core\n"
+                    "  \"Documentation mentions app.greet and \\\"app.greet/answer\\\".\"\n"
+                    "  (:require [app.greet :as g] [app.greet.extra :as extra]))\n"
+                    "(app.greet/answer) #'app.greet/answer 'app.greet/answer\n"
+                    "[app.greet.extra/answer other.app.greet/answer g/answer app.greet']\n"
+                    "[:app.greet/answer ::app.greet/answer \"app.greet/answer\" #\"app.greet/answer\"]\n"
+                    "[\\; \\\" \\newline] app.greet/answer\n")
+        expected (str "; (ns app.greet) and app.greet/answer stay in the comment\n"
+                      "(ns app.core\n"
+                      "  \"Documentation mentions app.greet and \\\"app.greet/answer\\\".\"\n"
+                      "  (:require [app.hello :as g] [app.greet.extra :as extra]))\n"
+                      "(app.hello/answer) #'app.hello/answer 'app.hello/answer\n"
+                      "[app.greet.extra/answer other.app.greet/answer g/answer app.greet']\n"
+                      "[:app.greet/answer ::app.greet/answer \"app.greet/answer\" #\"app.greet/answer\"]\n"
+                      "[\\; \\\" \\newline] app.hello/answer\n")]
+    (is (= expected (ns-graph/rewrite-ns-sym source 'app.greet 'app.hello)))))
+
+(deftest rewrite-namespaces-is-simultaneous-and-reversible
+  (let [source "(ns app.a (:require [app.b :as b] [app.a.extra :as x]))\n[app.a/f app.b/f app.a.extra/f]"
+        mapping {'app.a 'app.b 'app.b 'app.c 'app.a.extra 'app.b.extra}
+        rewritten (ns-graph/rewrite-ns-syms source mapping)]
+    (is (= "(ns app.b (:require [app.c :as b] [app.b.extra :as x]))\n[app.b/f app.c/f app.b.extra/f]"
+           rewritten))
+    (is (= source (ns-graph/rewrite-ns-syms rewritten
+                                          {'app.b 'app.a 'app.c 'app.b 'app.b.extra 'app.a.extra})))
+    (is (= source (ns-graph/rewrite-ns-syms source {nil 'app.invalid 'app.a ""}))))
+  (is (= "(app.hello/answer)"
+         (ns-graph/rewrite-ns-sym "(app.greet/answer)" 'app.greet 'app.hello))))
+
+(deftest renamed-fully-qualified-calls-can-reload
+  (let [mapping {'app.helper 'app.utility}
+        helper (ns-graph/rewrite-ns-syms "(ns app.helper) (defn answer [] 42)" mapping)
+        core (ns-graph/rewrite-ns-syms
+              "(ns app.core (:require [app.helper :as helper])) (app.helper/answer)"
+              mapping)
+        ctx (sci/init {})]
+    (sci/eval-string* ctx helper)
+    (is (= 42 (sci/eval-string* ctx core)))))
+
+(deftest rewrite-config-entry-points-preserves-formatting
+  (let [mapping {'app.core 'app.main}]
+    (is (= "{:name \"app.core\", :main app.main ; app.core stays in comment\n :preview :browser}"
+           (ns-graph/rewrite-config-ns-syms
+            "{:name \"app.core\", :main app.core ; app.core stays in comment\n :preview :browser}"
+            mapping)))
+    (is (= "{:builds {:app {:modules {:main {:init-fn app.main/init}}\n :devtools {:after-load app.main/reload} :entries [app.main app.core.extra]}}}"
+           (ns-graph/rewrite-config-ns-syms
+            "{:builds {:app {:modules {:main {:init-fn app.core/init}}\n :devtools {:after-load app.core/reload} :entries [app.core app.core.extra]}}}"
+            mapping)))))
+
+(deftest conventional-move-understands-munged-clojure-paths
+  (is (= 'app.my-helper (ns-graph/path->ns "src/app/my_helper.cljs")))
+  (is (= ['app.my-helper 'app.new-helper]
+         (ns-graph/conventional-move "src/app/my_helper.cljs"
+                                     "(ns app.my-helper)"
+                                     "src/app/new_helper.cljs"))))
+
+(deftest namespace-renames-preserve-local-names-and-aliases
+  (is (= "(ns b)\n(def a 1) (let [a 2] a) (b/f)"
+         (ns-graph/rewrite-ns-sym "(ns a)\n(def a 1) (let [a 2] a) (a/f)" 'a 'b)))
+  (is (= "(ns core (:require [b :as a :refer [a]]))\n(def a 1) (let [a 2] a) (a/f)"
+         (ns-graph/rewrite-ns-sym
+          "(ns core (:require [a :as a :refer [a]]))\n(def a 1) (let [a 2] a) (a/f)"
+          'a 'b)))
+  (is (= "(ns ^{:doc \"a\"} b (:require [other :as a]) (:refer-clojure :exclude [a]))\n(def a 1) (a/f)"
+         (ns-graph/rewrite-ns-sym
+          "(ns ^{:doc \"a\"} a (:require [other :as a]) (:refer-clojure :exclude [a]))\n(def a 1) (a/f)"
+          'a 'b)))
+  (is (= "{:main b :init-fn b/f}"
+         (ns-graph/rewrite-config-ns-syms "{:main a :init-fn a/f}" {'a 'b}))))
