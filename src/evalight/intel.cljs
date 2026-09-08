@@ -151,3 +151,57 @@
                    :boost (if (= "var" (:kind it)) 1 0)}
             (seq doc) (assoc :info doc)))
         (candidates prefix)))
+
+;; Def aliases retain function identity but do not inherit the source Var metadata.
+;; Index only function values, and preserve each alias's explicit metadata.
+(def sci-intel-form
+  "(let [n (ns-name *ns*)
+         interned (try (ns-interns n) (catch :default _ {}))
+         referred (try (ns-refers n) (catch :default _ {}))
+         aliases (try (ns-aliases n) (catch :default _ {}))
+         nss (try (all-ns) (catch :default _ []))
+         function-meta
+         (reduce (fn [index v]
+                   (try
+                     (let [value @v
+                           m (meta v)]
+                       (if (and (fn? value) (seq (:arglists m)))
+                         (update index value
+                                 (fn [old]
+                                   (merge old (into {} (filter (fn [[_ value]] (seq value))
+                                                              (select-keys m [:doc :arglists]))))))
+                         index))
+                     (catch :default _ index)))
+                 {} (mapcat (fn [n] (vals (ns-interns n))) nss))
+         pack (fn [s v kind]
+                (let [own (or (meta v) {})
+                      inherited (try (get function-meta @v) (catch :default _ nil))
+                      m (reduce (fn [m k]
+                                  (if (seq (get m k)) m
+                                    (assoc m k (get inherited k))))
+                                own [:doc :arglists])]
+                  {:name (str s)
+                   :kind kind
+                   :ns (str (or (:ns m) n))
+                   :arglists (when-let [a (:arglists m)] (pr-str a))
+                   :doc (:doc m)
+                   :macro (boolean (:macro m))}))]
+     {:ns (str n)
+      :items
+      (vec
+       (concat
+        (map (fn [[s v]] (pack s v \"var\")) interned)
+        (keep (fn [[s v]]
+                (when-not (contains? interned s)
+                  (pack s v \"core\")))
+              referred)
+        (mapcat
+         (fn [[a t]]
+           (let [target (try (ns-interns t) (catch :default _ {}))
+                 nsn (str (try (ns-name t) (catch :default _ a)))]
+             (cons {:name (str a) :kind \"alias\" :ns nsn}
+                   (map (fn [[s v]]
+                          (assoc (pack s v \"var\") :name (str a \"/\" s)))
+                        target))))
+         aliases)
+        (map (fn [x] {:name (str (ns-name x)) :kind \"ns\"}) nss)))})")

@@ -117,6 +117,24 @@ try {
   await page.waitForSelector('.cm-evalight-doc pre');
   assert.match(await page.$eval('.cm-evalight-doc pre', el => el.textContent), /Same as/);
   await page.mouse.move(1,1);
+  await page.$$eval('.tree-row', rows => rows.find(row => row.querySelector('.tree-name')?.textContent === 'gallery.cljs').querySelector('.tree-item').click());
+  await page.waitForFunction(() => document.querySelector('.file-path')?.textContent.includes('gallery.cljs'));
+  await page.click('.cm-content');
+  await page.keyboard.down(process.platform === 'darwin' ? 'Meta' : 'Control');
+  await page.keyboard.press('f');
+  await page.keyboard.up(process.platform === 'darwin' ? 'Meta' : 'Control');
+  await page.waitForSelector('.cm-search input');
+  await page.type('.cm-search input', 'ui/dialog');
+  await page.keyboard.press('Escape');
+  const dialogBox = await page.$$eval('.cm-content span', spans => {
+    const el = spans.find(el => el.textContent === 'ui/dialog');
+    const r = el.getBoundingClientRect(); return {x:r.x + r.width / 2, y:r.y + r.height / 2};
+  });
+  await page.mouse.move(dialogBox.x, dialogBox.y);
+  await page.waitForSelector('.cm-evalight-doc pre');
+  assert.match(await page.$eval('.cm-evalight-doc', el => el.textContent), /Modal overlay/);
+  assert.match(await page.$eval('.cm-evalight-doc', el => el.textContent), /children/);
+  await page.mouse.move(1,1);
   for (const width of [320, 390]) {
     await page.setViewport({width, height: 740});
     for (const [trigger, panel] of [['.beta-badge', '.beta-pop .ui-popover-panel'], ['[aria-label="Help"]', '.help-popover-panel']]) {

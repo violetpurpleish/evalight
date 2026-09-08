@@ -61,40 +61,6 @@
            :error (error->map e)
            :stdout @out})))))
 
-(def ^:private intel-form
-  "(let [n (ns-name *ns*)
-         interned (try (ns-interns n) (catch :default _ {}))
-         referred (try (ns-refers n) (catch :default _ {}))
-         aliases (try (ns-aliases n) (catch :default _ {}))
-         nss (try (all-ns) (catch :default _ []))
-         pack (fn [s v kind]
-                (let [m (or (meta v) {})]
-                  {:name (str s)
-                   :kind kind
-                   :ns (str (or (:ns m) n))
-                   :arglists (when-let [a (:arglists m)] (pr-str a))
-                   :doc (:doc m)
-                   :macro (boolean (:macro m))}))]
-     {:ns (str n)
-      :items
-      (vec
-       (concat
-        (map (fn [[s v]] (pack s v \"var\")) interned)
-        (keep (fn [[s v]]
-                (when-not (contains? interned s)
-                  (pack s v \"core\")))
-              referred)
-        (mapcat
-         (fn [[a t]]
-           (let [target (try (ns-interns t) (catch :default _ {}))
-                 nsn (str (try (ns-name t) (catch :default _ a)))]
-             (cons {:name (str a) :kind \"alias\" :ns nsn}
-                   (map (fn [[s v]]
-                          (assoc (pack s v \"var\") :name (str a \"/\" s)))
-                        target))))
-         aliases)
-        (map (fn [x] {:name (str (ns-name x)) :kind \"ns\"}) nss)))})")
-
 (defn- enrich-intel-item [ctx item]
   (if (and (seq (:doc item)) (seq (:arglists item)))
     item
@@ -111,7 +77,7 @@
     ;; in the same evaluation that reads its vars, aliases, and metadata.
     (let [code (str (when ns-name
                       (str "(when (find-ns '" ns-name ") (in-ns '" ns-name "))\n"))
-                    intel-form)
+                    intel/sci-intel-form)
           data (sci/eval-string* ctx code)]
       {:ok true
        :ns (or (:ns data) (str ns-name))

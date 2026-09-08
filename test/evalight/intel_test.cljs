@@ -92,3 +92,22 @@
     (is (re-find #"Same as" (:doc item)))
     (is (= "([name doc-string? attr-map? [params*] prepost-map? body])"
            (:arglists item)))))
+
+(deftest sci-function-reexports-inherit-docs-and-parameters
+  (let [ctx (sci/init {})
+        _ (sci/eval-string* ctx
+            "(ns original)
+             (defn dialog \"Show a modal.\" [props & children] nil)
+             (ns facade (:require [original :as original]))
+             (def dialog original/dialog)
+             (def custom \"Custom documentation.\" original/dialog)
+             (def plain nil)
+             (ns consumer (:require [facade :as ui]))")
+        data (sci/eval-string* ctx (str "(in-ns 'consumer)\n" intel/sci-intel-form))
+        items (into {} (map (juxt :name identity) (:items data)))
+        dialog (get items "ui/dialog")]
+    (is (= "Show a modal." (:doc dialog)))
+    (is (= "([props & children])" (:arglists dialog)))
+    (is (= "facade" (:ns dialog)))
+    (is (= "Custom documentation." (:doc (get items "ui/custom"))))
+    (is (nil? (:doc (get items "ui/plain"))))))
