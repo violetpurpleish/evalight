@@ -121,7 +121,7 @@ native-window preview pane; other Clojure projects get the editor and
 REPL with Preview hidden. The hosted playground stays ClojureScript.
 
 See [docs/clojure-support.md](docs/clojure-support.md). To put Evalight
-next to a [clj-gpui](https://github.com/gitwyrm/clj-gpui) template:
+next to a [clj-gpui](https://github.com/violetpurpleish/clj-gpui) template:
 
 ```clojure
 ;; evalight.edn

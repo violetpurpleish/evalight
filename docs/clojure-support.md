@@ -151,4 +151,4 @@ wrong interpreter for real Clojure.
 - SCI eval of `.clj` in the playground.
 - A second interpreter, LSP, or generic IDE.
 - Embedding a native window in Chromium.
-- Changing clj-gpui itself (that is a follow-up in gitwyrm/clj-gpui).
+- Changing clj-gpui itself (that is a follow-up in violetpurpleish/clj-gpui).

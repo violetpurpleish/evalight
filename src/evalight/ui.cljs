@@ -109,6 +109,9 @@
         [:p.muted "These files are on disk. Preview is the compiled app (shadow-cljs watch), the same heap Ctrl-Enter talks to. You need Bun, a JDK, and `bun install` once. SCI is only used on the hosted playground. Live reloads that preview after you save; off keeps the current page. `bun run evalight --attach` joins a watch you already started instead of starting one."])
       [:p.muted "Projects live in this browser and run in SCI. Export ZIP downloads them plus Evalight. Unzip and `bun run evalight` to compile for real and keep this workshop. JVM Clojure and clj-gpui need local mode on a real directory."])
     [:p.muted
+     [:a.help-licenses {:href "https://github.com/violetpurpleish/evalight" :target "_blank" :rel "noopener noreferrer"}
+       "Evalight on Github"]]
+    [:p.muted
      [:a.help-licenses {:href "/licenses.html" :target "_blank" :rel "noopener noreferrer"}
       "Open Source Licenses"]]]])
 
