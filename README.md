@@ -2,9 +2,11 @@
 
 A small, live ClojureScript environment that starts in the browser.
 
-Open the site and write ClojureScript immediately. There is no account, no project wizard, and no local toolchain required for the first session. The running preview *is* the program: evaluate a form and it talks to that live image, in the spirit of Nightlight, Lisp machines, and Smalltalk.
+Open the site and write ClojureScript immediately. There is no account, no project wizard, and no local toolchain required. The running preview *is* the program: evaluate a form and it talks to that live image, in the spirit of Nightlight, Lisp machines, and Smalltalk.
 
 When a project outgrows the playground, export it as a ZIP. The zip is a normal directory: source, `shadow-cljs.edn`, `package.json`, a README, and Evalight itself. Extract it and `bun run evalight` to keep using this workshop on those files, or open the folder in any other editor.
+
+![screenshot](https://i.imgur.com/1JFgBqU.png)
 
 ## Run it
 
