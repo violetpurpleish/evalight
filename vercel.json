@@ -1,6 +1,6 @@
 {
-  "buildCommand": "bun run release",
+  "buildCommand": "bash scripts/vercel-bun.sh run release",
   "outputDirectory": "public",
-  "installCommand": "bunx bun@1.4.0 install",
+  "installCommand": "bash scripts/vercel-bun.sh install --frozen-lockfile",
   "framework": null
 }

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "A small live ClojureScript environment that starts in the browser.",
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.2",
   "scripts": {
     "dev": "bun scripts/dev.mjs",
     "watch": "shadow-cljs watch app preview",

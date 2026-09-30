@@ -1,4 +1,5 @@
 node_modules/
+.vercel-bun/
 .shadow-cljs/
 public/js/
 public/evalight-embed/

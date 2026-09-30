@@ -150,6 +150,8 @@ That compiles the ClojureScript unit tests, then opens the workshop in headless 
 
 [GitHub Actions](https://github.com/violetpurpleish/evalight/actions/workflows/ci.yml) runs `bun run test`, `bun run release`, and `bun run embed` on pushes to `main` and on pull requests, including contributions from forks. It can also be started manually from the Actions tab. The workflow installs the Bun version from `package.json`, Node.js 24, Java 25, and stable Chrome, and uses the lockfile for dependency installation. Standard Ubuntu runners are [free for public repositories](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
 
+Vercel also uses the Bun version pinned in `package.json`. `scripts/vercel-bun.sh` downloads the official release binary into the ignored `.vercel-bun/` directory and uses it for dependency installation and the production build. This avoids the npm `bun` wrapper's installer; dependency installation uses `--frozen-lockfile`.
+
 The workshop UI is Replicant plus a small kit in `src/ui` (button, dialog, popover, split, and so on). The same files are copied into new projects. There is no React and no installable widget package. File actions, the help panel, and the project picker are still measured in layout tests as ordinary DOM.
 
 Evalight, including that kit, is MIT. Copyright (c) 2026 violetpurpleish & contributors. See `LICENSE`.
