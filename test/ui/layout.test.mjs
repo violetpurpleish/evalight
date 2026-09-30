@@ -873,7 +873,8 @@ try {
   check("help lists Ctrl+K", helpCopy.keys.includes("Ctrl+K"));
   check("help mentions History", /History/.test(helpCopy.text));
   check("help links Open Source Licenses", /Open Source Licenses/.test(helpCopy.text));
-  const licenseHref = await page.evaluate(() => document.querySelector(".help-licenses")?.getAttribute("href"));
+  const licenseHref = await page.$$eval(".help a", links =>
+    links.find(link => link.textContent.trim() === "Open Source Licenses")?.getAttribute("href"));
   check("help licenses href is /licenses.html", licenseHref === "/licenses.html");
   check("help does not teach Ctrl-Space", !/Ctrl.?Space/.test(helpCopy.text));
   check("help does not teach Ctrl-.", !/Ctrl.?\./.test(helpCopy.text));
@@ -2033,63 +2034,59 @@ try {
     { timeout: 8000 }
   );
 
+  const afterEditorLayout = () => page.evaluate(() => new Promise(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const bumpPoint = () => page.evaluate(() => {
+    const root = document.querySelector(".cm-content");
+    if (!root) return null;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const i = node.textContent.indexOf("bump");
+      if (i < 0) continue;
+      const line = node.parentElement?.closest(".cm-line");
+      if (!/\(defn\s+bump/.test(line?.textContent ?? "")) continue;
+      const range = document.createRange();
+      range.setStart(node, i);
+      range.setEnd(node, i + 4);
+      const r = range.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      if (document.elementFromPoint(x, y)?.closest(".cm-line") !== line) continue;
+      return { x, y, line: line.textContent, over: true };
+    }
+    return null;
+  });
+
+  // File switching restores scroll asynchronously. Let that finish before
+  // searching the virtualized editor for a visible symbol.
+  await afterEditorLayout();
   let bumpPos = null;
   for (let top = 0; top <= 3600 && !bumpPos; top += 140) {
     await page.evaluate((y) => {
       const s = document.querySelector(".cm-scroller");
       if (s) s.scrollTop = y;
     }, top);
-    await new Promise((r) => setTimeout(r, 40));
-    bumpPos = await page.evaluate(() => {
-      const root = document.querySelector(".cm-content");
-      if (!root) return null;
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let node;
-      while ((node = walker.nextNode())) {
-        const i = node.textContent.indexOf("bump");
-        if (i < 0) continue;
-        const line = node.parentElement?.closest(".cm-line");
-        if (!/\(defn\s+bump/.test(line?.textContent ?? "")) continue;
-        const range = document.createRange();
-        range.setStart(node, i);
-        range.setEnd(node, Math.min(i + 4, node.textContent.length));
-        const r = range.getBoundingClientRect();
-        if (r.width < 2 || r.height < 2) continue;
-        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-      }
-      return null;
-    });
+    await afterEditorLayout();
+    bumpPos = await bumpPoint();
   }
   check("found bump in the editor to hover", Boolean(bumpPos?.x), JSON.stringify(bumpPos));
   if (bumpPos?.x) {
     await page.mouse.click(bumpPos.x, bumpPos.y);
-    const hovered = await page.evaluate(() => {
-      const root = document.querySelector(".cm-content");
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let node;
-      while ((node = walker.nextNode())) {
-        const i = node.textContent.indexOf("bump");
-        if (i < 0) continue;
-        const line = node.parentElement?.closest(".cm-line");
-        if (!/\(defn\s+bump/.test(line?.textContent ?? "")) continue;
-        line.scrollIntoView({ block: "center" });
-        const range = document.createRange();
-        range.setStart(node, i);
-        range.setEnd(node, i + 4);
-        const r = range.getBoundingClientRect();
-        const x = r.x + r.width / 2;
-        const y = r.y + r.height / 2;
-        return {
-          x,
-          y,
-          line: line.textContent,
-          over: document.elementFromPoint(x, y)?.closest(".cm-editor") != null,
-        };
-      }
-      return null;
+    await afterEditorLayout();
+    await page.evaluate(() => {
+      [...document.querySelectorAll(".cm-line")]
+        .find(line => /\(defn\s+bump/.test(line.textContent))
+        ?.scrollIntoView({ block: "center" });
     });
+    // Scrolling changes CodeMirror's viewport and line measurements. Query
+    // the current DOM only after layout, rather than reusing pre-scroll points.
+    await afterEditorLayout();
+    const hovered = await bumpPoint();
     check("bump stays in view after click", Boolean(hovered?.over), JSON.stringify(hovered));
     if (hovered?.over) {
+      await page.mouse.move(1, 1);
       await page.mouse.move(hovered.x, hovered.y);
       try {
         await waitForUI(page,() => {

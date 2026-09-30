@@ -58,6 +58,9 @@ try {
     catch (e) { if (e.name === "NotFoundError") return null; throw e; }
   }, name);
   const rowAction = async (name, selector = ".tree-item") => {
+    // Renaming updates the active path before the asynchronous tree refresh.
+    await page.waitForFunction(name =>
+      [...document.querySelectorAll(".tree-row .tree-name")].some(el => el.textContent === name), {}, name);
     await page.evaluate(({ name, selector }) => {
       const row = [...document.querySelectorAll(".tree-row")].find(r => r.querySelector(".tree-name")?.textContent === name);
       if (!row) throw new Error("Missing file: " + name);
