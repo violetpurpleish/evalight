@@ -1,5 +1,7 @@
 # Evalight
 
+[![CI](https://github.com/violetpurpleish/evalight/actions/workflows/ci.yml/badge.svg)](https://github.com/violetpurpleish/evalight/actions/workflows/ci.yml)
+
 A small, live ClojureScript environment that starts in the browser.
 
 Open the site and write ClojureScript immediately. There is no account, no project wizard, and no local toolchain required. The running preview *is* the program: evaluate a form and it talks to that live image, in the spirit of Nightlight, Lisp machines, and Smalltalk.
@@ -145,6 +147,8 @@ bun run test
 That compiles the ClojureScript unit tests, then opens the workshop in headless Chrome and checks layout: file-row actions stay inside the sidebar, the help close control sits in the top-right of the popover, the project switcher opens a custom menu, and the three columns can be resized or hidden without dropping the preview iframe.
 
 `bun run test:ui` runs only the Chrome pass. It serves `public/` itself, so the IDE must already be compiled (`bun run dev` or `bun run release`). Point it at a running server with `EVALIGHT_URL=http://127.0.0.1:48721 bun run test:ui`.
+
+[GitHub Actions](https://github.com/violetpurpleish/evalight/actions/workflows/ci.yml) runs `bun run test`, `bun run release`, and `bun run embed` on pushes to `main` and on pull requests, including contributions from forks. It can also be started manually from the Actions tab. The workflow installs the Bun version from `package.json`, Node.js 24, Java 25, and stable Chrome, and uses the lockfile for dependency installation. Standard Ubuntu runners are [free for public repositories](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
 
 The workshop UI is Replicant plus a small kit in `src/ui` (button, dialog, popover, split, and so on). The same files are copied into new projects. There is no React and no installable widget package. File actions, the help panel, and the project picker are still measured in layout tests as ordinary DOM.
 
