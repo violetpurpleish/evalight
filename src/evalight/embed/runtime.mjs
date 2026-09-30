@@ -17,6 +17,9 @@ import {
   stopCljRuntime,
 } from "./clj.mjs";
 import { detectProject } from "./project.mjs";
+import { createGpuiCljsRuntime } from "./gpui-cljs.mjs";
+
+const gpuiCljs = createGpuiCljsRuntime();
 
 let active = "compiled";
 let detected = { kind: "none", preview: "none", mainNs: null };
@@ -24,11 +27,16 @@ let detected = { kind: "none", preview: "none", mainNs: null };
 export { parseEvalightArgs, detectProject };
 
 export async function startRuntime(projectRoot, flags = {}) {
+  stopRuntime();
   const project = await detectProject(projectRoot);
   detected = project;
   console.log(
     `Detected ${project.kind}${project.mainNs ? ` · ${project.mainNs}` : ""} (preview ${project.preview})`,
   );
+  if (project.backend === "cljs") {
+    active = "gpui-cljs";
+    return gpuiCljs.start(projectRoot, { ...flags, project });
+  }
   if (project.kind === "clj" || project.kind === "gpui") {
     active = "clj";
     console.log(`Starting ${project.kind} runtime…`);
@@ -40,6 +48,7 @@ export async function startRuntime(projectRoot, flags = {}) {
 }
 
 export async function handleRuntimeRequest(req, url) {
+  if (active === "gpui-cljs") return gpuiCljs.handle(req, url);
   if (active === "clj" || cljActive()) {
     const res = await handleCljRequest(req, url);
     if (res) return res;
@@ -52,12 +61,14 @@ export function runtimeMeta() {
     kind: detected.kind,
     mainNs: detected.mainNs || null,
   };
+  if (active === "gpui-cljs") return { ...extra, ...gpuiCljs.meta() };
   if (active === "clj" || cljActive()) return { ...extra, ...cljMeta() };
   return { ...extra, ...compiledMeta() };
 }
 
 export function stopRuntime() {
-  if (active === "clj") stopCljRuntime();
+  if (active === "gpui-cljs") gpuiCljs.stop();
+  else if (active === "clj") stopCljRuntime();
   else stopCompiledRuntime();
   active = "compiled";
 }

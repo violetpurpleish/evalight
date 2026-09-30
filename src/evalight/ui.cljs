@@ -81,7 +81,9 @@
    [:header.help-head [:h2 "Living with the program"]]
    [:div.help-body
     [:p (case (:runtime state)
-          :gpui "Evalight is editing a clj-gpui app. Ctrl-Enter talks to the JVM nREPL. The native window is the running program."
+          :gpui (if (= :cljs (:runtime-backend state))
+                  "Evalight is editing a ClojureScript GPUI app. Ctrl-Enter talks to the running Bun app through shadow-cljs. The native window is the running program."
+                  "Evalight is editing a clj-gpui app. Ctrl-Enter talks to the JVM nREPL. The native window is the running program.")
           :clj "Evalight is editing JVM Clojure. Ctrl-Enter talks to nREPL. There is no preview pane: this project has no window to show."
           "Evalight is a small ClojureScript workshop. The preview is the running program. Evaluating a form talks to that program, not a separate compiler.")]
     [:section.help-shortcuts {:aria-labelledby "help-shortcuts-title"}
@@ -100,7 +102,9 @@
     (if (= :local (:mode state))
       (cond
         (= :gpui (:runtime state))
-        [:p.muted "These files are on disk. Evalight started `clj -M:dev` (or attached to it). The GPUI window is the preview. A browser iframe cannot host that window; if the image interned gpui.runtime/preview-png, this pane can show a snapshot. Live stays off because the clj-gpui watcher already reloads on save."]
+        [:p.muted (if (= :cljs (:runtime-backend state))
+                    "These files are on disk. Evalight starts shadow-cljs watch and the Bun app, or attaches to both already running. shadow-cljs reloads saved changes into the same native window. This pane shows window snapshots; Live stays off. You need Bun and a JDK for compilation."
+                    "These files are on disk. Evalight started `clj -M:dev` (or attached to it). The GPUI window is the preview. This pane shows snapshots through gpui.runtime/preview-png. Live stays off because the clj-gpui watcher already reloads on save.")]
         (= :clj (:runtime state))
         [:p.muted "These files are on disk. Ctrl-Enter talks to a JVM nREPL. Preview stays hidden unless this is a clj-gpui app. You need a JDK and the Clojure CLI. SCI is only used on the hosted ClojureScript playground."]
         (:attached state)
@@ -262,11 +266,13 @@
                 :on {:keydown [:repl-expr-keydown]}}]]])
 
 (defn- native-preview-body [state]
-  (let [{:keys [preview preview-frame nrepl-port app-var attached attach-label]} state]
+  (let [{:keys [preview preview-frame nrepl-port app-var attached attach-label runtime-backend]} state]
     [:div.preview-native
      [:p.eyebrow "Native GPUI"]
      [:h2 (or app-var "GPUI window")]
-     [:p.lede "The running program is the native window. It cannot live inside this browser pane. Leave that window open; Ctrl-Enter still talks to it over nREPL."]
+     [:p.lede (if (= :cljs runtime-backend)
+                "The running program is the native window. Leave the Bun app open; Ctrl-Enter talks to it through shadow-cljs."
+                "The running program is the native window. It cannot live inside this browser pane. Leave that window open; Ctrl-Enter still talks to it over nREPL.")]
      (when-let [err (:error preview)]
        [:pre.preview-native-error err])
      (if preview-frame
@@ -275,7 +281,7 @@
         {:aria-hidden "true"}
         [:span.preview-native-chrome]])
      [:dl.preview-native-meta
-      [:div [:dt "nREPL"] [:dd (str (or nrepl-port "—"))]]
+      [:div [:dt (if (= :cljs runtime-backend) "shadow nREPL" "nREPL")] [:dd (str (or nrepl-port "—"))]]
       (when attached
         [:div [:dt "Attach"] [:dd (or attach-label "yes")]])]]))
 

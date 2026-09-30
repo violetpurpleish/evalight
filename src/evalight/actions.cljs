@@ -334,7 +334,7 @@
                                (swap! state/app update :dirty disj path))
                              (when reload?
                                (schedule-live-reload!)
-                               (schedule-native-frame! 450)))
+                               (schedule-native-frame! (if (= :cljs (:runtime-backend @state/app)) 1400 450))))
                            path)))]
     (reset! !save-queue saved)
     saved))
@@ -1151,6 +1151,7 @@
              (cond-> (-> s
                           (assoc :mode :local
                                  :runtime rt
+                                 :runtime-backend (keyword (:backend meta))
                                  :preview-kind preview-kind
                                  :preview-url (or (:preview-url meta) (:previewUrl meta))
                                  :nrepl-port (or (:nrepl-port meta) (:nreplPort meta))
@@ -1164,9 +1165,8 @@
                repl-ns (assoc-in [:repl :ns] repl-ns))))
     (reset! !fs (http-fs/open))
     (prefs/restore-repl! (or (:name meta) "local"))
-    ;; History restore can put back a ClojureScript ns. Only JVM apps
-    ;; should ignore that and keep the nREPL main ns.
-    (when (and repl-ns (or clj? gpui?))
+    ;; JVM apps keep their main ns; CLJS may restore a live REPL namespace.
+    (when (and repl-ns (or clj? (and gpui? (not= :cljs (:runtime-backend @state/app)))))
       (swap! state/app assoc-in [:repl :ns] repl-ns)))
   (-> (load-history!)
       (.then (fn [_] (refresh-tree!)))

@@ -117,12 +117,13 @@ That uses the running shadow nREPL and does not stop it. Evalight Live stays off
 
 Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
 
-## JVM Clojure and clj-gpui (experimental)
+## JVM Clojure and native clj-gpui (experimental)
 
 Local mode can open a real Clojure directory. Detection lives in
-`src/evalight/embed/project.mjs`. clj-gpui apps get a JVM nREPL and a
-native-window preview pane; other Clojure projects get the editor and
-REPL with Preview hidden. The hosted playground stays ClojureScript.
+`src/evalight/embed/project.mjs`. clj-gpui apps can use JVM Clojure or
+ClojureScript on Bun, with a native-window snapshot preview. Other Clojure
+projects get the editor and REPL with Preview hidden. The hosted playground
+stays ClojureScript.
 
 See [docs/clojure-support.md](docs/clojure-support.md). To put Evalight
 next to a [clj-gpui](https://github.com/violetpurpleish/clj-gpui) template:
@@ -136,7 +137,13 @@ next to a [clj-gpui](https://github.com/violetpurpleish/clj-gpui) template:
 ```
 
 Then `bun run evalight` from that folder (after copying a packed
-`evalight/` tree). First run still needs `clj -M:dev`'s host build.
+`evalight/` tree). JVM apps use `clj -M:dev`. The clj-gpui CLJS template
+is detected through `:backend :cljs` and its shadow `:node-script` build:
+Evalight starts shadow-cljs watch plus Bun, keeps native hot reload enabled,
+and connects Ctrl-Enter to the live Bun app. `--attach` joins an existing watch
+and Bun app without requiring a browser URL. Both backends need a native GPUI
+host; the CLJS backend also needs Bun and a JDK for compilation, plus the
+Clojure CLI when the project uses shadow-cljs `:deps`.
 
 ## Tests
 
