@@ -98,7 +98,9 @@
                                 (reject (js/Error. (or (:error st)
                                                        (if (compiled-runtime?)
                                                          "The compiled app did not connect. Need a JDK and bun install, and Preview must stay open."
-                                                         "Clojure nREPL did not connect. Need a JDK and the Clojure CLI."))))
+                                                         (if (= :cljs (:runtime-backend @state/app))
+                                                           "The Bun GPUI app did not connect to shadow-cljs. Need Bun, a JDK, and bun install."
+                                                           "Clojure nREPL did not connect. Need a JDK and the Clojure CLI.")))))
 
                                 (and (compiled-runtime?) (:ready st) (not @!reloaded))
                                 (do (reset! !reloaded true)

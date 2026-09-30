@@ -300,7 +300,7 @@ function run(cmd, args, opts) {
   });
 }
 
-async function ensureDeps(root) {
+export async function ensureDeps(root) {
   const shadowBin = join(root, "node_modules", ".bin", "shadow-cljs");
   if (await exists(shadowBin)) return;
   const pkg = join(root, "package.json");
@@ -393,9 +393,9 @@ async function cljsEval(code, nsName, ms = 20000) {
   return client.eval(session, code, ms, nsName || undefined);
 }
 
-function noRuntime(result) {
+export function noRuntime(result) {
   const blob = `${result?.value || ""} ${result?.stderr || ""} ${result?.stdout || ""} ${result?.ex || ""}`;
-  return /no-runtime|no connected JS runtime|There is no connected/i.test(blob);
+  return /no-runtime|no (?:available|connected) JS runtime|There is no connected|worker for this REPL has exited|previously used runtime disappeared/i.test(blob);
 }
 
 export async function runtimeStatus() {

@@ -6,6 +6,8 @@
  * dep beats shadow-cljs, and `:workshop` in shadow-cljs.edn marks this
  * repository so `bun run local` here stays on SCI.
  */
+import { nodeBuildInfo } from "./gpui-cljs-config.mjs";
+import { ednGet, ednValue, readEdn } from "./edn.mjs";
 
 export function runtimeFromEdn(text) {
   const m = (text || "").match(/:runtime\s+:(gpui|clj|cljs)\b/);
@@ -87,10 +89,21 @@ export function classifyProject({
   hasGpuiEdn = false,
 } = {}) {
   const forced = runtimeFromEdn(evalightEdn);
-  const gpui = looksLikeGpui(depsEdn, hasGpuiEdn || Boolean(gpuiEdn && gpuiEdn.trim()));
+  const config = (text) => { try { return readEdn(text || "{}"); } catch { return null; } };
+  const gpuiConfig = config(gpuiEdn);
+  const evalightConfig = config(evalightEdn);
+  const requestedBuild = ednValue(ednGet(evalightConfig, "cljs-build")) || ednValue(ednGet(gpuiConfig, "cljs-build"));
+  let nodeBuild = null;
+  try { nodeBuild = nodeBuildInfo(shadowEdn, requestedBuild); } catch { /* start reports invalid native config */ }
+  const cljsBackend = ednValue(ednGet(gpuiConfig, "backend")) === "cljs";
+  const gpui = looksLikeGpui(depsEdn, hasGpuiEdn || Boolean(gpuiEdn && gpuiEdn.trim())) ||
+    (Boolean(nodeBuild) && (ednValue(ednGet(config(shadowEdn), "source-paths")) || []).some((path) => typeof path === "string" && path.includes("clj-gpui")));
+  const nativeCljs = forced !== "clj" && (cljsBackend || (gpui && Boolean(requestedBuild)) ||
+    (Boolean(nodeBuild) && (gpui || forced === "gpui" || previewKindFromEdn(evalightEdn) === "native")));
   const formMain =
     mainFromEdn(evalightEdn) ||
     mainFromEdn(gpuiEdn) ||
+    (nativeCljs ? nodeBuild?.mainNs : null) ||
     (gpui || forced === "gpui" ? gpuiMainFromDeps(depsEdn) : null);
   const previewOverride = previewKindFromEdn(evalightEdn);
 
@@ -110,6 +123,12 @@ export function classifyProject({
   }
 
   const out = defaultsFor(kind, formMain);
+  if (nativeCljs) {
+    out.backend = "cljs";
+    out.preview = "native";
+    out.buildId = requestedBuild || nodeBuild?.buildId || null;
+    out.outputTo = nodeBuild?.outputTo || null;
+  }
   if (previewOverride) out.preview = previewOverride;
   return out;
 }

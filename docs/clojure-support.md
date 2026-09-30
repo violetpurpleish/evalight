@@ -1,154 +1,114 @@
-# Clojure and clj-gpui in Evalight
+# Clojure and native GPUI projects
 
-Feasibility spike. The hosted playground stays ClojureScript + SCI. JVM
-Clojure is **local mode only** (`bun run evalight` / `bun run local`).
+JVM Clojure and native GPUI applications run in **local mode** (`bun run local`
+from this checkout, or `bun run evalight` from a project containing a packed
+`evalight/` folder). The hosted playground continues to use ClojureScript + SCI.
 
-## What already worked
+| Project | Evaluation | Preview |
+| --- | --- | --- |
+| Browser ClojureScript | shadow-cljs nREPL into the browser app | iframe |
+| GPUI with JVM Clojure | JVM nREPL, `clj -M:dev` | native window snapshots |
+| GPUI with ClojureScript | shadow-cljs nREPL into the Bun app | native window snapshots |
+| Other JVM Clojure | JVM nREPL | hidden |
 
-- The editor maps `.clj` / `.cljs` / `.cljc` / `.edn` to the same
-  CodeMirror Clojure mode and Parinfer.
-- Local Evalight already speaks nREPL (bencode TCP client). Compiled
-  ClojureScript uses a Clojure session plus `shadow/nrepl-select`.
-- Preview is an iframe of either SCI (`preview.html`) or the compiled
-  app HTTP server. Hiding Preview is already a first-class layout mode.
+The editor supports `.clj`, `.cljs`, `.cljc` and `.edn` with the same Clojure mode
+and Parinfer. Native previews show PNG snapshots of the real OS window. Keep the
+native window open to interact with it. Evalight refreshes snapshots after
+loading, Run, evaluation and saves; it does not stream the window.
 
-## What was missing
+## ClojureScript GPUI
 
-SCI cannot load JVM Clojure (interop, macros, `clj-gpui`).
-`project-payload` only sent `.cljs` / `.cljc` to the sandbox.
-`isUserProject` treated any `evalight.edn` with `:main` as a
-shadow-cljs app, so dropping Evalight into a clj-gpui template would
-try to start `shadow-cljs watch` and fail.
+Evalight recognizes `gpui.edn` with `:backend :cljs`, or a shadow-cljs
+`:node-script` build alongside a clj-gpui dependency/source path. It uses the
+`:cljs-build` selected in `evalight.edn` or `gpui.edn`. Otherwise it picks the
+`:app` node-script build, or the only node-script build. Multiple builds without
+an `:app` need an explicit selection.
 
-GPUI is a native window (Rust process, Vulkan). It is not HTML. An
-iframe cannot contain it.
+The current clj-gpui ClojureScript template needs no extra Evalight configuration:
 
-## Runtime split (this branch)
-
-| Kind | How we detect it | Eval | Preview |
-| --- | --- | --- | --- |
-| ClojureScript lamp / export | `shadow-cljs.edn` `:app`, or `evalight.edn` `:main` without `:runtime` | SCI (playground) or shadow nREPL (local) | iframe |
-| Evalight checkout | `:workshop` in `shadow-cljs.edn` | SCI | iframe of workshop |
-| **clj-gpui** | `evalight.edn` `:runtime :gpui`, `gpui.edn`, or `clj-gpui` / `gpui.dev` in `deps.edn` | JVM nREPL (`clj -M:dev` or `--attach`) | native window + status pane |
-| **JVM Clojure** | `deps.edn` / `project.clj` without the above | JVM nREPL (`nrepl.cmdline` or `--attach`) | **hidden** |
-
-`evalight.edn` `:runtime` always wins. `:preview {:kind :native|:iframe|:none}`
-overrides the default.
-
-## Can Preview show the GPUI window?
-
-**Not inside the iframe.** The running program is the OS window that
-`gpui.dev` already opens. That is the honest preview.
-
-This branch:
-
-1. Spawns or attaches to `clj -M:dev` so that window still appears.
-2. Replaces the iframe with a **Preview · GPUI** pane (nREPL port, app
-   var, status). Live stays off: clj-gpui's file watcher already reloads.
-3. Asks `GET /api/runtime/frame` after nREPL connects, after Run, after
-   a successful eval, and shortly after a save. That evals
-   `(gpui.runtime/preview-png)` when the var exists. Not a poll, and
-   Live stays off.
-
-**clj-gpui does not intern `preview-png` today.** There is no screenshot
-or offscreen capture in the host protocol (v5 is UI-tree JSON). To put
-pixels in the Evalight pane, add something like:
-
-```clojure
-;; in clj-gpui, later
-(defn preview-png
-  "Return a base64 PNG of the current native window, or nil."
-  []
-  ...)
+```sh
+bun install --frozen-lockfile
+# From the Evalight checkout:
+bun run local /path/to/my-app
 ```
 
-The host would capture the GPUI framebuffer (or an OS window shot) and
-Clojure would return the bytes. Evalight already displays a `data:image/png`
-when that call succeeds. Reconstructing the UI tree as HTML would not
-be the GPUI window; this spike does not do that.
+Evalight runs the project's shadow-cljs CLI with Bun, waits for the first
+successful compile, and starts the build's `:output-to` script with Bun in the
+original project directory. The compiler gets a temporary configuration and
+cache, isolated ports, and paths resolved against the real project. Project
+configuration files are not rewritten. The project's `:after-load` hook and
+shadow autoload remain enabled, so saves reload into the same Bun process and
+native window. `defonce` state survives. Compiler errors keep the last successful
+UI; diagnostics appear in the compiler's output. Evalight Live stays off.
 
-## Bundling with the clj-gpui template
-
-Evalight's export zip already vendors `evalight/` (workshop JS +
-`server.mjs`). A clj-gpui app should do the same, **without**
-shadow-cljs:
+To select a custom build or starting REPL namespace:
 
 ```clojure
-;; template/evalight.edn
+;; evalight.edn
 {:name "my-app"
- :main my.app/app
  :runtime :gpui
+ :cljs-build :desktop
+ :main my.app/app
  :preview {:kind :native}}
 ```
 
+Requirements: Bun, a JDK for compilation, project dependencies, and the native
+GPUI host (`CLJ_GPUI_BIN`, or Cargo for the library's automatic host build).
+Projects using shadow-cljs `:deps` also need the Clojure CLI, including the current
+clj-gpui CLJS template. Evalight does not require a Node binary for this backend.
+
+Ctrl-Enter uses `shadow/nrepl-select` for the selected build and evaluates in the
+live Bun process. Hover and completions use that build's compiler environment,
+including definitions entered in the REPL. The native host's `nREPL=disabled`
+means there is no application JVM nREPL; shadow-cljs provides the REPL connection.
+
+To attach to an existing compiler and application:
+
+```sh
+# In the app project, start watch and the Bun app in separate terminals first.
+bun run watch
+bun run start
+# Then, from the Evalight checkout:
+bun run local --attach /path/to/my-app
+```
+
+Attach reads `.shadow-cljs/nrepl.port`, `.nrepl-port`, or `:nrepl {:port ...}` in
+`shadow-cljs.edn`. You can override it with `--nrepl-port=7888`. A browser preview
+URL is unnecessary. Evalight stops both processes when it owns them, stops the
+compiler if its Bun app exits, and never stops processes it attached to.
+
+`gpui.runtime/preview-png` returns a Promise on ClojureScript. Evalight waits for
+its PNG asynchronously and cleans up the temporary capture result on success,
+nil, error or timeout. An unavailable capture leaves the native status pane
+usable. macOS captures need Screen Recording permission; other platforms need a
+supported display/capture environment.
+
+## JVM GPUI and other Clojure projects
+
+`gpui.edn`, a clj-gpui dependency, `gpui.dev`, or `:runtime :gpui` identifies JVM
+GPUI projects when no CLJS backend is selected. Evalight starts `clj -M:dev` or
+attaches to its JVM nREPL. Other `deps.edn` / `project.clj` projects start a generic
+JVM nREPL and hide Preview. Explicit `:runtime :clj` selects JVM Clojure.
+
+```clojure
+;; evalight.edn for a JVM GPUI app
+{:name "my-app" :main my.app/app :runtime :gpui :preview {:kind :native}}
+```
+
+JVM GPUI snapshots use the synchronous `gpui.runtime/preview-png` hook. A cold
+host build can exceed Evalight's startup timeout; build the host first or attach
+after a manual launch. `--attach` never stops the existing JVM application.
+
+## Bundling Evalight
+
+Copy a packed `evalight/` folder next to the application's sources and add this
+script to its existing `package.json`, retaining its dependencies and other
+scripts:
+
 ```json
-{
-  "name": "my-app",
-  "private": true,
-  "scripts": {
-    "evalight": "bun evalight/server.mjs"
-  }
-}
+{"scripts": {"evalight": "bun evalight/server.mjs"}}
 ```
 
-`evalight.template/gpui-evalight-edn` and `clj-package-json` emit those
-files. Copy a packed `evalight/` folder next to `src/` (from
-`bun run embed` + pack, or `bun run evalight` after placing it).
-
-Then, from the app directory:
-
-```sh
-bun run evalight
-```
-
-Needs Bun (workshop server), a JDK, the Clojure CLI, and a GPUI host
-binary (`CLJ_GPUI_BIN` or Cargo on first `clj -M:dev`). It does **not**
-need `bun install` of shadow-cljs.
-
-`--attach` joins an already-running `clj -M:dev` nREPL and does not
-kill it. `--preview-url` is a ClojureScript flag and is unused here.
-
-From an Evalight checkout:
-
-```sh
-bun run local /path/to/clj-gpui/examples/todomvc
-```
-
-That serves the **`:workshop` release** (`evalight-ui/js`), never
-`public/js` from `bun run dev`. A watch build of the IDE injects the
-shadow HUD. Local mode does not start that websocket, so the old path
-showed **shadow-cljs – Reconnecting…** over a SCI preview while
-`clj -M:dev` still opened the native window.
-
-If Preview still says Live / `(bump)` / `app.core`, the browser is not
-on this local server (wrong port), or it is caching `/js/main.js`.
-Hard-refresh (Ctrl-Shift-R). The header should read **GPUI** next to
-the project name, and Preview should be **Preview · GPUI**.
-
-## Generic Clojure (not clj-gpui)
-
-Same editor, REPL, hover, completions. No preview column (and no
-mobile Preview tab). Evalight is then a small Nightlight-style
-workshop on disk, not a browser image.
-
-The hosted playground will not grow a JVM. SCI-in-the-browser is the
-wrong interpreter for real Clojure.
-
-## Risks
-
-- First `clj -M:dev` compiles the Rust host. Evalight waits up to 120s
-  for nREPL. A cold Cargo build can exceed that; `--attach` after a
-  manual first run is the workaround.
-- Linux GPUI needs a display and Vulkan (lavapipe is enough). Headless
-  Cloud Agent VMs will connect nREPL and show the status pane, not a
-  window.
-- `nrepl.cmdline` for generic Clojure ignores project `:nrepl` aliases.
-  `evalight.edn` can grow `{:nrepl {:cmd [...]}}` later.
-- Windows: process-group kill matches the compiled runtime (Unix-first).
-
-## What this repo still will not do
-
-- SCI eval of `.clj` in the playground.
-- A second interpreter, LSP, or generic IDE.
-- Embedding a native window in Chromium.
-- Changing clj-gpui itself (that is a follow-up in violetpurpleish/clj-gpui).
+Both runtimes use the same bundled workshop UI. Local mode serves the release
+workshop, avoiding the IDE's shadow watch reconnect overlay. The native host and
+application remain separate from the browser workshop.

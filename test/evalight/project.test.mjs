@@ -72,6 +72,26 @@ assert.equal(classifyProject({ depsEdn: `{:paths ["src"] :deps {}}` }).preview, 
 assert.equal(classifyProject({ projectClj: `(defproject x "0.1.0")` }).kind, "clj");
 assert.equal(classifyProject({}).kind, "none");
 
+const nativeShadow = `{:deps {:aliases [:cljs]}
+ :builds {:app {:target :node-script :output-to "target/app.js" :main my.app/main
+                :devtools {:after-load my.app/reload!}}}}`;
+assert.deepEqual(classifyProject({ depsEdn: gpuiDeps, shadowEdn: nativeShadow,
+  gpuiEdn: `{:backend :cljs :cljs-build :app :cljs-output "target/app.js"}` }),
+  { kind: "gpui", preview: "native", backend: "cljs", mainNs: "my.app/main", buildId: "app", outputTo: "target/app.js" });
+assert.equal(classifyProject({ depsEdn: gpuiDeps, shadowEdn: nativeShadow }).backend, "cljs");
+assert.equal(classifyProject({ shadowEdn: nativeShadow.replace(':deps {:aliases [:cljs]}', ':source-paths ["src" "../clj-gpui/src"]') }).kind, "gpui");
+assert.equal(classifyProject({ depsEdn: gpuiDeps, shadowEdn: nativeShadow,
+  evalightEdn: `{:runtime :cljs :preview {:kind :native}}` }).backend, "cljs");
+assert.equal(classifyProject({ depsEdn: gpuiDeps, shadowEdn: nativeShadow,
+  evalightEdn: `{:runtime :clj}` }).backend, undefined, "explicit JVM override wins");
+assert.equal(classifyProject({ hasGpuiEdn: true, shadowEdn: `{:builds {:app {:target :browser}}}` }).backend, undefined,
+  "a browser build does not change the JVM GPUI path");
+assert.equal(classifyProject({ gpuiEdn: `{:description ":backend :cljs"}` }).backend, undefined,
+  "strings do not select the CLJS backend");
+assert.equal(classifyProject({ depsEdn: gpuiDeps, shadowEdn: nativeShadow,
+  evalightEdn: `{:runtime :gpui :cljs-build :missing}` }).backend, "cljs",
+  "an invalid explicit CLJS selection must report a build error instead of starting JVM Clojure");
+
 assert.equal(
   classifyProject({
     evalightEdn: `{:runtime :clj :preview {:kind :iframe} :main user}`,
