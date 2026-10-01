@@ -249,7 +249,7 @@
          [:pre text]])
       [:p.muted.empty (if (contains? #{:clj :gpui} runtime)
                         "Enter evaluates. Shift-Enter adds a line. Results come from the JVM nREPL."
-                        "Enter evaluates. Shift-Enter adds a line. Results come from the live preview, so (bump) will move the lamp.")])]
+                        "Enter evaluates. Shift-Enter adds a line. Results come from the live preview, so (bump) increments the counter.")])]
    [:form.repl-input
     {:replicant/key "repl-form"
      :on {:submit [:submit-repl]}}
