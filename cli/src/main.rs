@@ -22,9 +22,9 @@ enum Action {
     New {
         /// Project directory name
         name: Option<String>,
-        /// Use the native GPUI starter (the current default)
-        #[arg(long = "gpui")]
-        _gpui: bool,
+        /// Use a native clj-gpui starter
+        #[arg(long)]
+        gpui: bool,
         /// Use ClojureScript instead of JVM Clojure
         #[arg(long)]
         cljs: bool,
@@ -59,39 +59,40 @@ fn main() -> ExitCode {
 fn run(action: Option<Action>) -> Result<()> {
     let cwd = env::current_dir().context("find the current directory")?;
     match action {
-        None => new_project(&cwd, None, false),
-        Some(Action::New { name, cljs, .. }) => new_project(&cwd, name, cljs),
+        None => new_project(&cwd, None, false, false),
+        Some(Action::New { name, gpui, cljs }) => new_project(&cwd, name, gpui, cljs),
         Some(Action::Dev { attach, no_open }) => dev(&project::find_root(&cwd)?, attach, no_open),
         Some(action) => project::run(&project::find_root(&cwd)?, action),
     }
 }
 
-fn new_project(cwd: &Path, name: Option<String>, cljs: bool) -> Result<()> {
-    let (name, backend) = match name {
-        Some(name) => (name, Backend::from_cljs(cljs)),
+fn new_project(cwd: &Path, name: Option<String>, gpui: bool, cljs: bool) -> Result<()> {
+    let (name, gpui, cljs) = match name {
+        Some(name) => (name, gpui, cljs),
         None => {
             if !io::stdin().is_terminal() {
-                bail!("provide a project name, for example: evalight new myproject --gpui");
+                bail!("provide a project name, for example: evalight new myproject");
             }
-            let name = prompt("New GPUI project name: ")?;
-            let backend = if cljs {
-                Backend::Cljs
-            } else {
-                loop {
-                    match prompt("Language [1] Clojure (default), [2] ClojureScript: ")?.as_str() {
-                        "" | "1" => break Backend::Clj,
-                        "2" => break Backend::Cljs,
-                        _ => eprintln!("Choose 1 for Clojure or 2 for ClojureScript."),
-                    }
-                }
-            };
-            (name, backend)
+            let name = prompt("Project name: ")?;
+            let gpui = gpui || choose_second("Project type", "Standard", "Native GPUI")?;
+            let cljs = cljs || choose_second("Language", "Clojure", "ClojureScript")?;
+            (name, gpui, cljs)
         }
     };
 
-    project::create(cwd, &name, backend)?;
+    project::create(cwd, &name, gpui, Backend::from_cljs(cljs))?;
     println!("Created {name}/. Run `cd {name}` and then `evalight dev`.");
     Ok(())
+}
+
+fn choose_second(label: &str, first: &str, second: &str) -> Result<bool> {
+    loop {
+        match prompt(&format!("{label} [1] {first} (default), [2] {second}: "))?.as_str() {
+            "" | "1" => return Ok(false),
+            "2" => return Ok(true),
+            _ => eprintln!("Choose 1 for {first} or 2 for {second}."),
+        }
+    }
 }
 
 fn prompt(label: &str) -> Result<String> {

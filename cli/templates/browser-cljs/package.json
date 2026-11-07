@@ -1,0 +1,12 @@
+{
+  "name": "my-app",
+  "private": true,
+  "scripts": {
+    "dev": "bun --no-install node_modules/shadow-cljs/cli/runner.js watch app",
+    "test": "bun --no-install node_modules/shadow-cljs/cli/runner.js compile test && bun --no-install target/test.js",
+    "release": "bun --no-install node_modules/shadow-cljs/cli/runner.js release app"
+  },
+  "devDependencies": {
+    "shadow-cljs": "2.28.23"
+  }
+}

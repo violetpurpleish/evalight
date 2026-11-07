@@ -499,6 +499,11 @@ export async function startCljRuntime(projectRoot, {
         : "Clojure nREPL did not start. Need Java and the Clojure CLI.",
     );
     await ensureClj(nreplPort);
+    if (kind === "clj" && nsOf(mainNs) !== "user") {
+      const ns = nsOf(mainNs);
+      const result = await cljEval(`(require (symbol ${JSON.stringify(ns)}))`);
+      if (!result.ok) console.warn(`  Could not load ${ns}: ${result.stderr || result.ex}`);
+    }
     started = {
       enabled: true,
       attached: false,

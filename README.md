@@ -117,37 +117,38 @@ That uses the running shadow nREPL and does not stop it. Evalight Live stays off
 
 Evalight itself is also ClojureScript, so opening this repository in local mode is the first step toward editing Evalight inside Evalight.
 
-## JVM Clojure and native clj-gpui (experimental)
+## Evalight CLI
 
-### Evalight CLI
-
-The CLI creates and runs native clj-gpui projects directly from the terminal.
+The CLI creates and runs Clojure, browser ClojureScript, and native clj-gpui
+projects directly from the terminal.
 Download the archive for your platform from the [CLI workflow](https://github.com/violetpurpleish/evalight/actions/workflows/cli.yml)
 artifacts. Extract it and keep the `evalight-workshop/` directory next to the
 `evalight` binary. Put that directory on your `PATH` or invoke the binary by
 its full path.
 
-```sh
-evalight new myproject --gpui --cljs
-cd myproject
-evalight dev
-```
+| Command | Starter |
+| --- | --- |
+| `evalight new myproject` | JVM Clojure |
+| `evalight new myproject --cljs` | Browser ClojureScript with the Evalight component gallery |
+| `evalight new myproject --gpui` | Native GPUI with JVM Clojure |
+| `evalight new myproject --gpui --cljs` | Native GPUI with ClojureScript |
 
-Omit `--cljs` for JVM Clojure. Run `evalight` with no arguments to choose a
-name and language interactively. GPUI is the project type supported by this
-version. The generated project pins clj-gpui and can be created offline.
-Running it for the first time may download its dependencies.
+Run `evalight` with no arguments to choose a name, project type, and language
+interactively. Project creation works offline. GPUI starters pin their clj-gpui
+dependency. The first run may download project dependencies.
+
+From the generated project directory:
 
 | Command | What it does |
 | --- | --- |
 | `evalight run` | Launches the application using the starter's development entry point. |
 | `evalight dev` | Starts the local Evalight workshop and opens the browser. Pass `--no-open` to print the URL or `--attach` to join an existing nREPL session. |
 | `evalight test` | Runs the test entry point included in the generated project. |
-| `evalight package` | Builds a native package under `target/package/` using the clj-gpui packager. |
+| `evalight package` | Builds a GPUI app package under `target/package/`. |
 
-Running and packaging require the starter's toolchain, including the Clojure
-CLI, a JDK, and the [native build prerequisites](https://github.com/violetpurpleish/clj-gpui#quick-start).
-`evalight dev` and the ClojureScript starter also require Bun.
+All starters use a JDK. JVM Clojure and native GPUI require the Clojure CLI.
+`evalight dev` and both ClojureScript starters use Bun. Native GPUI also needs
+the [native build prerequisites](https://github.com/violetpurpleish/clj-gpui#quick-start).
 
 To build the CLI and workshop from this repository on macOS or Linux:
 
@@ -161,7 +162,7 @@ bun scripts/pack-workshop.mjs out/cli/evalight-workshop
 out/cli/evalight --help
 ```
 
-### Local workshop integration
+## JVM Clojure and native clj-gpui (experimental)
 
 Local mode can open a real Clojure directory. Detection lives in
 `src/evalight/embed/project.mjs`. clj-gpui apps can use JVM Clojure or

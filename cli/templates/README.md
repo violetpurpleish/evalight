@@ -1,4 +1,11 @@
-# clj-gpui starters
+# CLI starters
+
+The `plain-clj/` starter uses Clojure CLI aliases for running and testing.
+The `browser-cljs/` starter shares the website's gallery, styles and UI kit
+sources. Its local configuration includes shadow-cljs commands for running
+and testing.
+
+## clj-gpui starters
 
 The `clj/` and `cljs/` starters are based on the matching
 [clj-gpui templates](https://github.com/violetpurpleish/clj-gpui/tree/ce172661bb68dc44ead8b1fb20212db938d87307/templates)

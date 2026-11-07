@@ -1,0 +1,4 @@
+{:name "my-app"
+ :main my.app
+ :runtime :gpui
+ :preview {:kind :native}}

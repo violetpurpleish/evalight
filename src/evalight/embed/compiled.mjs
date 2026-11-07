@@ -733,10 +733,10 @@ export async function startCompiledRuntime(projectRoot, {
     return started;
   }
 
-  const bin = join(projectRoot, "node_modules", ".bin", "shadow-cljs");
+  const runner = join(projectRoot, "node_modules", "shadow-cljs", "cli", "runner.js");
   let log = "";
   let spawnErr = null;
-  child = spawn(bin, ["--force-spawn", "watch", buildId], {
+  child = spawn(process.execPath, ["--no-install", runner, "--force-spawn", "watch", buildId], {
     cwd: watchRoot,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],

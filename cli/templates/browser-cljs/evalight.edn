@@ -1,0 +1,5 @@
+{:name "my-app"
+ :main app.core
+ :runtime :cljs
+ :src-paths ["src"]
+ :preview {:css ["public/css/ui.css" "public/style.css"]}}

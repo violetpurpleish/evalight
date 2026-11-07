@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import puppeteer from "puppeteer-core";
@@ -195,10 +195,15 @@ await new Promise((resolve, reject) => {
   inst.on("exit", (code) => (code === 0 ? resolve() : reject(new Error("bun install failed"))));
   inst.on("error", reject);
 });
-const child = spawn("bun", ["evalight/server.mjs"], {
+// Exercise the standalone workshop on a machine where only Bun is available.
+const blockedNode = join(lamp, ".blocked-node");
+await mkdir(blockedNode);
+await writeFile(join(blockedNode, "node"), "#!/bin/sh\necho 'Unexpected Node launch' >&2\nexit 127\n", { mode: 0o755 });
+const child = spawn(process.execPath, ["evalight/server.mjs"], {
   cwd: lamp,
   env: {
     ...process.env,
+    PATH: [blockedNode, process.env.PATH].join(delimiter),
     PORT: String(PORT),
     EVALIGHT_APP_PORT: String(APP_PORT),
     EVALIGHT_NREPL_PORT: "7878",

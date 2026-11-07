@@ -13,33 +13,41 @@ struct TemplateFile {
     bytes: &'static [u8],
 }
 
-macro_rules! template {
-    ($backend:literal, $($path:literal),+ $(,)?) => {
-        &[$(TemplateFile {
-            path: $path,
-            bytes: include_bytes!(concat!("../templates/", $backend, "/", $path)),
-        }),+]
+macro_rules! template_file {
+    ($dir:literal, $path:literal) => {
+        template_file!($dir, $path => concat!("../templates/", $dir, "/", $path))
+    };
+    ($dir:literal, $path:literal => $source:expr) => {
+        TemplateFile { path: $path, bytes: include_bytes!($source) }
     };
 }
 
-const CLJ: &[TemplateFile] = template!(
+macro_rules! template {
+    ($dir:literal, $($path:literal $(=> $source:expr)?),+ $(,)?) => {
+        &[$(template_file!($dir, $path $(=> $source)?)),+]
+    };
+}
+
+const GPUI_CLJ: &[TemplateFile] = template!(
     "clj",
     ".gitignore",
     "README.md",
     "deps.edn",
+    "evalight.edn",
     "gpui.edn",
     "resources/icon.png",
     "src/my/app.clj",
     "test/my/app_test.clj",
-    "test/my/test_runner.clj",
+    "test/my/test_runner.clj" => "../templates/test_runner.clj",
 );
 
-const CLJS: &[TemplateFile] = template!(
+const GPUI_CLJS: &[TemplateFile] = template!(
     "cljs",
     ".gitignore",
     "README.md",
     "bun.lock",
     "deps.edn",
+    "evalight.edn",
     "gpui.edn",
     "package.json",
     "shadow-cljs.edn",
@@ -47,6 +55,53 @@ const CLJS: &[TemplateFile] = template!(
     "src/my/app.cljs",
     "src/my/host.clj",
     "test/my/app_test.cljs",
+);
+
+const CLJ: &[TemplateFile] = template!(
+    "plain-clj",
+    ".gitignore" => "../templates/clj/.gitignore",
+    "README.md",
+    "deps.edn",
+    "evalight.edn",
+    "src/my/app.clj",
+    "test/my/app_test.clj",
+    "test/my/test_runner.clj" => "../templates/test_runner.clj",
+);
+
+const BROWSER_CLJS: &[TemplateFile] = template!(
+    "browser-cljs",
+    ".gitignore",
+    "README.md",
+    "bun.lock",
+    "evalight.edn",
+    "package.json",
+    "shadow-cljs.edn",
+    "public/index.html",
+    "test/app/gallery_test.cljs",
+    // Use the same gallery, styles and UI sources as the website starter.
+    "src/app/core.cljs" => "../../src/evalight/templates/core.cljs",
+    "src/app/gallery.cljs" => "../../src/evalight/templates/gallery.cljs",
+    "public/style.css" => "../../src/evalight/templates/style.css",
+    "public/css/ui.css" => "../../public/css/ui.css",
+    "src/ui/api.cljs" => "../../src/ui/api.cljs",
+    "src/ui/breadcrumbs.cljs" => "../../src/ui/breadcrumbs.cljs",
+    "src/ui/button.cljs" => "../../src/ui/button.cljs",
+    "src/ui/checkbox.cljs" => "../../src/ui/checkbox.cljs",
+    "src/ui/command.cljs" => "../../src/ui/command.cljs",
+    "src/ui/core.cljs" => "../../src/ui/core.cljs",
+    "src/ui/dialog.cljs" => "../../src/ui/dialog.cljs",
+    "src/ui/disclosure.cljs" => "../../src/ui/disclosure.cljs",
+    "src/ui/dropdown.cljs" => "../../src/ui/dropdown.cljs",
+    "src/ui/field.cljs" => "../../src/ui/field.cljs",
+    "src/ui/input.cljs" => "../../src/ui/input.cljs",
+    "src/ui/popover.cljs" => "../../src/ui/popover.cljs",
+    "src/ui/select.cljs" => "../../src/ui/select.cljs",
+    "src/ui/split.cljs" => "../../src/ui/split.cljs",
+    "src/ui/switch.cljs" => "../../src/ui/switch.cljs",
+    "src/ui/tabs.cljs" => "../../src/ui/tabs.cljs",
+    "src/ui/toast.cljs" => "../../src/ui/toast.cljs",
+    "src/ui/tooltip.cljs" => "../../src/ui/tooltip.cljs",
+    "src/ui/tree.cljs" => "../../src/ui/tree.cljs",
 );
 
 #[derive(Clone, Copy)]
@@ -61,7 +116,7 @@ impl Backend {
     }
 }
 
-pub fn create(parent: &Path, name: &str, backend: Backend) -> Result<()> {
+pub fn create(parent: &Path, name: &str, gpui: bool, backend: Backend) -> Result<()> {
     ensure!(
         name.starts_with(|c: char| c.is_ascii_lowercase())
             && name
@@ -73,7 +128,13 @@ pub fn create(parent: &Path, name: &str, backend: Backend) -> Result<()> {
     );
     let root = parent.join(name);
     fs::create_dir(&root).with_context(|| format!("create {}", root.display()))?;
-    if let Err(error) = write_project(&root, name, backend) {
+    let template = match (gpui, backend) {
+        (false, Backend::Clj) => CLJ,
+        (false, Backend::Cljs) => BROWSER_CLJS,
+        (true, Backend::Clj) => GPUI_CLJ,
+        (true, Backend::Cljs) => GPUI_CLJS,
+    };
+    if let Err(error) = write_project(&root, name, template) {
         if let Err(cleanup) = fs::remove_dir_all(&root) {
             eprintln!("could not remove {}: {cleanup}", root.display());
         }
@@ -82,11 +143,7 @@ pub fn create(parent: &Path, name: &str, backend: Backend) -> Result<()> {
     Ok(())
 }
 
-fn write_project(root: &Path, name: &str, backend: Backend) -> Result<()> {
-    let template = match backend {
-        Backend::Clj => CLJ,
-        Backend::Cljs => CLJS,
-    };
+fn write_project(root: &Path, name: &str, template: &[TemplateFile]) -> Result<()> {
     let namespace_path = name.replace('-', "_");
     let source_path = format!("src/{namespace_path}/");
     let namespace_dir = format!("/{namespace_path}/");
@@ -114,16 +171,6 @@ fn write_project(root: &Path, name: &str, backend: Backend) -> Result<()> {
         }
     }
 
-    let main = match backend {
-        Backend::Clj => format!("{name}.app/app"),
-        Backend::Cljs => format!("{name}.app"),
-    };
-    fs::write(
-        root.join("evalight.edn"),
-        format!(
-            "{{:name \"{name}\"\n :main {main}\n :runtime :gpui\n :preview {{:kind :native}}}}\n"
-        ),
-    )?;
     fs::write(root.join("LICENSE"), include_bytes!("../../LICENSE"))?;
     Ok(())
 }
@@ -151,14 +198,15 @@ pub fn find_root(cwd: &Path) -> Result<PathBuf> {
 }
 
 pub fn run(root: &Path, action: Action) -> Result<()> {
-    ensure!(
-        root.join("gpui.edn").is_file(),
-        "this command expects a clj-gpui project with gpui.edn"
-    );
-    // The CLJS starter includes a shadow build and Bun scripts.
+    let gpui = root.join("gpui.edn").is_file();
+    if matches!(action, Action::Package) && !gpui {
+        bail!("evalight package requires a native clj-gpui project with gpui.edn");
+    }
+
     if root.join("shadow-cljs.edn").is_file() && root.join("package.json").is_file() {
         let script = match action {
-            Action::Run => "start",
+            Action::Run if gpui => "start",
+            Action::Run => "dev",
             Action::Test => "test",
             Action::Package => "package",
             _ => unreachable!(),
@@ -167,15 +215,24 @@ pub fn run(root: &Path, action: Action) -> Result<()> {
             .join("node_modules/shadow-cljs/cli/runner.js")
             .is_file()
         {
-            checked(root, "bun", &["install", "--frozen-lockfile"])?;
+            let mut args = vec!["install"];
+            if gpui || root.join("bun.lock").is_file() || root.join("bun.lockb").is_file() {
+                args.push("--frozen-lockfile");
+            }
+            checked(root, "bun", &args)?;
         }
-        if matches!(action, Action::Run) {
+        if gpui && matches!(action, Action::Run) {
             checked(root, "bun", &["run", "compile"])?;
         }
         exec(Command::new("bun").args(["run", script]).current_dir(root))
     } else {
+        ensure!(
+            gpui || root.join("deps.edn").is_file(),
+            "expected a deps.edn or a shadow-cljs project with package.json"
+        );
         let alias = match action {
-            Action::Run => "-M:dev",
+            Action::Run if gpui => "-M:dev",
+            Action::Run => "-M:run",
             Action::Test => "-M:test",
             Action::Package => "-X:build",
             _ => unreachable!(),
