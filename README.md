@@ -121,8 +121,8 @@ Evalight itself is also ClojureScript, so opening this repository in local mode 
 
 The CLI creates and runs Clojure, browser ClojureScript, and native clj-gpui
 projects directly from the terminal.
-Download the archive for your platform from the [CLI workflow](https://github.com/violetpurpleish/evalight/actions/workflows/cli.yml)
-artifacts. Extract it and put the `evalight` executable on your `PATH`.
+Download the archive for your platform from the [latest GitHub Release](https://github.com/violetpurpleish/evalight/releases/latest).
+Extract it and put the `evalight` executable on your `PATH`.
 Once the crate is published, `cargo install evalight` will install the same
 self-contained executable on macOS and Linux.
 
