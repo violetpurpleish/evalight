@@ -1,0 +1,68 @@
+name: CLI
+
+on:
+  push:
+    branches: [main]
+    paths: ['cli/**', 'src/**', 'public/**', 'scripts/**', '*.*', '.github/workflows/cli.yml']
+  pull_request:
+    paths: ['cli/**', 'src/**', 'public/**', 'scripts/**', '*.*', '.github/workflows/cli.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cli:
+    name: CLI on ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+          - os: macos-15
+            platform: macos-aarch64
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test the Rust CLI
+        run: |
+          cargo fmt --manifest-path cli/Cargo.toml --check
+          cargo clippy --locked --manifest-path cli/Cargo.toml --all-targets -- -D warnings
+          cargo test --locked --manifest-path cli/Cargo.toml
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Build and verify the CLI archive
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          bun install --frozen-lockfile
+          bun run embed
+          cargo build --locked --release --manifest-path cli/Cargo.toml
+          mkdir -p out/cli
+          cp cli/target/release/evalight LICENSE out/cli/
+          bun scripts/pack-workshop.mjs out/cli/evalight-workshop
+          bun cli/tests/workshop.mjs out/cli/evalight
+          tar -C out/cli -czf "out/evalight-${PLATFORM}.tar.gz" evalight evalight-workshop LICENSE
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evalight-${{ matrix.platform }}
+          path: out/evalight-${{ matrix.platform }}.tar.gz
+          if-no-files-found: error

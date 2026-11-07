@@ -119,6 +119,50 @@ Evalight itself is also ClojureScript, so opening this repository in local mode 
 
 ## JVM Clojure and native clj-gpui (experimental)
 
+### Evalight CLI
+
+The CLI creates and runs native clj-gpui projects directly from the terminal.
+Download the archive for your platform from the [CLI workflow](https://github.com/violetpurpleish/evalight/actions/workflows/cli.yml)
+artifacts. Extract it and keep the `evalight-workshop/` directory next to the
+`evalight` binary. Put that directory on your `PATH` or invoke the binary by
+its full path.
+
+```sh
+evalight new myproject --gpui --cljs
+cd myproject
+evalight dev
+```
+
+Omit `--cljs` for JVM Clojure. Run `evalight` with no arguments to choose a
+name and language interactively. GPUI is the project type supported by this
+version. The generated project pins clj-gpui and can be created offline.
+Running it for the first time may download its dependencies.
+
+| Command | What it does |
+| --- | --- |
+| `evalight run` | Launches the application using the starter's development entry point. |
+| `evalight dev` | Starts the local Evalight workshop and opens the browser. Pass `--no-open` to print the URL or `--attach` to join an existing nREPL session. |
+| `evalight test` | Runs the test entry point included in the generated project. |
+| `evalight package` | Builds a native package under `target/package/` using the clj-gpui packager. |
+
+Running and packaging require the starter's toolchain, including the Clojure
+CLI, a JDK, and the [native build prerequisites](https://github.com/violetpurpleish/clj-gpui#quick-start).
+`evalight dev` and the ClojureScript starter also require Bun.
+
+To build the CLI and workshop from this repository on macOS or Linux:
+
+```sh
+bun install --frozen-lockfile
+bun run embed
+cargo build --locked --release --manifest-path cli/Cargo.toml
+mkdir -p out/cli
+cp cli/target/release/evalight LICENSE out/cli/
+bun scripts/pack-workshop.mjs out/cli/evalight-workshop
+out/cli/evalight --help
+```
+
+### Local workshop integration
+
 Local mode can open a real Clojure directory. Detection lives in
 `src/evalight/embed/project.mjs`. clj-gpui apps can use JVM Clojure or
 ClojureScript on Bun, with a native-window snapshot preview. Other Clojure

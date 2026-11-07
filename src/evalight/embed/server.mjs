@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Evalight, running from inside a project.
+ * Evalight, running from an exported project or the CLI workshop bundle.
  *
  * Serves the workshop UI from ./public and the filesystem API over the
- * parent directory (the project). Skip the evalight/ folder in the tree
- * so the tool does not list itself.
+ * project directory. Exports use the parent directory, and the CLI passes
+ * the project path explicitly.
  *
  *   bun evalight/server.mjs
  *   bun evalight/server.mjs --attach
@@ -28,9 +28,7 @@ import { servePublicPath } from "./static.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const UI_ROOT = join(HERE, "public");
-const FS_ROOT = resolve(HERE, "..");
 const PORT = Number(process.env.PORT || 48721);
-const fsApi = createFsApi(FS_ROOT);
 
 async function packSelf() {
   const files = {};
@@ -57,13 +55,27 @@ const flags = (() => {
   }
 })();
 
+if (flags.positional.length > 1) {
+  console.error("Pass at most one project directory.");
+  process.exit(1);
+}
+const FS_ROOT = flags.positional.length ? resolve(flags.positional[0]) : resolve(HERE, "..");
+const fsApi = createFsApi(FS_ROOT);
+
+function shutdown() {
+  stopRuntime();
+  process.exit(0);
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
 await startRuntime(FS_ROOT, {
   attach: flags.attach,
   previewUrl: flags.previewUrl,
   nreplPort: flags.nreplPort,
 });
 
-Bun.serve({
+const options = {
   port: PORT,
   hostname: "127.0.0.1",
   async fetch(req) {
@@ -92,14 +104,26 @@ Bun.serve({
     if (served) return served;
     return new Response("Not found", { status: 404 });
   },
-});
+};
 
-console.log(`Evalight  http://127.0.0.1:${PORT}`);
+let server;
+try {
+  server = Bun.serve(options);
+} catch (error) {
+  stopRuntime();
+  throw error;
+}
+
+const url = server.url.href;
+console.log(`Evalight  ${url}`);
 console.log(`  project  ${FS_ROOT}`);
 
-function shutdown() {
-  stopRuntime();
-  process.exit(0);
+if (process.env.EVALIGHT_OPEN_BROWSER === "1") {
+  const opener = process.platform === "darwin" ? "open" : "xdg-open";
+  try {
+    const status = await Bun.spawn([opener, url], { stdout: "ignore", stderr: "ignore" }).exited;
+    if (status !== 0) throw new Error(`${opener} exited with status ${status}`);
+  } catch (error) {
+    console.error(`Could not open the browser (${error.message}). Open ${url} in your browser.`);
+  }
 }
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
