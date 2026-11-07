@@ -1,8 +1,9 @@
 mod project;
+mod workshop;
 
 use std::env;
 use std::io::{self, IsTerminal, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, ExitCode};
 
 use anyhow::{Context, Result, bail};
@@ -106,18 +107,7 @@ fn prompt(label: &str) -> Result<String> {
 }
 
 fn dev(root: &Path, attach: bool, no_open: bool) -> Result<()> {
-    let workshop = match env::var_os("EVALIGHT_WORKSHOP_DIR") {
-        Some(path) => PathBuf::from(path),
-        None => env::current_exe()?.with_file_name("evalight-workshop"),
-    };
-    let server = workshop.join("server.mjs");
-    if !server.is_file() || !workshop.join("public/js/main.js").is_file() {
-        bail!(
-            "workshop files missing in {}. Install the full CLI archive or set EVALIGHT_WORKSHOP_DIR to a built workshop",
-            workshop.display()
-        );
-    }
-    let server = server
+    let server = workshop::server_path()?
         .canonicalize()
         .context("resolve the workshop server")?;
     let mut command = Command::new("bun");

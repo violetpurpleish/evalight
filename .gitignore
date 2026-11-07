@@ -5,6 +5,7 @@ public/js/
 public/evalight-embed/
 evalight-ui/
 out/
+/target/
 .cpcache/
 .nrepl-port
 .cljs_node_repl

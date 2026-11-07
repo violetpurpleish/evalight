@@ -29,12 +29,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Test the Rust CLI
-        run: |
-          cargo fmt --manifest-path cli/Cargo.toml --check
-          cargo clippy --locked --manifest-path cli/Cargo.toml --all-targets -- -D warnings
-          cargo test --locked --manifest-path cli/Cargo.toml
-
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
@@ -48,18 +42,30 @@ jobs:
         with:
           bun-version-file: package.json
 
-      - name: Build and verify the CLI archive
+      - name: Prepare the embedded workshop
+        run: |
+          bun install --frozen-lockfile
+          bun scripts/pack-workshop.mjs --archive
+
+      - name: Test the Rust CLI
+        run: |
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+
+      - name: Install from the packaged crate and build the CLI archive
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
-          bun install --frozen-lockfile
-          bun run embed
-          cargo build --locked --release --manifest-path cli/Cargo.toml
+          cargo package --locked --allow-dirty
+          scratch=$(mktemp -d)
+          trap 'rm -rf "$scratch"' EXIT
+          tar -xzf target/package/evalight-*.crate -C "$scratch"
+          cargo install --locked --path "$scratch"/evalight-* --root "$scratch/install"
+          bun cli/tests/workshop.mjs "$scratch/install/bin/evalight"
           mkdir -p out/cli
-          cp cli/target/release/evalight LICENSE out/cli/
-          bun scripts/pack-workshop.mjs out/cli/evalight-workshop
-          bun cli/tests/workshop.mjs out/cli/evalight
-          tar -C out/cli -czf "out/evalight-${PLATFORM}.tar.gz" evalight evalight-workshop LICENSE
+          cp "$scratch/install/bin/evalight" LICENSE out/cli/
+          tar -C out/cli -czf "out/evalight-${PLATFORM}.tar.gz" evalight LICENSE
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

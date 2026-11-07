@@ -122,9 +122,9 @@ Evalight itself is also ClojureScript, so opening this repository in local mode 
 The CLI creates and runs Clojure, browser ClojureScript, and native clj-gpui
 projects directly from the terminal.
 Download the archive for your platform from the [CLI workflow](https://github.com/violetpurpleish/evalight/actions/workflows/cli.yml)
-artifacts. Extract it and keep the `evalight-workshop/` directory next to the
-`evalight` binary. Put that directory on your `PATH` or invoke the binary by
-its full path.
+artifacts. Extract it and put the `evalight` executable on your `PATH`.
+Once the crate is published, `cargo install evalight` will install the same
+self-contained executable on macOS and Linux.
 
 | Command | Starter |
 | --- | --- |
@@ -150,17 +150,24 @@ All starters use a JDK. JVM Clojure and native GPUI require the Clojure CLI.
 `evalight dev` and both ClojureScript starters use Bun. Native GPUI also needs
 the [native build prerequisites](https://github.com/violetpurpleish/clj-gpui#quick-start).
 
+`evalight dev` extracts its embedded workshop on first use and reuses it on
+subsequent runs. The cache is under `$XDG_CACHE_HOME/evalight` when set to an absolute path, or
+`~/Library/Caches/evalight` on macOS and `~/.cache/evalight` on Linux.
+Set `EVALIGHT_WORKSHOP_DIR` to use a different workshop for development.
+
 To build the CLI and workshop from this repository on macOS or Linux:
 
 ```sh
 bun install --frozen-lockfile
-bun run embed
-cargo build --locked --release --manifest-path cli/Cargo.toml
-mkdir -p out/cli
-cp cli/target/release/evalight LICENSE out/cli/
-bun scripts/pack-workshop.mjs out/cli/evalight-workshop
-out/cli/evalight --help
+bun scripts/pack-workshop.mjs --archive
+cargo build --locked --release
+target/release/evalight --help
 ```
+
+To prepare the crate for publication, build the workshop as above, then run
+`cargo package --locked --allow-dirty` to verify the standalone source archive.
+Cargo requires `--allow-dirty` because the generated workshop archive is included
+in the crate. Installing the packaged crate requires only the Rust toolchain.
 
 ## JVM Clojure and native clj-gpui (experimental)
 

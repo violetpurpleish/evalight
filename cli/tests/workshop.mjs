@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 
@@ -9,9 +9,14 @@ const scratch = await mkdtemp(join(tmpdir(), "evalight-workshop-"));
 const project = join(scratch, "project with spaces");
 const opener = process.platform === "darwin" ? "open" : "xdg-open";
 const opened = join(scratch, "opened");
+const cache = join(scratch, "cache");
 let child;
 let exited;
 try {
+  const created = Bun.spawnSync([binary, "new", "installed-demo"], { cwd: scratch });
+  assert.equal(created.exitCode, 0, created.stderr.toString());
+  assert.ok(await Bun.file(join(scratch, "installed-demo/src/installed_demo/app.clj")).exists());
+
   await mkdir(join(project, "src"), { recursive: true });
   // Detect the workshop as the project type, so this smoke test needs no app runtime.
   await writeFile(join(project, "shadow-cljs.edn"), "{:builds {:workshop {}}}");
@@ -20,7 +25,14 @@ try {
 
   child = spawn(binary, ["dev"], {
     cwd: join(project, "src"),
-    env: { ...process.env, PATH: scratch + delimiter + process.env.PATH, PORT: "0", OPENED: opened },
+    env: {
+      ...process.env,
+      PATH: scratch + delimiter + process.env.PATH,
+      PORT: "0",
+      OPENED: opened,
+      EVALIGHT_WORKSHOP_DIR: undefined,
+      XDG_CACHE_HOME: cache,
+    },
     stdio: ["ignore", "pipe", "inherit"],
   });
   exited = new Promise((done) => child.once("close", done));
@@ -51,6 +63,9 @@ try {
   assert.equal(source.status, 200);
   assert.equal((await source.json()).content, "(ns demo)\n");
   assert.equal((await fetch(url + "js/main.js")).status, 200);
+  const entries = await readdir(join(cache, "evalight"));
+  assert.equal(entries.length, 1);
+  assert.match(entries[0], /^workshop-[a-f0-9]{64}$/);
   for (let tries = 0; tries < 100; tries++) {
     if (await Bun.file(opened).exists()) break;
     await Bun.sleep(20);
