@@ -283,20 +283,14 @@ try {
     for (const part of ['evalight','projects','lamp','src']) dir = await dir.getDirectoryHandle(part);
     return (await (await (await (await dir.getDirectoryHandle('ui')).getFileHandle('api.cljs')).getFile()).text()).includes('[ui.tree');
   };
-  await page.waitForFunction(async () => {
-    let dir = await navigator.storage.getDirectory();
-    for (const part of ['evalight','projects','lamp','src']) dir = await dir.getDirectoryHandle(part);
-    return !(await (await (await (await dir.getDirectoryHandle('ui')).getFileHandle('api.cljs')).getFile()).text()).includes('[ui.tree');
-  });
+  // These toasts appear after the facade write finishes. An OPFS File snapshot
+  // can become unreadable if the app replaces api.cljs while the test reads it.
+  await page.waitForFunction(() => document.querySelector('.toast')?.textContent === 'Deleted src/ui/tree.cljs');
   assert.equal(await page.evaluate(facadeHasTree), false);
   await page.click('.add-ui-btn');
   await page.waitForSelector('.kit-list');
   await page.$$eval('.kit-list li', rows => rows.find(row => row.querySelector('.kit-title')?.textContent === 'Tree').querySelector('button').click());
-  await page.waitForFunction(async () => {
-    let dir = await navigator.storage.getDirectory();
-    for (const part of ['evalight','projects','lamp','src']) dir = await dir.getDirectoryHandle(part);
-    return (await (await (await (await dir.getDirectoryHandle('ui')).getFileHandle('api.cljs')).getFile()).text()).includes('[ui.tree');
-  });
+  await page.waitForFunction(() => document.querySelector('.toast')?.textContent === 'Added Tree');
   assert.equal(await page.evaluate(facadeHasTree), true);
 
   assert.deepEqual(errors, []);
